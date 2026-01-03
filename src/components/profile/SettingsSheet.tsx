@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,9 @@ import {
   LogOut,
   ChevronRight,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Sparkles,
+  Bell
 } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +42,21 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [fullScreenMatch, setFullScreenMatch] = useState(true);
+
+  // Load full screen match preference
+  useEffect(() => {
+    const saved = localStorage.getItem('frinder_fullScreenMatch');
+    if (saved !== null) {
+      setFullScreenMatch(JSON.parse(saved));
+    }
+  }, []);
+
+  const toggleFullScreenMatch = () => {
+    const newValue = !fullScreenMatch;
+    setFullScreenMatch(newValue);
+    localStorage.setItem('frinder_fullScreenMatch', JSON.stringify(newValue));
+  };
 
   const handleLogout = async () => {
     try {
@@ -91,9 +108,9 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
               <div className="flex items-center gap-3">
                 {darkMode ? (
-                  <Moon className="w-5 h-5 text-[#ed8c00]" />
+                  <Moon className="w-5 h-5 text-frinder-orange" />
                 ) : (
-                  <Sun className="w-5 h-5 text-[#ed8c00]" />
+                  <Sun className="w-5 h-5 text-frinder-orange" />
                 )}
                 <div>
                   <Label className="text-sm font-medium dark:text-white">Dark Mode</Label>
@@ -105,7 +122,33 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               <Switch 
                 checked={darkMode} 
                 onCheckedChange={toggleDarkMode}
-                className="data-[state=checked]:bg-[#ed8c00]"
+                className="data-[state=checked]:bg-frinder-orange"
+              />
+            </div>
+          </div>
+
+          <Separator className="dark:bg-gray-800" />
+
+          {/* Match Notifications */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Match Notifications
+            </h3>
+            
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-5 h-5 text-frinder-orange" />
+                <div>
+                  <Label className="text-sm font-medium dark:text-white">Full Screen Match Popup</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {fullScreenMatch ? 'Celebrate matches with full screen animation' : 'Show matches as toast notifications'}
+                  </p>
+                </div>
+              </div>
+              <Switch 
+                checked={fullScreenMatch} 
+                onCheckedChange={toggleFullScreenMatch}
+                className="data-[state=checked]:bg-frinder-orange"
               />
             </div>
           </div>
@@ -120,7 +163,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             
             <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <div className="flex items-center gap-3">
-                <Globe className="w-5 h-5 text-[#ed8c00]" />
+                <Globe className="w-5 h-5 text-frinder-orange" />
                 <div className="text-left">
                   <p className="text-sm font-medium dark:text-white">Language</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">English (US)</p>

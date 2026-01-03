@@ -250,7 +250,13 @@ export function subscribeToUnreadCount(userId: string, callback: (count: number)
 }
 
 // Send a message
-export async function sendMessage(matchId: string, senderId: string, text: string, imageUrl?: string): Promise<string> {
+export async function sendMessage(
+  matchId: string, 
+  senderId: string, 
+  text: string, 
+  imageUrl?: string,
+  replyTo?: { id: string; text: string; senderId: string }
+): Promise<string> {
   try {
     const messagesRef = collection(db, 'matches', matchId, 'messages');
     const messageDoc = doc(messagesRef);
@@ -262,6 +268,7 @@ export async function sendMessage(matchId: string, senderId: string, text: strin
       read: boolean;
       imageUrl?: string;
       type: 'text' | 'image';
+      replyTo?: { id: string; text: string; senderId: string };
     } = {
       senderId,
       text,
@@ -272,6 +279,10 @@ export async function sendMessage(matchId: string, senderId: string, text: strin
 
     if (imageUrl) {
       messageData.imageUrl = imageUrl;
+    }
+
+    if (replyTo) {
+      messageData.replyTo = replyTo;
     }
 
     await setDoc(messageDoc, messageData);
@@ -525,3 +536,171 @@ export async function checkSwipeStatus(fromUserId: string, toUserId: string): Pr
     return 'none';
   }
 }
+
+// Voice Call Types
+export interface CallData {
+  id: string;
+  callerId: string;
+  callerName: string;
+  callerPhoto: string;
+  receiverId: string;
+  receiverName: string;
+  receiverPhoto: string;
+  matchId: string;
+  status: 'ringing' | 'ongoing' | 'ended' | 'missed' | 'declined';
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  createdAt: Timestamp;
+  endedAt?: Timestamp;
+}
+
+export interface IceCandidate {
+  id: string;
+  candidate: RTCIceCandidateInit;
+  fromUserId: string;
+  timestamp: Timestamp;
+}
+
+// Create a new voice call
+export async function createCall(
+  callerId: string,
+  callerName: string,
+  callerPhoto: string,
+  receiverId: string,
+  receiverName: string,
+  receiverPhoto: string,
+  matchId: string,
+  offer: RTCSessionDescriptionInit
+): Promise<string> {
+  try {
+    const callRef = doc(collection(db, 'calls'));
+    const callData: Omit<CallData, 'id'> = {
+      callerId,
+      callerName,
+      callerPhoto,
+      receiverId,
+      receiverName,
+      receiverPhoto,
+      matchId,
+      status: 'ringing',
+      offer,
+      createdAt: serverTimestamp() as Timestamp
+    };
+    await setDoc(callRef, callData);
+    return callRef.id;
+  } catch (error) {
+    console.error('Error creating call:', error);
+    throw error;
+  }
+}
+
+// Answer a call
+export async function answerCall(callId: string, answer: RTCSessionDescriptionInit): Promise<void> {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    await updateDoc(callRef, {
+      answer,
+      status: 'ongoing'
+    });
+  } catch (error) {
+    console.error('Error answering call:', error);
+    throw error;
+  }
+}
+
+// End a call
+export async function endCall(callId: string, status: 'ended' | 'missed' | 'declined' = 'ended'): Promise<void> {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    await updateDoc(callRef, {
+      status,
+      endedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error ending call:', error);
+    throw error;
+  }
+}
+
+// Add ICE candidate
+export async function addIceCandidate(
+  callId: string,
+  candidate: RTCIceCandidateInit,
+  fromUserId: string
+): Promise<void> {
+  try {
+    const candidateRef = doc(collection(db, 'calls', callId, 'iceCandidates'));
+    await setDoc(candidateRef, {
+      candidate,
+      fromUserId,
+      timestamp: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error adding ICE candidate:', error);
+    throw error;
+  }
+}
+
+// Subscribe to call state
+export function subscribeToCall(
+  callId: string,
+  callback: (call: CallData | null) => void
+): () => void {
+  const callRef = doc(db, 'calls', callId);
+  return onSnapshot(callRef, (snapshot) => {
+    if (snapshot.exists()) {
+      callback({ id: snapshot.id, ...snapshot.data() } as CallData);
+    } else {
+      callback(null);
+    }
+  });
+}
+
+// Subscribe to ICE candidates
+export function subscribeToIceCandidates(
+  callId: string,
+  excludeUserId: string,
+  callback: (candidate: IceCandidate) => void
+): () => void {
+  const candidatesRef = collection(db, 'calls', callId, 'iceCandidates');
+  const q = query(candidatesRef, orderBy('timestamp'));
+  
+  return onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'added') {
+        const data = change.doc.data();
+        if (data.fromUserId !== excludeUserId) {
+          callback({
+            id: change.doc.id,
+            ...data
+          } as IceCandidate);
+        }
+      }
+    });
+  });
+}
+
+// Subscribe to incoming calls for a user
+export function subscribeToIncomingCalls(
+  userId: string,
+  callback: (call: CallData | null) => void
+): () => void {
+  const callsRef = collection(db, 'calls');
+  const q = query(
+    callsRef,
+    where('receiverId', '==', userId),
+    where('status', '==', 'ringing'),
+    orderBy('createdAt', 'desc'),
+    limit(1)
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      callback({ id: doc.id, ...doc.data() } as CallData);
+    } else {
+      callback(null);
+    }
+  });
+}
+

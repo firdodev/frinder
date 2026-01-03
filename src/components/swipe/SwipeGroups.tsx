@@ -30,6 +30,85 @@ interface Group {
   location?: string;
 }
 
+// Mock data for development
+const MOCK_GROUPS: Group[] = [
+  {
+    id: 'mock-group-1',
+    name: 'Weekend Hikers',
+    description: 'A group for outdoor enthusiasts who love exploring trails and mountains every weekend. All skill levels welcome!',
+    photo: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800',
+    members: [
+      { id: 'm1', name: 'Alex', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200' },
+      { id: 'm2', name: 'Jordan', photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200' },
+      { id: 'm3', name: 'Sam', photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200' },
+    ],
+    interests: ['Hiking', 'Nature', 'Fitness', 'Photography'],
+    activity: 'Every Saturday morning',
+    location: 'Mountain trails nearby'
+  },
+  {
+    id: 'mock-group-2',
+    name: 'Coffee & Code',
+    description: 'Tech professionals and hobbyists meeting up to code, share knowledge, and enjoy good coffee together.',
+    photo: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800',
+    members: [
+      { id: 'm4', name: 'Taylor', photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200' },
+      { id: 'm5', name: 'Chris', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200' },
+      { id: 'm6', name: 'Pat', photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200' },
+      { id: 'm7', name: 'Morgan', photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200' },
+    ],
+    interests: ['Coding', 'Tech', 'Coffee', 'Networking', 'Startups'],
+    activity: 'Wednesdays 6 PM',
+    location: 'Local coffee shops'
+  },
+  {
+    id: 'mock-group-3',
+    name: 'Foodies Unite',
+    description: 'Exploring the best restaurants, hidden gems, and food trucks in the city. From street food to fine dining!',
+    photo: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800',
+    members: [
+      { id: 'm8', name: 'Jamie', photo: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=200' },
+      { id: 'm9', name: 'Casey', photo: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200' },
+    ],
+    interests: ['Food', 'Cooking', 'Wine', 'Travel', 'Photography'],
+    activity: 'Bi-weekly dinners',
+    location: 'Various restaurants'
+  },
+  {
+    id: 'mock-group-4',
+    name: 'Yoga & Mindfulness',
+    description: 'A peaceful community focused on yoga practice, meditation, and overall wellness. Beginners welcome!',
+    photo: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800',
+    members: [
+      { id: 'm10', name: 'River', photo: 'https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?w=200' },
+      { id: 'm11', name: 'Sky', photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200' },
+      { id: 'm12', name: 'Luna', photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200' },
+    ],
+    interests: ['Yoga', 'Wellness', 'Meditation', 'Fitness', 'Nature'],
+    activity: 'Daily morning sessions',
+    location: 'Park & Studio'
+  },
+  {
+    id: 'mock-group-5',
+    name: 'Board Game Nights',
+    description: 'Weekly board game sessions for strategy lovers, casual players, and everyone in between. Bring your favorites!',
+    photo: 'https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=800',
+    members: [
+      { id: 'm13', name: 'Drew', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200' },
+      { id: 'm14', name: 'Quinn', photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200' },
+      { id: 'm15', name: 'Blake', photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200' },
+      { id: 'm16', name: 'Avery', photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200' },
+      { id: 'm17', name: 'Riley', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200' },
+    ],
+    interests: ['Gaming', 'Social', 'Strategy', 'Fun', 'Networking'],
+    activity: 'Friday nights',
+    location: 'Member homes (rotating)'
+  },
+];
+
+// Check if running in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 interface SwipeGroupCardProps {
   group: Group;
   onSwipe: (direction: 'left' | 'right' | 'up') => void;
@@ -206,9 +285,19 @@ export default function SwipeGroups() {
     }
   };
 
-  // Load groups from Firebase
+  // Load groups from Firebase (or mock data in development)
   useEffect(() => {
     async function loadGroups() {
+      // In development, use mock data for testing
+      if (isDevelopment) {
+        setLoading(true);
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setGroups(MOCK_GROUPS);
+        setLoading(false);
+        return;
+      }
+
       if (!user?.uid) return;
 
       try {
@@ -248,11 +337,19 @@ export default function SwipeGroups() {
 
   const handleSwipe = useCallback(
     async (direction: 'left' | 'right' | 'up') => {
-      if (!user?.uid || groups.length === 0) return;
+      if (groups.length === 0) return;
 
       const currentGroup = groups[0];
       setLastAction({ group: currentGroup, direction });
       setGroups(prev => prev.slice(1));
+
+      // In development, skip Firebase operations
+      if (isDevelopment) {
+        console.log(`[DEV] Swiped ${direction} on group: ${currentGroup.name}`);
+        return;
+      }
+
+      if (!user?.uid) return;
 
       if (direction === 'right' || direction === 'up') {
         try {
@@ -279,6 +376,24 @@ export default function SwipeGroups() {
   };
 
   const handleCreateGroup = async () => {
+    // In development, simulate group creation
+    if (isDevelopment) {
+      const mockNewGroup: Group = {
+        id: `mock-new-${Date.now()}`,
+        name: newGroup.name,
+        description: newGroup.description,
+        photo: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800',
+        members: [{ id: 'current-user', name: 'You', photo: '/placeholder-avatar.png' }],
+        interests: newGroup.interests,
+        activity: newGroup.activity,
+        location: newGroup.location
+      };
+      setGroups(prev => [mockNewGroup, ...prev]);
+      setShowCreateDialog(false);
+      setNewGroup({ name: '', description: '', interests: [], activity: '', location: '' });
+      return;
+    }
+
     if (!user?.uid || !userProfile) return;
 
     try {

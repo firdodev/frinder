@@ -12,7 +12,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, writeBatch, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, listAll, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
 
@@ -53,6 +53,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Update user presence when online/offline
+  const updatePresence = async (userId: string, isOnline: boolean) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        isOnline,
+        lastSeen: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error updating presence:', error);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async user => {
       setUser(user);
@@ -61,6 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileDoc.exists()) {
           setUserProfile(profileDoc.data() as UserProfile);
         }
+        // Set user as online
+        await updatePresence(user.uid, true);
       } else {
         setUserProfile(null);
       }
@@ -69,6 +83,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => unsubscribe();
   }, []);
+
+  // Handle visibility change and beforeunload for presence
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updatePresence(user.uid, true);
+      } else {
+        updatePresence(user.uid, false);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable offline status on page close
+      const data = JSON.stringify({ isOnline: false });
+      navigator.sendBeacon?.(`/api/presence?userId=${user.uid}`, data);
+      // Fallback: direct update (may not always complete)
+      updatePresence(user.uid, false);
+    };
+
+    // Set online when window gains focus
+    const handleFocus = () => {
+      updatePresence(user.uid, true);
+    };
+
+    // Set offline when window loses focus (optional - can be too aggressive)
+    // const handleBlur = () => {
+    //   updatePresence(user.uid, false);
+    // };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('focus', handleFocus);
+
+    // Set online immediately
+    updatePresence(user.uid, true);
+
+    // Heartbeat to keep online status fresh (every 30 seconds)
+    const heartbeatInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        updatePresence(user.uid, true);
+      }
+    }, 30000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(heartbeatInterval);
+      // Set offline when component unmounts
+      updatePresence(user.uid, false);
+    };
+  }, [user]);
 
   const validateEmail = (email: string): boolean => {
     return email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN);
@@ -111,6 +179,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user) {
+      // Set offline before signing out
+      await updatePresence(user.uid, false);
+    }
     await firebaseSignOut(auth);
     setUserProfile(null);
   };
