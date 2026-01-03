@@ -25,7 +25,8 @@ import {
   searchUsers,
   sendMatchRequest,
   checkIfMatched,
-  checkSwipeStatus
+  checkSwipeStatus,
+  cancelPendingRequest
 } from '@/lib/firebaseServices';
 import { toast } from 'sonner';
 
@@ -55,6 +56,7 @@ export default function Search({ onStartChat }: SearchProps) {
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<SearchResult | null>(null);
   const [sendingRequest, setSendingRequest] = useState<string | null>(null);
+  const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   const performSearch = useCallback(async (query: string) => {
@@ -162,6 +164,29 @@ export default function Search({ onStartChat }: SearchProps) {
     }
   };
 
+  const handleCancelRequest = async (targetUser: SearchResult) => {
+    if (!user?.uid) return;
+
+    setCancelingRequest(targetUser.id);
+    try {
+      await cancelPendingRequest(user.uid, targetUser.id);
+      toast.success('Request cancelled');
+      // Update swipe status back to none
+      setResults(prev => prev.map(r => 
+        r.id === targetUser.id 
+          ? { ...r, swipeStatus: 'none' as const }
+          : r
+      ));
+      if (selectedUser?.id === targetUser.id) {
+        setSelectedUser(prev => prev ? { ...prev, swipeStatus: 'none' } : null);
+      }
+    } catch (error) {
+      toast.error('Failed to cancel request');
+    } finally {
+      setCancelingRequest(null);
+    }
+  };
+
   const getActionButton = (result: SearchResult) => {
     if (result.isMatched) {
       return (
@@ -183,9 +208,24 @@ export default function Search({ onStartChat }: SearchProps) {
 
     if (result.swipeStatus === 'right' || result.swipeStatus === 'superlike') {
       return (
-        <Button size='sm' variant='outline' disabled className='text-green-500 border-green-500'>
-          <Check className='w-4 h-4 mr-1' />
-          Sent
+        <Button 
+          size='sm' 
+          variant='outline' 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCancelRequest(result);
+          }}
+          disabled={cancelingRequest === result.id}
+          className='text-red-500 border-red-300 hover:bg-red-50 dark:hover:bg-red-950'
+        >
+          {cancelingRequest === result.id ? (
+            <Loader2 className='w-4 h-4 animate-spin' />
+          ) : (
+            <>
+              <X className='w-4 h-4 mr-1' />
+              Cancel
+            </>
+          )}
         </Button>
       );
     }
@@ -288,9 +328,20 @@ export default function Search({ onStartChat }: SearchProps) {
                       Message
                     </Button>
                   ) : selectedUser.swipeStatus === 'right' || selectedUser.swipeStatus === 'superlike' ? (
-                    <Button variant='outline' disabled className='flex-1 h-12 text-green-500 border-green-500'>
-                      <Check className='w-5 h-5 mr-2' />
-                      Request Sent
+                    <Button 
+                      variant='outline' 
+                      onClick={() => handleCancelRequest(selectedUser)}
+                      disabled={cancelingRequest === selectedUser.id}
+                      className='flex-1 h-12 text-red-500 border-red-300 hover:bg-red-50 dark:hover:bg-red-950'
+                    >
+                      {cancelingRequest === selectedUser.id ? (
+                        <Loader2 className='w-5 h-5 animate-spin' />
+                      ) : (
+                        <>
+                          <X className='w-5 h-5 mr-2' />
+                          Cancel Request
+                        </>
+                      )}
                     </Button>
                   ) : (
                     <>

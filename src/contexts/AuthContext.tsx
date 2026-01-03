@@ -15,6 +15,7 @@ import {
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, writeBatch, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, listAll, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
+import { updateUserProfileInMatches } from '@/lib/firebaseServices';
 
 export interface UserProfile {
   uid: string;
@@ -193,6 +194,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const updatedProfile = { ...userProfile, ...data } as UserProfile;
     await setDoc(doc(db, 'users', user.uid), updatedProfile);
     setUserProfile(updatedProfile);
+    
+    // Update profile in all matches (async, non-blocking)
+    updateUserProfileInMatches(user.uid, data).catch(console.error);
   };
 
   const deleteAccount = async (password: string) => {

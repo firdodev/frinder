@@ -215,11 +215,32 @@ export function subscribeToMatches(userId: string, callback: (matches: Match[]) 
   const matchesQuery = query(matchesRef, where('users', 'array-contains', userId), orderBy('createdAt', 'desc'));
 
   return onSnapshot(matchesQuery, snapshot => {
-    const matches = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Match[];
+    const matches = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(match => !(match as any).unmatched) as Match[]; // Filter out unmatched
     callback(matches);
+  });
+}
+
+// Subscribe to unmatched conversations (for showing old messages with disabled chat)
+export function subscribeToUnmatchedConversations(
+  userId: string, 
+  callback: (matches: (Match & { unmatched: boolean; unmatchedAt?: Timestamp })[]
+) => void): () => void {
+  const matchesRef = collection(db, 'matches');
+  const matchesQuery = query(matchesRef, where('users', 'array-contains', userId), orderBy('createdAt', 'desc'));
+
+  return onSnapshot(matchesQuery, snapshot => {
+    const unmatchedMatches = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(match => (match as any).unmatched === true && (match as any).lastMessage) as (Match & { unmatched: boolean; unmatchedAt?: Timestamp })[];
+    callback(unmatchedMatches);
   });
 }
 
@@ -404,6 +425,31 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   }
 }
 
+// Update user profile in all matches
+export async function updateUserProfileInMatches(userId: string, profileData: Partial<UserProfile>): Promise<void> {
+  try {
+    // Get all matches for this user
+    const matchesRef = collection(db, 'matches');
+    const matchesQuery = query(matchesRef, where('users', 'array-contains', userId));
+    const matchesSnapshot = await getDocs(matchesQuery);
+    
+    // Update user profile in each match
+    const updatePromises = matchesSnapshot.docs.map(async (matchDoc) => {
+      const matchData = matchDoc.data();
+      const currentUserProfile = matchData.userProfiles?.[userId] || {};
+      
+      await updateDoc(doc(db, 'matches', matchDoc.id), {
+        [`userProfiles.${userId}`]: { ...currentUserProfile, ...profileData }
+      });
+    });
+    
+    await Promise.all(updatePromises);
+  } catch (error) {
+    console.error('Error updating user profile in matches:', error);
+    // Don't throw - this is a non-critical operation
+  }
+}
+
 // Update user online status
 export async function updateUserPresence(userId: string, isOnline: boolean): Promise<void> {
   try {
@@ -433,14 +479,31 @@ export function subscribeToUserPresence(userId: string, callback: (isOnline: boo
 // Unmatch/unfriend a user
 export async function unmatchUser(matchId: string): Promise<void> {
   try {
-    // Delete all messages in the match
-    const messagesRef = collection(db, 'matches', matchId, 'messages');
-    const messagesSnapshot = await getDocs(messagesRef);
-    const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
-    await Promise.all(deletePromises);
+    // Get the match document to retrieve user IDs
+    const matchDoc = await getDoc(doc(db, 'matches', matchId));
     
-    // Delete the match document
-    await deleteDoc(doc(db, 'matches', matchId));
+    if (matchDoc.exists()) {
+      const matchData = matchDoc.data();
+      const users = matchData.users as string[];
+      
+      if (users && users.length === 2) {
+        // Delete swipe records in both directions
+        const swipeId1 = `${users[0]}_${users[1]}`;
+        const swipeId2 = `${users[1]}_${users[0]}`;
+        
+        await Promise.all([
+          deleteDoc(doc(db, 'swipes', swipeId1)).catch(() => {}), // Ignore if doesn't exist
+          deleteDoc(doc(db, 'swipes', swipeId2)).catch(() => {})  // Ignore if doesn't exist
+        ]);
+      }
+      
+      // Mark the match as unmatched instead of deleting
+      // This preserves chat history but prevents new messages
+      await updateDoc(doc(db, 'matches', matchId), {
+        unmatched: true,
+        unmatchedAt: serverTimestamp()
+      });
+    }
   } catch (error) {
     console.error('Error unmatching user:', error);
     throw error;
@@ -512,6 +575,11 @@ export async function checkIfMatched(userId1: string, userId2: string): Promise<
     const matchDoc = await getDoc(doc(db, 'matches', matchId));
     
     if (matchDoc.exists()) {
+      const data = matchDoc.data();
+      // Check if match was unmatched
+      if (data.unmatched) {
+        return { isMatched: false };
+      }
       return { isMatched: true, matchId };
     }
     return { isMatched: false };
@@ -534,6 +602,242 @@ export async function checkSwipeStatus(fromUserId: string, toUserId: string): Pr
   } catch (error) {
     console.error('Error checking swipe status:', error);
     return 'none';
+  }
+}
+
+// Get pending match requests (people you swiped right on but haven't matched)
+export async function getPendingRequests(userId: string): Promise<(UserProfile & { swipedAt: Date })[]> {
+  try {
+    // Get all right swipes from this user
+    const swipesRef = collection(db, 'swipes');
+    const swipesQuery = query(
+      swipesRef,
+      where('fromUserId', '==', userId),
+      where('direction', 'in', ['right', 'superlike'])
+    );
+    const swipesSnapshot = await getDocs(swipesQuery);
+    
+    const pendingRequests: (UserProfile & { swipedAt: Date })[] = [];
+    
+    for (const swipeDoc of swipesSnapshot.docs) {
+      const swipeData = swipeDoc.data();
+      const targetUserId = swipeData.toUserId;
+      
+      // Check if there's already a match (excluding unmatched)
+      const matchId = [userId, targetUserId].sort().join('_');
+      const matchDoc = await getDoc(doc(db, 'matches', matchId));
+      
+      if (matchDoc.exists() && !matchDoc.data().unmatched) {
+        // Already matched, skip
+        continue;
+      }
+      
+      // Get the target user's profile
+      const userDoc = await getDoc(doc(db, 'users', targetUserId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserProfile;
+        pendingRequests.push({
+          ...userData,
+          swipedAt: swipeData.timestamp?.toDate() || new Date()
+        });
+      }
+    }
+    
+    // Sort by most recent
+    pendingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
+    
+    return pendingRequests;
+  } catch (error) {
+    console.error('Error getting pending requests:', error);
+    return [];
+  }
+}
+
+// Subscribe to pending requests in real-time
+export function subscribeToPendingRequests(
+  userId: string,
+  callback: (requests: (UserProfile & { swipedAt: Date })[]) => void
+): () => void {
+  const swipesRef = collection(db, 'swipes');
+  const swipesQuery = query(
+    swipesRef,
+    where('fromUserId', '==', userId),
+    where('direction', 'in', ['right', 'superlike'])
+  );
+  
+  return onSnapshot(swipesQuery, async (snapshot) => {
+    const pendingRequests: (UserProfile & { swipedAt: Date })[] = [];
+    
+    for (const swipeDoc of snapshot.docs) {
+      const swipeData = swipeDoc.data();
+      const targetUserId = swipeData.toUserId;
+      
+      // Check if there's already a match (excluding unmatched)
+      const matchId = [userId, targetUserId].sort().join('_');
+      const matchDoc = await getDoc(doc(db, 'matches', matchId));
+      
+      if (matchDoc.exists() && !matchDoc.data().unmatched) {
+        continue;
+      }
+      
+      // Get the target user's profile
+      const userDoc = await getDoc(doc(db, 'users', targetUserId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserProfile;
+        pendingRequests.push({
+          ...userData,
+          swipedAt: swipeData.timestamp?.toDate() || new Date()
+        });
+      }
+    }
+    
+    pendingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
+    callback(pendingRequests);
+  });
+}
+
+// Cancel/remove a pending match request
+export async function cancelPendingRequest(fromUserId: string, toUserId: string): Promise<void> {
+  try {
+    const swipeId = `${fromUserId}_${toUserId}`;
+    await deleteDoc(doc(db, 'swipes', swipeId));
+  } catch (error) {
+    console.error('Error canceling pending request:', error);
+    throw error;
+  }
+}
+
+// Get incoming match requests (people who liked you but you haven't responded)
+export async function getIncomingRequests(userId: string): Promise<(UserProfile & { swipedAt: Date })[]> {
+  try {
+    // Get all right swipes TO this user
+    const swipesRef = collection(db, 'swipes');
+    const swipesQuery = query(
+      swipesRef,
+      where('toUserId', '==', userId),
+      where('direction', 'in', ['right', 'superlike'])
+    );
+    const swipesSnapshot = await getDocs(swipesQuery);
+    
+    const incomingRequests: (UserProfile & { swipedAt: Date })[] = [];
+    
+    for (const swipeDoc of swipesSnapshot.docs) {
+      const swipeData = swipeDoc.data();
+      const fromUserId = swipeData.fromUserId;
+      
+      // Check if there's already a match (excluding unmatched)
+      const matchId = [userId, fromUserId].sort().join('_');
+      const matchDoc = await getDoc(doc(db, 'matches', matchId));
+      
+      if (matchDoc.exists() && !matchDoc.data().unmatched) {
+        // Already matched, skip
+        continue;
+      }
+      
+      // Check if current user already swiped on this person
+      const reverseSwipeId = `${userId}_${fromUserId}`;
+      const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
+      if (reverseSwipeDoc.exists()) {
+        // Already responded, skip
+        continue;
+      }
+      
+      // Get the from user's profile
+      const userDoc = await getDoc(doc(db, 'users', fromUserId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserProfile;
+        incomingRequests.push({
+          ...userData,
+          swipedAt: swipeData.timestamp?.toDate() || new Date()
+        });
+      }
+    }
+    
+    // Sort by most recent
+    incomingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
+    
+    return incomingRequests;
+  } catch (error) {
+    console.error('Error getting incoming requests:', error);
+    return [];
+  }
+}
+
+// Subscribe to incoming requests in real-time
+export function subscribeToIncomingRequests(
+  userId: string,
+  callback: (requests: (UserProfile & { swipedAt: Date })[]) => void
+): () => void {
+  const swipesRef = collection(db, 'swipes');
+  const swipesQuery = query(
+    swipesRef,
+    where('toUserId', '==', userId),
+    where('direction', 'in', ['right', 'superlike'])
+  );
+  
+  return onSnapshot(swipesQuery, async (snapshot) => {
+    const incomingRequests: (UserProfile & { swipedAt: Date })[] = [];
+    
+    for (const swipeDoc of snapshot.docs) {
+      const swipeData = swipeDoc.data();
+      const fromUserId = swipeData.fromUserId;
+      
+      // Check if there's already a match (excluding unmatched)
+      const matchId = [userId, fromUserId].sort().join('_');
+      const matchDoc = await getDoc(doc(db, 'matches', matchId));
+      
+      if (matchDoc.exists() && !matchDoc.data().unmatched) {
+        continue;
+      }
+      
+      // Check if current user already swiped on this person
+      const reverseSwipeId = `${userId}_${fromUserId}`;
+      const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
+      if (reverseSwipeDoc.exists()) {
+        continue;
+      }
+      
+      const userDoc = await getDoc(doc(db, 'users', fromUserId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserProfile;
+        incomingRequests.push({
+          ...userData,
+          swipedAt: swipeData.timestamp?.toDate() || new Date()
+        });
+      }
+    }
+    
+    incomingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
+    callback(incomingRequests);
+  });
+}
+
+// Accept an incoming match request (creates a match)
+export async function acceptMatchRequest(currentUserId: string, fromUserId: string): Promise<string> {
+  try {
+    // This will create a match since the other person already swiped right
+    const result = await sendMatchRequest(currentUserId, fromUserId);
+    return result.matchId || '';
+  } catch (error) {
+    console.error('Error accepting match request:', error);
+    throw error;
+  }
+}
+
+// Decline an incoming match request
+export async function declineMatchRequest(currentUserId: string, fromUserId: string): Promise<void> {
+  try {
+    // Swipe left on them (this prevents them from showing up again)
+    const swipeId = `${currentUserId}_${fromUserId}`;
+    await setDoc(doc(db, 'swipes', swipeId), {
+      fromUserId: currentUserId,
+      toUserId: fromUserId,
+      direction: 'left',
+      timestamp: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error declining match request:', error);
+    throw error;
   }
 }
 

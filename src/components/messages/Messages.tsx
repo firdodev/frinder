@@ -33,6 +33,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import {
   subscribeToMatches,
+  subscribeToUnmatchedConversations,
   subscribeToMessages,
   sendMessage,
   markMessagesAsRead,
@@ -79,6 +80,7 @@ interface Match {
   unreadCount: number;
   isOnline: boolean;
   isNewMatch?: boolean;
+  isUnmatched?: boolean;
 }
 
 function formatTime(date: Date): string {
@@ -954,20 +956,28 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           <ChevronLeft className='w-5 h-5 sm:w-6 sm:h-6 dark:text-white' />
         </button>
         <div className='relative'>
-          <Avatar className='w-9 h-9 sm:w-10 sm:h-10'>
+          <Avatar className={`w-9 h-9 sm:w-10 sm:h-10 ${match.isUnmatched ? 'grayscale' : ''}`}>
             <AvatarImage src={match.photo} alt={match.name} />
-            <AvatarFallback className='bg-[#ed8c00] text-white'>{match.name[0]}</AvatarFallback>
+            <AvatarFallback className={match.isUnmatched ? 'bg-gray-400 text-white' : 'bg-frinder-orange text-white'}>{match.name[0]}</AvatarFallback>
           </Avatar>
-          {isOnline && (
+          {isOnline && !match.isUnmatched && (
             <span className='absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-black' />
           )}
         </div>
         <div className='flex-1'>
-          <h3 className='font-semibold text-sm sm:text-base dark:text-white'>{match.name}</h3>
-          <p className={`text-[10px] sm:text-xs ${isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
-            {getStatusText()}
+          <div className='flex items-center gap-2'>
+            <h3 className='font-semibold text-sm sm:text-base dark:text-white'>{match.name}</h3>
+            {match.isUnmatched && (
+              <Badge variant='outline' className='text-[10px] border-gray-300 dark:border-gray-700 text-gray-500'>
+                Unmatched
+              </Badge>
+            )}
+          </div>
+          <p className={`text-[10px] sm:text-xs ${match.isUnmatched ? 'text-gray-400' : isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
+            {match.isUnmatched ? 'Chat disabled' : getStatusText()}
           </p>
         </div>
+        {!match.isUnmatched && (
         <div className='flex items-center gap-1 sm:gap-2'>
           <button 
             onClick={initiateCall}
@@ -998,6 +1008,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -1079,7 +1090,15 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         )}
       </AnimatePresence>
 
-      {/* Input */}
+      {/* Input or Unmatched Notice */}
+      {match.isUnmatched ? (
+        <div className='p-3 sm:p-4 border-t bg-gray-100 dark:bg-gray-900 dark:border-gray-800 safe-bottom'>
+          <div className='flex items-center justify-center gap-2 py-2 text-gray-500 dark:text-gray-400'>
+            <UserX className='w-4 h-4' />
+            <span className='text-sm'>This conversation has ended. You can no longer send messages.</span>
+          </div>
+        </div>
+      ) : (
       <div className='p-3 sm:p-4 border-t bg-white dark:bg-black dark:border-gray-800 safe-bottom'>
         {/* Reply Preview */}
         <AnimatePresence>
@@ -1185,6 +1204,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           </motion.button>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -1258,8 +1278,9 @@ export default function Messages() {
           lastMessage: m.lastMessage,
           lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
           unreadCount: (m as any).unreadCount?.[user.uid] || 0,
-          isOnline: false, // Would need presence system for this
-          isNewMatch: !m.lastMessage
+          isOnline: false,
+          isNewMatch: !m.lastMessage,
+          isUnmatched: false
         };
       });
 
@@ -1272,8 +1293,48 @@ export default function Messages() {
         return b.lastMessageTime.getTime() - a.lastMessageTime.getTime();
       });
 
-      setMatches(mappedMatches);
+      setMatches(prev => {
+        // Keep unmatched conversations and merge with active matches
+        const unmatchedConvos = prev.filter(m => m.isUnmatched);
+        return [...mappedMatches, ...unmatchedConvos];
+      });
       setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Subscribe to unmatched conversations
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToUnmatchedConversations(user.uid, (unmatchedMatches) => {
+      const mappedUnmatched: Match[] = unmatchedMatches.map(m => {
+        const otherUserIndex = m.users[0] === user.uid ? 1 : 0;
+        const otherUserId = m.users[otherUserIndex];
+        const otherUserProfile = m.userProfiles?.[otherUserId];
+        const otherUserName = otherUserProfile?.displayName || 'Unknown';
+        const otherUserPhoto = otherUserProfile?.photos?.[0] || '';
+
+        return {
+          id: m.id,
+          odMatchId: otherUserId,
+          name: otherUserName,
+          photo: otherUserPhoto,
+          lastMessage: m.lastMessage,
+          lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
+          unreadCount: 0,
+          isOnline: false,
+          isNewMatch: false,
+          isUnmatched: true
+        };
+      });
+
+      setMatches(prev => {
+        // Keep active matches and update unmatched conversations
+        const activeMatches = prev.filter(m => !m.isUnmatched);
+        return [...activeMatches, ...mappedUnmatched];
+      });
     });
 
     return () => unsubscribe();
@@ -1304,9 +1365,10 @@ export default function Messages() {
     );
   }
 
-  // Get new matches and conversations
-  const newMatches = matches.filter(m => m.isNewMatch);
-  const conversations = matches.filter(m => !m.isNewMatch && m.lastMessage);
+  // Get new matches, conversations, and unmatched conversations
+  const newMatches = matches.filter(m => m.isNewMatch && !m.isUnmatched);
+  const conversations = matches.filter(m => !m.isNewMatch && m.lastMessage && !m.isUnmatched);
+  const unmatchedConversations = matches.filter(m => m.isUnmatched);
 
   if (loading) {
     return (
@@ -1440,7 +1502,7 @@ export default function Messages() {
                     <div className='relative'>
                       <Avatar className='w-12 h-12 sm:w-14 sm:h-14'>
                         <AvatarImage src={match.photo} alt={match.name} />
-                        <AvatarFallback className='bg-[#ed8c00] text-white'>{match.name[0]}</AvatarFallback>
+                        <AvatarFallback className='bg-frinder-orange text-white'>{match.name[0]}</AvatarFallback>
                       </Avatar>
                       {match.isOnline && (
                         <span className='absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
@@ -1461,7 +1523,49 @@ export default function Messages() {
                         {match.lastMessage}
                       </p>
                     </div>
-                    {match.unreadCount > 0 && <Badge className='bg-[#ed8c00] text-white text-[10px] sm:text-xs'>{match.unreadCount}</Badge>}
+                    {match.unreadCount > 0 && <Badge className='bg-frinder-orange text-white text-[10px] sm:text-xs'>{match.unreadCount}</Badge>}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* Unmatched Conversations - Chat history with disabled messaging */}
+        {unmatchedConversations.length > 0 && (
+          <div className='px-3 sm:px-4 mt-4'>
+            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
+              <UserX className='w-3 h-3' />
+              Past Conversations
+            </h2>
+            <div className='space-y-1.5 sm:space-y-2'>
+              <AnimatePresence>
+                {unmatchedConversations.map(match => (
+                  <motion.button
+                    key={match.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    onClick={() => setSelectedMatch(match)}
+                    className='w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-muted dark:hover:bg-gray-800 transition-colors opacity-60'
+                  >
+                    <div className='relative'>
+                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14 grayscale'>
+                        <AvatarImage src={match.photo} alt={match.name} />
+                        <AvatarFallback className='bg-gray-400 text-white'>{match.name[0]}</AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <div className='flex-1 text-left min-w-0'>
+                      <div className='flex items-center justify-between mb-0.5 sm:mb-1'>
+                        <h3 className='font-semibold text-sm sm:text-base dark:text-white'>{match.name}</h3>
+                        <Badge variant='outline' className='text-[10px] border-gray-300 dark:border-gray-700 text-gray-500'>
+                          Unmatched
+                        </Badge>
+                      </div>
+                      <p className='text-xs sm:text-sm truncate text-muted-foreground'>
+                        {match.lastMessage}
+                      </p>
+                    </div>
                   </motion.button>
                 ))}
               </AnimatePresence>
