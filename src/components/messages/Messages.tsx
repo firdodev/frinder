@@ -260,8 +260,9 @@ export default function Messages() {
         // Find the other user in the match
         const otherUserIndex = m.users[0] === user.uid ? 1 : 0;
         const otherUserId = m.users[otherUserIndex];
-        const otherUserName = m.userNames?.[otherUserIndex] || 'Unknown';
-        const otherUserPhoto = m.userPhotos?.[otherUserIndex] || '';
+        const otherUserProfile = m.userProfiles?.[otherUserId];
+        const otherUserName = otherUserProfile?.displayName || 'Unknown';
+        const otherUserPhoto = otherUserProfile?.photos?.[0] || '';
 
         return {
           id: m.id,
@@ -270,7 +271,7 @@ export default function Messages() {
           photo: otherUserPhoto,
           lastMessage: m.lastMessage,
           lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
-          unreadCount: m.unreadCount?.[user.uid] || 0,
+          unreadCount: (m as any).unreadCount?.[user.uid] || 0,
           isOnline: false, // Would need presence system for this
           isNewMatch: !m.lastMessage
         };
