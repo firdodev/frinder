@@ -96,10 +96,7 @@ function ChatView({ match, currentUserId, onBack }: ChatViewProps) {
       // Mark messages as read
       const unreadMessages = firebaseMessages.filter(m => !m.read && m.senderId !== currentUserId);
       if (unreadMessages.length > 0) {
-        markMessagesAsRead(
-          match.id,
-          unreadMessages.map(m => m.id)
-        );
+        markMessagesAsRead(match.id, currentUserId);
       }
     });
 
