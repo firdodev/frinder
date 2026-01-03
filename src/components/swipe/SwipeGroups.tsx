@@ -193,11 +193,14 @@ export default function SwipeGroups() {
           description: g.description,
           photo: g.photo || 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800',
           members:
-            g.members?.map(m => ({
-              id: m.id,
-              name: m.name,
-              photo: m.photo || '/placeholder-avatar.png'
-            })) || [],
+            g.members?.map(memberId => {
+              const profile = g.memberProfiles?.[memberId];
+              return {
+                id: memberId,
+                name: profile?.displayName || 'Unknown',
+                photo: profile?.photos?.[0] || '/placeholder-avatar.png'
+              };
+            }) || [],
           interests: g.interests || [],
           activity: g.activity || 'Weekly meetups',
           location: g.location
