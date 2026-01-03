@@ -22,91 +22,6 @@ interface Profile {
   course?: string;
 }
 
-// Mock data for development
-const MOCK_PROFILES: Profile[] = [
-  {
-    id: 'mock-1',
-    name: 'Emma',
-    age: 24,
-    bio: 'Coffee enthusiast ☕ | Love hiking and photography 📸 | Looking for genuine connections',
-    photos: [
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800',
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800',
-    ],
-    interests: ['Photography', 'Hiking', 'Coffee', 'Travel', 'Art'],
-    distance: '2 km away',
-    course: 'New York, USA'
-  },
-  {
-    id: 'mock-2',
-    name: 'Alex',
-    age: 26,
-    bio: 'Software developer by day, musician by night 🎸 | Always up for an adventure',
-    photos: [
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800',
-    ],
-    interests: ['Music', 'Coding', 'Gaming', 'Fitness', 'Movies'],
-    distance: '5 km away',
-    course: 'San Francisco, USA'
-  },
-  {
-    id: 'mock-3',
-    name: 'Sofia',
-    age: 23,
-    bio: 'Foodie exploring the city one restaurant at a time 🍕 | Yoga lover 🧘‍♀️',
-    photos: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800',
-    ],
-    interests: ['Food', 'Yoga', 'Cooking', 'Wellness', 'Fashion'],
-    distance: '3 km away',
-    course: 'Los Angeles, USA'
-  },
-  {
-    id: 'mock-4',
-    name: 'Marcus',
-    age: 28,
-    bio: 'Entrepreneur & fitness junkie 💪 | Let\'s grab a coffee and talk about life',
-    photos: [
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800',
-    ],
-    interests: ['Business', 'Fitness', 'Startups', 'Networking', 'Coffee'],
-    distance: '8 km away',
-    course: 'Austin, USA'
-  },
-  {
-    id: 'mock-5',
-    name: 'Luna',
-    age: 25,
-    bio: 'Artist 🎨 | Cat mom 🐱 | Believes in magic and good vibes ✨',
-    photos: [
-      'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800',
-      'https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?w=800',
-    ],
-    interests: ['Art', 'Cats', 'Reading', 'Nature', 'Spirituality'],
-    distance: '1 km away',
-    course: 'Portland, USA'
-  },
-  {
-    id: 'mock-6',
-    name: 'Jake',
-    age: 27,
-    bio: 'Travel addict 🌍 | 30 countries and counting | Photography is my passion',
-    photos: [
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800',
-      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800',
-    ],
-    interests: ['Travel', 'Photography', 'Adventure', 'Languages', 'Camping'],
-    distance: '4 km away',
-    course: 'Denver, USA'
-  },
-];
-
-// Check if running in development mode
-const isDevelopment = process.env.NODE_ENV === 'development';
-
 // Firework particle for celebration
 function Firework({ delay, x, color }: { delay: number; x: number; color: string }) {
   const particles = Array.from({ length: 12 }, (_, i) => ({
@@ -730,19 +645,9 @@ export default function SwipePeople() {
     }
   }, []);
 
-  // Load users to swipe from Firebase (or mock data in development)
+  // Load users to swipe from Firebase
   useEffect(() => {
     async function loadProfiles() {
-      // In development, use mock data for testing
-      if (isDevelopment) {
-        setLoading(true);
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setProfiles(MOCK_PROFILES);
-        setLoading(false);
-        return;
-      }
-
       if (!user?.uid || !userProfile) return;
 
       try {
@@ -781,15 +686,6 @@ export default function SwipePeople() {
 
       // Remove the swiped profile from UI immediately
       setProfiles(prev => prev.slice(1));
-
-      // In development, simulate a match on every other right swipe
-      if (isDevelopment) {
-        if ((direction === 'right' || direction === 'up') && Math.random() > 0.5) {
-          setMatchedProfile(currentProfile);
-          setShowMatchCelebration(true);
-        }
-        return;
-      }
 
       if (!user?.uid) return;
 

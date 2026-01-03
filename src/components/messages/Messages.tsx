@@ -28,7 +28,11 @@ import {
   X,
   ZoomIn,
   Reply,
-  CornerDownLeft
+  CornerDownLeft,
+  Users,
+  Crown,
+  LogOut,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -46,9 +50,19 @@ import {
   subscribeToCall,
   subscribeToIceCandidates,
   subscribeToIncomingCalls,
+  updateTypingStatus,
+  subscribeToTypingStatus,
+  subscribeToUserGroups,
+  getGroupMembers,
+  removeGroupMember,
+  leaveGroup,
+  subscribeToGroupMessages,
+  sendGroupMessage,
   type Match as FirebaseMatch,
   type Message as FirebaseMessage,
-  type CallData
+  type CallData,
+  type Group as FirebaseGroup,
+  type GroupMessage as FirebaseGroupMessage
 } from '@/lib/firebaseServices';
 import { uploadMessageImage, compressImage } from '@/lib/storageService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -688,6 +702,9 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  // Typing indicator state
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Voice call state
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [activeCallData, setActiveCallData] = useState<CallData | null>(null);
@@ -697,6 +714,47 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  // Subscribe to other user's typing status
+  useEffect(() => {
+    if (!match.id || !match.odMatchId || match.isUnmatched) return;
+    
+    const unsubscribe = subscribeToTypingStatus(match.id, match.odMatchId, (isTyping) => {
+      setIsOtherUserTyping(isTyping);
+    });
+
+    return () => unsubscribe();
+  }, [match.id, match.odMatchId, match.isUnmatched]);
+
+  // Handle typing indicator - update when user types
+  const handleTyping = useCallback(() => {
+    if (match.isUnmatched) return;
+    
+    // Update typing status
+    updateTypingStatus(match.id, currentUserId, true);
+    
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set timeout to clear typing status after 3 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      updateTypingStatus(match.id, currentUserId, false);
+    }, 3000);
+  }, [match.id, match.isUnmatched, currentUserId]);
+
+  // Cleanup typing status on unmount or when leaving chat
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (match.id && currentUserId) {
+        updateTypingStatus(match.id, currentUserId, false);
+      }
+    };
+  }, [match.id, currentUserId]);
 
   // Subscribe to active call state
   useEffect(() => {
@@ -1057,6 +1115,66 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 </div>
               );
             })}
+            
+            {/* Typing Indicator */}
+            <AnimatePresence>
+              {isOtherUserTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className='flex items-center gap-2 mb-2'
+                >
+                  <Avatar className='w-6 h-6'>
+                    <AvatarImage src={match.photo} alt={match.name} />
+                    <AvatarFallback className='bg-frinder-orange text-white text-xs'>
+                      {match.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className='bg-muted dark:bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5'>
+                    <div className='flex items-center gap-1'>
+                      <motion.span
+                        className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                        animate={{ 
+                          y: [0, -4, 0],
+                          opacity: [0.5, 1, 0.5]
+                        }}
+                        transition={{ 
+                          duration: 0.8, 
+                          repeat: Infinity,
+                          delay: 0 
+                        }}
+                      />
+                      <motion.span
+                        className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                        animate={{ 
+                          y: [0, -4, 0],
+                          opacity: [0.5, 1, 0.5]
+                        }}
+                        transition={{ 
+                          duration: 0.8, 
+                          repeat: Infinity,
+                          delay: 0.2 
+                        }}
+                      />
+                      <motion.span
+                        className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                        animate={{ 
+                          y: [0, -4, 0],
+                          opacity: [0.5, 1, 0.5]
+                        }}
+                        transition={{ 
+                          duration: 0.8, 
+                          repeat: Infinity,
+                          delay: 0.4 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
             <div ref={messagesEndRef} />
           </>
         )}
@@ -1183,7 +1301,10 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           <Input
             ref={inputRef}
             value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
+            onChange={e => {
+              setNewMessage(e.target.value);
+              handleTyping();
+            }}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder={replyingTo ? `Reply to ${replyingTo.senderId === currentUserId ? 'yourself' : match.name}...` : selectedImage ? 'Add a caption...' : 'Type a message...'}
             className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
@@ -1209,14 +1330,494 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   );
 }
 
+// Group Chat View Props
+interface GroupChatViewProps {
+  group: FirebaseGroup;
+  currentUserId: string;
+  currentUserName: string;
+  currentUserPhoto: string;
+  onBack: () => void;
+  onManageMembers: () => void;
+}
+
+// Group Chat View Component - Similar to ChatView but with member avatars like WhatsApp groups
+function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto, onBack, onManageMembers }: GroupChatViewProps) {
+  const [messages, setMessages] = useState<FirebaseGroupMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<FirebaseGroupMessage | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Subscribe to group messages
+  useEffect(() => {
+    const unsubscribe = subscribeToGroupMessages(group.id, (msgs) => {
+      setMessages(msgs);
+    });
+
+    return () => unsubscribe();
+  }, [group.id]);
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if ((!newMessage.trim() && !selectedImage) || sending) return;
+
+    setSending(true);
+
+    try {
+      let imageUrl: string | undefined;
+
+      if (selectedImage) {
+        setUploadingImage(true);
+        const compressed = await compressImage(selectedImage);
+        imageUrl = await uploadMessageImage(group.id, currentUserId, compressed);
+        setSelectedImage(null);
+        setUploadingImage(false);
+      }
+
+      await sendGroupMessage(
+        group.id,
+        currentUserId,
+        currentUserName,
+        currentUserPhoto,
+        newMessage.trim() || (imageUrl ? '📷 Photo' : ''),
+        imageUrl,
+        replyingTo ? {
+          id: replyingTo.id,
+          text: replyingTo.text,
+          senderId: replyingTo.senderId,
+          senderName: replyingTo.senderName
+        } : undefined
+      );
+
+      setNewMessage('');
+      setReplyingTo(null);
+    } catch (error) {
+      console.error('Error sending group message:', error);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+    }
+  };
+
+  const handleSwipeToReply = (message: FirebaseGroupMessage) => {
+    setReplyingTo(message);
+  };
+
+  return (
+    <div className='flex flex-col h-full bg-white dark:bg-black'>
+      {/* Header */}
+      <div className='flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-b dark:border-gray-800'>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={onBack}
+          className='p-1.5 sm:p-2 -ml-1 sm:-ml-2 rounded-full hover:bg-muted dark:hover:bg-gray-800'
+        >
+          <ChevronLeft className='w-5 h-5 sm:w-6 sm:h-6 dark:text-white' />
+        </motion.button>
+
+        <div className='relative'>
+          <Avatar className='w-10 h-10 sm:w-12 sm:h-12'>
+            <AvatarImage src={group.photo} alt={group.name} />
+            <AvatarFallback className='bg-frinder-orange text-white'>
+              <Users className='w-5 h-5' />
+            </AvatarFallback>
+          </Avatar>
+        </div>
+
+        <div className='flex-1 min-w-0'>
+          <h2 className='font-semibold text-sm sm:text-base dark:text-white truncate'>{group.name}</h2>
+          <p className='text-xs text-muted-foreground truncate'>
+            {group.members?.length || 1} members
+          </p>
+        </div>
+
+        <div className='relative'>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowMenu(!showMenu)}
+            className='p-1.5 sm:p-2 rounded-full hover:bg-muted dark:hover:bg-gray-800'
+          >
+            <MoreVertical className='w-4 h-4 sm:w-5 sm:h-5 dark:text-white' />
+          </motion.button>
+
+          <AnimatePresence>
+            {showMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[150px] z-50'
+              >
+                <button
+                  onClick={() => { onManageMembers(); setShowMenu(false); }}
+                  className='w-full px-4 py-2 text-left text-sm hover:bg-muted dark:hover:bg-gray-800 dark:text-white flex items-center gap-2'
+                >
+                  <Users className='w-4 h-4' />
+                  View Members
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <div className='flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4'>
+        <AnimatePresence>
+          {messages.map((message, index) => {
+            const isOwn = message.senderId === currentUserId;
+            const showAvatar = !isOwn && (index === 0 || messages[index - 1]?.senderId !== message.senderId);
+            const showName = !isOwn && showAvatar;
+
+            return (
+              <GroupMessageBubble
+                key={message.id}
+                message={message}
+                isOwn={isOwn}
+                showAvatar={showAvatar}
+                showName={showName}
+                onSwipeReply={() => handleSwipeToReply(message)}
+                onImageClick={(url) => setPreviewImage(url)}
+              />
+            );
+          })}
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Image Preview Modal */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4'
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.button
+              className='absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30'
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <X className='w-6 h-6 text-white' />
+            </motion.button>
+            <motion.img
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              src={previewImage}
+              alt='Preview'
+              className='max-w-full max-h-full object-contain rounded-lg'
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Reply Preview */}
+      <AnimatePresence>
+        {replyingTo && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className='px-3 sm:px-4 py-2 border-t dark:border-gray-800 bg-muted/50 dark:bg-gray-900/50'
+          >
+            <div className='flex items-center gap-2'>
+              <Reply className='w-4 h-4 text-frinder-orange' />
+              <div className='flex-1 min-w-0'>
+                <p className='text-xs font-medium text-frinder-orange'>{replyingTo.senderName}</p>
+                <p className='text-xs text-muted-foreground truncate'>{replyingTo.text}</p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className='p-1'>
+                <X className='w-4 h-4 text-muted-foreground' />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Selected Image Preview */}
+      {selectedImage && (
+        <div className='px-3 sm:px-4 py-2 border-t dark:border-gray-800'>
+          <div className='relative inline-block'>
+            <img
+              src={URL.createObjectURL(selectedImage)}
+              alt='Selected'
+              className='h-20 rounded-lg object-cover'
+            />
+            <button
+              onClick={() => setSelectedImage(null)}
+              className='absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center'
+            >
+              <X className='w-4 h-4 text-white' />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Input Area */}
+      <div className='p-3 sm:p-4 border-t dark:border-gray-800'>
+        <div className='flex items-center gap-2'>
+          <input
+            type='file'
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            accept='image/*'
+            className='hidden'
+          />
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => fileInputRef.current?.click()}
+            className='p-2 rounded-full hover:bg-muted dark:hover:bg-gray-800'
+            disabled={uploadingImage}
+          >
+            <ImageIcon className='w-5 h-5 text-muted-foreground' />
+          </motion.button>
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            placeholder='Message group...'
+            className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+            disabled={sending || uploadingImage}
+          />
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={handleSend}
+            disabled={(!newMessage.trim() && !selectedImage) || sending || uploadingImage}
+            className='w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-frinder-orange flex items-center justify-center disabled:opacity-50'
+          >
+            {sending || uploadingImage ? (
+              <Loader2 className='w-4 h-4 sm:w-5 sm:h-5 text-white animate-spin' />
+            ) : (
+              <Send className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
+            )}
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Group Message Bubble Component - WhatsApp-style with small avatars
+interface GroupMessageBubbleProps {
+  message: FirebaseGroupMessage;
+  isOwn: boolean;
+  showAvatar: boolean;
+  showName: boolean;
+  onSwipeReply: () => void;
+  onImageClick: (url: string) => void;
+}
+
+function GroupMessageBubble({ message, isOwn, showAvatar, showName, onSwipeReply, onImageClick }: GroupMessageBubbleProps) {
+  const x = useMotionValue(0);
+  const replyOpacity = useTransform(x, [0, 50], [0, 1]);
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (info.offset.x > 50) {
+      onSwipeReply();
+    }
+  };
+
+  const timestamp = message.timestamp?.toDate ? message.timestamp.toDate() : new Date();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
+    >
+      {/* Reply indicator */}
+      {!isOwn && (
+        <motion.div style={{ opacity: replyOpacity }} className='flex-shrink-0'>
+          <CornerDownLeft className='w-4 h-4 text-frinder-orange' />
+        </motion.div>
+      )}
+
+      {/* Avatar for other users - WhatsApp style */}
+      {!isOwn && (
+        <div className='flex-shrink-0 w-7 h-7'>
+          {showAvatar && (
+            <Avatar className='w-7 h-7'>
+              <AvatarImage src={message.senderPhoto} alt={message.senderName} />
+              <AvatarFallback className='bg-frinder-orange text-white text-xs'>
+                {message.senderName?.[0] || '?'}
+              </AvatarFallback>
+            </Avatar>
+          )}
+        </div>
+      )}
+
+      <motion.div
+        drag='x'
+        dragConstraints={{ left: 0, right: isOwn ? 0 : 80 }}
+        dragElastic={0.2}
+        onDragEnd={handleDragEnd}
+        style={{ x }}
+        className={`max-w-[75%] ${isOwn ? 'order-1' : ''}`}
+      >
+        {/* Sender name for group messages */}
+        {showName && (
+          <p className='text-xs font-medium text-frinder-orange mb-1 ml-1'>
+            {message.senderName}
+          </p>
+        )}
+
+        <div
+          className={`rounded-2xl px-3 py-2 ${
+            isOwn
+              ? 'bg-frinder-orange text-white rounded-br-md'
+              : 'bg-muted dark:bg-gray-800 rounded-bl-md'
+          }`}
+        >
+          {/* Reply preview */}
+          {message.replyTo && (
+            <div
+              className={`mb-2 p-2 rounded-lg text-xs ${
+                isOwn ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'
+              }`}
+            >
+              <p className={`font-medium ${isOwn ? 'text-white/80' : 'text-frinder-orange'}`}>
+                {message.replyTo.senderName}
+              </p>
+              <p className={isOwn ? 'text-white/70' : 'text-muted-foreground'}>
+                {message.replyTo.text}
+              </p>
+            </div>
+          )}
+
+          {/* Image */}
+          {message.type === 'image' && message.imageUrl && (
+            <div className='mb-2 -mx-1 -mt-1'>
+              <img
+                src={message.imageUrl}
+                alt='Shared'
+                className='rounded-lg max-w-full cursor-pointer'
+                onClick={() => onImageClick(message.imageUrl!)}
+              />
+            </div>
+          )}
+
+          {/* Text */}
+          {message.text && message.text !== '📷 Photo' && (
+            <p className={`text-sm ${isOwn ? 'text-white' : 'dark:text-white'}`}>
+              {message.text}
+            </p>
+          )}
+
+          {/* Timestamp */}
+          <p
+            className={`text-[10px] mt-1 ${
+              isOwn ? 'text-white/70' : 'text-muted-foreground'
+            }`}
+          >
+            {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Reply indicator for own messages */}
+      {isOwn && (
+        <motion.div style={{ opacity: replyOpacity }} className='flex-shrink-0 order-0'>
+          <CornerDownLeft className='w-4 h-4 text-frinder-orange' />
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
+
 export default function Messages() {
   const { user, userProfile } = useAuth();
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  // Groups state
+  const [userGroups, setUserGroups] = useState<FirebaseGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<FirebaseGroup | null>(null);
+  const [showGroupChat, setShowGroupChat] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [showGroupMembersDialog, setShowGroupMembersDialog] = useState(false);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
   // Incoming call state
   const [incomingCall, setIncomingCall] = useState<CallData | null>(null);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
+
+  // Subscribe to user's groups
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToUserGroups(user.uid, (groups) => {
+      setUserGroups(groups);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Load group members when viewing group
+  const handleViewGroupMembers = async (group: FirebaseGroup) => {
+    setSelectedGroup(group);
+    const members = await getGroupMembers(group.id);
+    setGroupMembers(members);
+    setShowGroupMembersDialog(true);
+  };
+
+  // Handle opening a group chat
+  const handleOpenGroupChat = (group: FirebaseGroup) => {
+    setSelectedGroup(group);
+    setShowGroupChat(true);
+    setSelectedMatch(null); // Close any open match chat
+  };
+
+  // Handle closing group chat
+  const handleCloseGroupChat = () => {
+    setShowGroupChat(false);
+    setSelectedGroup(null);
+  };
+
+  // Handle removing a member (admin only)
+  const handleRemoveMember = async (memberId: string) => {
+    if (!selectedGroup || !user?.uid) return;
+    setRemovingMember(memberId);
+    try {
+      await removeGroupMember(selectedGroup.id, memberId, user.uid);
+      setGroupMembers(prev => prev.filter(m => m.uid !== memberId));
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+    } finally {
+      setRemovingMember(null);
+    }
+  };
+
+  // Handle leaving a group
+  const handleLeaveGroup = async (groupId: string) => {
+    if (!user?.uid) return;
+    try {
+      await leaveGroup(groupId, user.uid);
+    } catch (error: any) {
+      console.error('Error leaving group:', error);
+    }
+  };
 
   // Subscribe to incoming calls
   useEffect(() => {
@@ -1361,6 +1962,19 @@ export default function Messages() {
         currentUserPhoto={userProfile?.photos?.[0] || user.photoURL || '/placeholder-avatar.png'}
         onBack={() => setSelectedMatch(null)} 
         onUnmatch={handleUnmatch}
+      />
+    );
+  }
+
+  if (showGroupChat && selectedGroup) {
+    return (
+      <GroupChatView
+        group={selectedGroup}
+        currentUserId={user.uid}
+        currentUserName={userProfile?.displayName || user.displayName || 'You'}
+        currentUserPhoto={userProfile?.photos?.[0] || user.photoURL || '/placeholder-avatar.png'}
+        onBack={handleCloseGroupChat}
+        onManageMembers={() => handleViewGroupMembers(selectedGroup)}
       />
     );
   }
@@ -1572,6 +2186,141 @@ export default function Messages() {
             </div>
           </div>
         )}
+
+        {/* User's Groups */}
+        {userGroups.length > 0 && (
+          <div className='px-3 sm:px-4 mt-4'>
+            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
+              <Users className='w-3 h-3 text-frinder-orange' />
+              Your Groups
+            </h2>
+            <div className='space-y-1.5 sm:space-y-2'>
+              <AnimatePresence>
+                {userGroups.map(group => (
+                  <motion.button
+                    key={group.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    onClick={() => handleOpenGroupChat(group)}
+                    className='w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50 transition-colors text-left'
+                  >
+                    <div className='relative'>
+                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14'>
+                        <AvatarImage src={group.photo} alt={group.name} />
+                        <AvatarFallback className='bg-frinder-orange text-white'>
+                          <Users className='w-5 h-5' />
+                        </AvatarFallback>
+                      </Avatar>
+                      {group.creatorId === user?.uid && (
+                        <div className='absolute -top-1 -right-1 w-5 h-5 bg-frinder-gold rounded-full flex items-center justify-center'>
+                          <Crown className='w-3 h-3 text-white' />
+                        </div>
+                      )}
+                    </div>
+                    <div className='flex-1 text-left min-w-0'>
+                      <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
+                        <h3 className='font-semibold text-sm sm:text-base dark:text-white truncate'>{group.name}</h3>
+                        <Badge variant='outline' className='text-[10px] shrink-0'>
+                          {group.members?.length || 1} members
+                        </Badge>
+                      </div>
+                      <p className='text-xs sm:text-sm truncate text-muted-foreground'>
+                        {group.activity || group.description}
+                      </p>
+                    </div>
+                    <div className='flex items-center gap-1' onClick={(e) => e.stopPropagation()}>
+                      {/* Admin can view/manage members */}
+                      {group.creatorId === user?.uid && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleViewGroupMembers(group); }}
+                          className='p-2 rounded-full hover:bg-muted dark:hover:bg-gray-700 transition-colors'
+                          title='Manage members'
+                        >
+                          <Users className='w-4 h-4 text-frinder-orange' />
+                        </button>
+                      )}
+                      {/* Non-admin can leave */}
+                      {group.creatorId !== user?.uid && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleLeaveGroup(group.id); }}
+                          className='p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors'
+                          title='Leave group'
+                        >
+                          <LogOut className='w-4 h-4 text-red-500' />
+                        </button>
+                      )}
+                    </div>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* Group Members Dialog (Admin Only) */}
+        <Dialog open={showGroupMembersDialog} onOpenChange={setShowGroupMembersDialog}>
+          <DialogContent className='dark:bg-gray-950 dark:border-gray-800 max-w-md'>
+            <DialogHeader>
+              <DialogTitle className='dark:text-white flex items-center gap-2'>
+                <Users className='w-5 h-5 text-frinder-orange' />
+                {selectedGroup?.name} - Members
+              </DialogTitle>
+              <DialogDescription>
+                Manage group members. As admin, you can remove members from the group.
+              </DialogDescription>
+            </DialogHeader>
+            <div className='space-y-2 max-h-[400px] overflow-y-auto'>
+              {groupMembers.map(member => (
+                <div 
+                  key={member.uid}
+                  className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
+                >
+                  <Avatar className='w-10 h-10'>
+                    <AvatarImage src={member.photos?.[0]} alt={member.displayName} />
+                    <AvatarFallback className='bg-frinder-orange text-white'>
+                      {member.displayName?.[0] || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className='flex-1 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <span className='font-medium dark:text-white truncate'>{member.displayName}</span>
+                      {member.uid === selectedGroup?.creatorId && (
+                        <Badge className='bg-frinder-gold text-white text-[10px]'>
+                          <Crown className='w-2.5 h-2.5 mr-1' />
+                          Admin
+                        </Badge>
+                      )}
+                    </div>
+                    {member.city && (
+                      <span className='text-xs text-muted-foreground'>{member.city}</span>
+                    )}
+                  </div>
+                  {member.uid !== selectedGroup?.creatorId && member.uid !== user?.uid && (
+                    <button
+                      onClick={() => handleRemoveMember(member.uid)}
+                      disabled={removingMember === member.uid}
+                      className='p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50'
+                      title='Remove member'
+                    >
+                      {removingMember === member.uid ? (
+                        <Loader2 className='w-4 h-4 animate-spin text-red-500' />
+                      ) : (
+                        <Trash2 className='w-4 h-4 text-red-500' />
+                      )}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {groupMembers.length === 0 && (
+                <div className='text-center py-8 text-muted-foreground'>
+                  <Users className='w-10 h-10 mx-auto mb-2 opacity-50' />
+                  <p>No members found</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Empty state */}
         {matches.length === 0 && (

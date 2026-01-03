@@ -351,11 +351,11 @@ export async function markMessagesAsRead(matchId: string, userId: string): Promi
   }
 }
 
-// Get groups to swipe on
+// Get groups to swipe on (excludes groups user is member of and groups they created)
 export async function getGroupsToSwipe(currentUserId: string, limitCount: number = 10): Promise<Group[]> {
   try {
     const groupsRef = collection(db, 'groups');
-    const groupsQuery = query(groupsRef, limit(limitCount));
+    const groupsQuery = query(groupsRef, limit(limitCount * 2)); // Fetch more to filter
     const groupsSnapshot = await getDocs(groupsQuery);
 
     return groupsSnapshot.docs
@@ -363,7 +363,11 @@ export async function getGroupsToSwipe(currentUserId: string, limitCount: number
         id: doc.id,
         ...doc.data()
       } as Group))
-      .filter(group => !group.members?.includes(currentUserId));
+      .filter(group => 
+        !group.members?.includes(currentUserId) && // Not a member
+        group.creatorId !== currentUserId // Not the creator
+      )
+      .slice(0, limitCount);
   } catch (error) {
     console.error('Error getting groups:', error);
     return [];
@@ -407,6 +411,135 @@ export async function createGroup(
     return groupRef.id;
   } catch (error) {
     console.error('Error creating group:', error);
+    throw error;
+  }
+}
+
+// Get user's joined groups
+export async function getUserGroups(userId: string): Promise<Group[]> {
+  try {
+    const groupsRef = collection(db, 'groups');
+    const groupsQuery = query(groupsRef, where('members', 'array-contains', userId));
+    const groupsSnapshot = await getDocs(groupsQuery);
+
+    return groupsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Group));
+  } catch (error) {
+    console.error('Error getting user groups:', error);
+    return [];
+  }
+}
+
+// Subscribe to user's groups in real-time
+export function subscribeToUserGroups(
+  userId: string,
+  callback: (groups: Group[]) => void
+): () => void {
+  const groupsRef = collection(db, 'groups');
+  const groupsQuery = query(groupsRef, where('members', 'array-contains', userId));
+  
+  return onSnapshot(groupsQuery, (snapshot) => {
+    const groups = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Group));
+    callback(groups);
+  });
+}
+
+// Get group members (for admin view)
+export async function getGroupMembers(groupId: string): Promise<UserProfile[]> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) return [];
+    
+    const groupData = groupDoc.data();
+    const memberProfiles = groupData.memberProfiles || {};
+    
+    return Object.values(memberProfiles) as UserProfile[];
+  } catch (error) {
+    console.error('Error getting group members:', error);
+    return [];
+  }
+}
+
+// Remove member from group (admin only)
+export async function removeGroupMember(groupId: string, memberId: string, adminId: string): Promise<void> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
+    
+    // Check if user is admin (creator)
+    if (groupData.creatorId !== adminId) {
+      throw new Error('Only the group admin can remove members');
+    }
+    
+    // Cannot remove yourself as admin
+    if (memberId === adminId) {
+      throw new Error('Admin cannot be removed from the group');
+    }
+    
+    // Remove member from members array and memberProfiles
+    const updatedMembers = (groupData.members || []).filter((id: string) => id !== memberId);
+    const updatedProfiles = { ...groupData.memberProfiles };
+    delete updatedProfiles[memberId];
+    
+    await updateDoc(doc(db, 'groups', groupId), {
+      members: updatedMembers,
+      memberProfiles: updatedProfiles
+    });
+  } catch (error) {
+    console.error('Error removing group member:', error);
+    throw error;
+  }
+}
+
+// Leave a group
+export async function leaveGroup(groupId: string, userId: string): Promise<void> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
+    
+    // Admin cannot leave (must delete group instead)
+    if (groupData.creatorId === userId) {
+      throw new Error('Admin cannot leave the group. Delete the group instead.');
+    }
+    
+    const updatedMembers = (groupData.members || []).filter((id: string) => id !== userId);
+    const updatedProfiles = { ...groupData.memberProfiles };
+    delete updatedProfiles[userId];
+    
+    await updateDoc(doc(db, 'groups', groupId), {
+      members: updatedMembers,
+      memberProfiles: updatedProfiles
+    });
+  } catch (error) {
+    console.error('Error leaving group:', error);
+    throw error;
+  }
+}
+
+// Delete a group (admin only)
+export async function deleteGroup(groupId: string, adminId: string): Promise<void> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
+    
+    if (groupData.creatorId !== adminId) {
+      throw new Error('Only the group admin can delete the group');
+    }
+    
+    await deleteDoc(doc(db, 'groups', groupId));
+  } catch (error) {
+    console.error('Error deleting group:', error);
     throw error;
   }
 }
@@ -460,6 +593,41 @@ export async function updateUserPresence(userId: string, isOnline: boolean): Pro
   } catch (error) {
     console.error('Error updating presence:', error);
   }
+}
+
+// Update typing status for a match
+export async function updateTypingStatus(matchId: string, userId: string, isTyping: boolean): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'matches', matchId), {
+      [`typing.${userId}`]: isTyping ? serverTimestamp() : null
+    });
+  } catch (error) {
+    console.error('Error updating typing status:', error);
+  }
+}
+
+// Subscribe to typing status for a match
+export function subscribeToTypingStatus(
+  matchId: string, 
+  otherUserId: string, 
+  callback: (isTyping: boolean) => void
+): () => void {
+  return onSnapshot(doc(db, 'matches', matchId), (snapshot) => {
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      const typingTimestamp = data.typing?.[otherUserId];
+      if (typingTimestamp) {
+        // Consider typing if timestamp is within last 5 seconds
+        const typingTime = typingTimestamp.toDate?.() || new Date(typingTimestamp);
+        const isRecent = Date.now() - typingTime.getTime() < 5000;
+        callback(isRecent);
+      } else {
+        callback(false);
+      }
+    } else {
+      callback(false);
+    }
+  });
 }
 
 // Subscribe to a user's online status
@@ -1007,4 +1175,98 @@ export function subscribeToIncomingCalls(
     }
   });
 }
+
+// Group Message type
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName: string;
+  senderPhoto: string;
+  text: string;
+  timestamp: Timestamp;
+  type: 'text' | 'image';
+  imageUrl?: string;
+  replyTo?: {
+    id: string;
+    text: string;
+    senderId: string;
+    senderName: string;
+  };
+}
+
+// Send a message to a group
+export async function sendGroupMessage(
+  groupId: string,
+  senderId: string,
+  senderName: string,
+  senderPhoto: string,
+  text: string,
+  imageUrl?: string,
+  replyTo?: { id: string; text: string; senderId: string; senderName: string }
+): Promise<string> {
+  try {
+    const messagesRef = collection(db, 'groups', groupId, 'messages');
+    const messageDoc = doc(messagesRef);
+
+    const messageData: {
+      senderId: string;
+      senderName: string;
+      senderPhoto: string;
+      text: string;
+      timestamp: ReturnType<typeof serverTimestamp>;
+      type: 'text' | 'image';
+      imageUrl?: string;
+      replyTo?: { id: string; text: string; senderId: string; senderName: string };
+    } = {
+      senderId,
+      senderName,
+      senderPhoto,
+      text,
+      timestamp: serverTimestamp(),
+      type: imageUrl ? 'image' : 'text'
+    };
+
+    if (imageUrl) {
+      messageData.imageUrl = imageUrl;
+    }
+
+    if (replyTo) {
+      messageData.replyTo = replyTo;
+    }
+
+    await setDoc(messageDoc, messageData);
+
+    // Update group with last message
+    await updateDoc(doc(db, 'groups', groupId), {
+      lastMessage: imageUrl ? '📷 Photo' : text,
+      lastMessageTime: serverTimestamp(),
+      lastMessageSender: senderName
+    });
+
+    return messageDoc.id;
+  } catch (error) {
+    console.error('Error sending group message:', error);
+    throw error;
+  }
+}
+
+// Subscribe to group messages in real-time
+export function subscribeToGroupMessages(
+  groupId: string,
+  callback: (messages: GroupMessage[]) => void
+): () => void {
+  const messagesRef = collection(db, 'groups', groupId, 'messages');
+  const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
+
+  return onSnapshot(messagesQuery, snapshot => {
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      groupId,
+      ...doc.data()
+    })) as GroupMessage[];
+    callback(messages);
+  });
+}
+
 
