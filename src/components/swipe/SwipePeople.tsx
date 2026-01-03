@@ -2,13 +2,27 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo, useAnimation } from 'framer-motion';
-import { Heart, X, Star, RotateCcw, Info, MapPin, Briefcase, Loader2, Sparkles, MessageCircle } from 'lucide-react';
+import { Heart, X, Star, RotateCcw, Info, MapPin, Briefcase, Loader2, Sparkles, MessageCircle, Crown, Zap, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { getUsersToSwipe, recordSwipe } from '@/lib/firebaseServices';
+import { 
+  getUsersToSwipe, 
+  recordSwipe, 
+  canUseSuperLike,
+  incrementSwipeCount,
+  addSuperLikes,
+  purchasePremium,
+  purchaseAdFree,
+  recordPurchase,
+  subscribeToUserCredits,
+  subscribeToUserSubscription,
+  type UserCredits,
+  type UserSubscription
+} from '@/lib/firebaseServices';
 import { toast } from 'sonner';
 
 interface Profile {
@@ -569,26 +583,31 @@ function SwipeCard({
             </motion.div>
           )}
 
-          {/* Dark overlay for text readability */}
-          <div className='absolute inset-x-0 bottom-0 h-2/3 bg-black/60 pointer-events-none' />
+          {/* Improved gradient overlay - subtle at top, stronger at bottom for text */}
+          <div className='absolute inset-0 pointer-events-none'>
+            {/* Top subtle vignette */}
+            <div className='absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent' />
+            {/* Bottom gradient for text - more compact */}
+            <div className='absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/90 via-black/50 to-transparent' />
+          </div>
 
           {/* Profile info */}
           <div className='absolute bottom-0 left-0 right-0 p-4 sm:p-6 text-white z-20'>
             <div className='flex items-end justify-between'>
               <div className='flex-1'>
-                <h2 className='text-2xl sm:text-3xl font-bold mb-1'>
+                <h2 className='text-2xl sm:text-3xl font-bold mb-1 drop-shadow-lg'>
                   {profile.name}, {profile.age}
                 </h2>
                 {profile.course && (
-                  <div className='flex items-center gap-2 text-white/80 mb-1'>
+                  <div className='flex items-center gap-2 text-white/90 mb-1'>
                     <Briefcase className='w-3 h-3 sm:w-4 sm:h-4' />
-                    <span className='text-xs sm:text-sm'>{profile.course}</span>
+                    <span className='text-xs sm:text-sm drop-shadow'>{profile.course}</span>
                   </div>
                 )}
                 {profile.distance && (
-                  <div className='flex items-center gap-2 text-white/80'>
+                  <div className='flex items-center gap-2 text-white/90'>
                     <MapPin className='w-3 h-3 sm:w-4 sm:h-4' />
-                    <span className='text-xs sm:text-sm'>{profile.distance}</span>
+                    <span className='text-xs sm:text-sm drop-shadow'>{profile.distance}</span>
                   </div>
                 )}
               </div>
@@ -636,6 +655,17 @@ export default function SwipePeople() {
   const [matchedProfile, setMatchedProfile] = useState<Profile | null>(null);
   const [showMatchCelebration, setShowMatchCelebration] = useState(false);
   const [useFullScreenMatch, setUseFullScreenMatch] = useState(true);
+  
+  // Credits & Subscription state
+  const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+  
+  // Dialog states
+  const [showAdDialog, setShowAdDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [showNoSuperLikesDialog, setShowNoSuperLikesDialog] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(5);
 
   // Load settings for match notification preference
   useEffect(() => {
@@ -644,6 +674,27 @@ export default function SwipePeople() {
       setUseFullScreenMatch(JSON.parse(savedPreference));
     }
   }, []);
+
+  // Subscribe to user credits and subscription
+  useEffect(() => {
+    if (!user?.uid) return;
+    
+    const unsubCredits = subscribeToUserCredits(user.uid, setUserCredits);
+    const unsubSub = subscribeToUserSubscription(user.uid, setUserSubscription);
+    
+    return () => {
+      unsubCredits();
+      unsubSub();
+    };
+  }, [user?.uid]);
+
+  // Ad countdown timer
+  useEffect(() => {
+    if (showAdDialog && adCountdown > 0) {
+      const timer = setTimeout(() => setAdCountdown(adCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAdDialog, adCountdown]);
 
   // Load users to swipe from Firebase
   useEffect(() => {
@@ -682,6 +733,16 @@ export default function SwipePeople() {
       if (profiles.length === 0) return;
 
       const currentProfile = profiles[0];
+      
+      // Check if super like and if user can use it
+      if (direction === 'up' && user?.uid) {
+        const canUse = await canUseSuperLike(user.uid);
+        if (!canUse.canUse) {
+          setShowNoSuperLikesDialog(true);
+          return;
+        }
+      }
+      
       setLastAction({ profile: currentProfile, direction });
 
       // Remove the swiped profile from UI immediately
@@ -690,6 +751,13 @@ export default function SwipePeople() {
       if (!user?.uid) return;
 
       try {
+        // Check if ad should be shown (every 10 swipes for non-premium)
+        const adResult = await incrementSwipeCount(user.uid);
+        if (adResult.showAd) {
+          setAdCountdown(5);
+          setShowAdDialog(true);
+        }
+        
         // Record swipe to Firebase
         const swipeDirection = direction === 'up' ? 'superlike' : direction;
 
@@ -699,6 +767,10 @@ export default function SwipePeople() {
           // It's a match!
           setMatchedProfile(currentProfile);
           setShowMatchCelebration(true);
+          
+          if (result.isSuperLike) {
+            toast.success('⭐ Super Like Match! They\'ll know you really like them!');
+          }
         }
       } catch (error) {
         console.error('Error recording swipe:', error);
@@ -706,6 +778,60 @@ export default function SwipePeople() {
     },
     [profiles, user?.uid]
   );
+
+  // Purchase handlers
+  const handlePurchaseSuperLikes = async () => {
+    if (!user?.uid) return;
+    setPurchasing(true);
+    try {
+      // In a real app, this would go through a payment provider
+      // For now, we'll simulate the purchase
+      await addSuperLikes(user.uid, 10);
+      await recordPurchase(user.uid, 'super_likes', 1.00);
+      toast.success('🎉 10 Super Likes added to your account!');
+      setShowNoSuperLikesDialog(false);
+      setShowUpgradeDialog(false);
+    } catch (error) {
+      console.error('Error purchasing super likes:', error);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handlePurchasePremium = async () => {
+    if (!user?.uid) return;
+    setPurchasing(true);
+    try {
+      await purchasePremium(user.uid);
+      await recordPurchase(user.uid, 'premium', 5.00);
+      toast.success('👑 Welcome to Frinder Premium!');
+      setShowUpgradeDialog(false);
+      setShowNoSuperLikesDialog(false);
+    } catch (error) {
+      console.error('Error purchasing premium:', error);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handlePurchaseAdFree = async () => {
+    if (!user?.uid) return;
+    setPurchasing(true);
+    try {
+      await purchaseAdFree(user.uid);
+      await recordPurchase(user.uid, 'ad_free', 1.00);
+      toast.success('✨ Ads removed! Enjoy uninterrupted swiping!');
+      setShowAdDialog(false);
+      setShowUpgradeDialog(false);
+    } catch (error) {
+      console.error('Error purchasing ad-free:', error);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   const handleUndo = () => {
     if (lastAction) {
@@ -830,10 +956,11 @@ export default function SwipePeople() {
               <Heart className='w-7 h-7 sm:w-8 sm:h-8 text-green-500' fill='currentColor' />
             </motion.button>
 
-            {/* Boost */}
+            {/* Boost / Upgrade */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              onClick={() => setShowUpgradeDialog(true)}
               className='w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border border-muted dark:border-gray-800 transition-shadow hover:shadow-xl'
             >
               <svg className='w-5 h-5 sm:w-6 sm:h-6 text-frinder-burnt' viewBox='0 0 24 24' fill='currentColor'>
@@ -841,8 +968,199 @@ export default function SwipePeople() {
               </svg>
             </motion.button>
           </div>
+
+          {/* Super Likes Counter */}
+          <div className='flex justify-center mt-2'>
+            <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+              <Star className='w-3 h-3 text-blue-500' fill='currentColor' />
+              <span>{userSubscription?.unlimitedSuperLikes ? '∞' : (userCredits?.superLikes ?? 0)} Super Likes</span>
+              {userSubscription?.isPremium && (
+                <Badge className='ml-1 bg-frinder-orange text-white text-[10px] px-1 py-0'>Premium</Badge>
+              )}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* No Super Likes Dialog */}
+      <Dialog open={showNoSuperLikesDialog} onOpenChange={setShowNoSuperLikesDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900'>
+          <DialogHeader>
+            <DialogTitle className='text-center flex flex-col items-center gap-2'>
+              <div className='w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center'>
+                <Star className='w-8 h-8 text-blue-500' />
+              </div>
+              <span className='text-xl'>Out of Super Likes!</span>
+            </DialogTitle>
+            <DialogDescription className='text-center'>
+              Super Likes instantly match you with someone special. Get more to increase your chances!
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-3 pt-4'>
+            <Button
+              onClick={handlePurchaseSuperLikes}
+              disabled={purchasing}
+              className='w-full bg-blue-500 hover:bg-blue-600 text-white'
+            >
+              {purchasing ? (
+                <Loader2 className='w-4 h-4 animate-spin mr-2' />
+              ) : (
+                <Star className='w-4 h-4 mr-2' fill='currentColor' />
+              )}
+              Get 10 Super Likes - $1
+            </Button>
+            <Button
+              onClick={handlePurchasePremium}
+              disabled={purchasing}
+              className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
+            >
+              {purchasing ? (
+                <Loader2 className='w-4 h-4 animate-spin mr-2' />
+              ) : (
+                <Crown className='w-4 h-4 mr-2' />
+              )}
+              Go Premium - $5/month
+            </Button>
+            <Button
+              variant='outline'
+              onClick={() => setShowNoSuperLikesDialog(false)}
+              className='w-full'
+            >
+              Maybe Later
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ad Dialog */}
+      <Dialog open={showAdDialog} onOpenChange={setShowAdDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900'>
+          <DialogHeader>
+            <DialogTitle className='text-center'>Quick Break!</DialogTitle>
+            <DialogDescription className='text-center'>
+              Support Frinder by watching this quick ad, or go ad-free!
+            </DialogDescription>
+          </DialogHeader>
+          <div className='py-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center'>
+            <div className='text-center text-muted-foreground'>
+              <div className='w-16 h-16 mx-auto mb-2 bg-gray-300 dark:bg-gray-700 rounded flex items-center justify-center'>
+                <Zap className='w-8 h-8' />
+              </div>
+              <p className='text-sm'>Ad Placeholder</p>
+            </div>
+          </div>
+          <div className='space-y-3'>
+            <Button
+              onClick={() => setShowAdDialog(false)}
+              className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
+            >
+              Continue Swiping
+            </Button>
+            <Button
+              onClick={handlePurchaseAdFree}
+              disabled={purchasing}
+              variant='outline'
+              className='w-full'
+            >
+              {purchasing ? (
+                <Loader2 className='w-4 h-4 animate-spin mr-2' />
+              ) : null}
+              Remove Ads - $1/month
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upgrade Shop Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className='sm:max-w-lg dark:bg-gray-900'>
+          <DialogHeader>
+            <DialogTitle className='text-center flex flex-col items-center gap-2'>
+              <div className='w-16 h-16 rounded-full bg-frinder-orange/10 flex items-center justify-center'>
+                <Crown className='w-8 h-8 text-frinder-orange' />
+              </div>
+              <span className='text-xl'>Frinder Shop</span>
+            </DialogTitle>
+            <DialogDescription className='text-center'>
+              Upgrade your experience and find your match faster!
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-4 pt-4'>
+            {/* Super Likes Pack */}
+            <div className='border dark:border-gray-700 rounded-lg p-4 flex items-center justify-between'>
+              <div className='flex items-center gap-3'>
+                <div className='w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center'>
+                  <Star className='w-6 h-6 text-blue-500' fill='currentColor' />
+                </div>
+                <div>
+                  <h4 className='font-semibold dark:text-white'>10 Super Likes</h4>
+                  <p className='text-sm text-muted-foreground'>Instant match guarantee</p>
+                </div>
+              </div>
+              <Button
+                onClick={handlePurchaseSuperLikes}
+                disabled={purchasing}
+                className='bg-blue-500 hover:bg-blue-600 text-white'
+              >
+                {purchasing ? <Loader2 className='w-4 h-4 animate-spin' /> : '$1'}
+              </Button>
+            </div>
+
+            {/* Ad-Free */}
+            <div className='border dark:border-gray-700 rounded-lg p-4 flex items-center justify-between'>
+              <div className='flex items-center gap-3'>
+                <div className='w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center'>
+                  <Zap className='w-6 h-6 text-green-500' />
+                </div>
+                <div>
+                  <h4 className='font-semibold dark:text-white'>Ad-Free Swiping</h4>
+                  <p className='text-sm text-muted-foreground'>No interruptions for 1 month</p>
+                </div>
+              </div>
+              <Button
+                onClick={handlePurchaseAdFree}
+                disabled={purchasing || userSubscription?.isAdFree}
+                variant={userSubscription?.isAdFree ? 'outline' : 'default'}
+                className={userSubscription?.isAdFree ? '' : 'bg-green-500 hover:bg-green-600 text-white'}
+              >
+                {userSubscription?.isAdFree ? 'Active' : purchasing ? <Loader2 className='w-4 h-4 animate-spin' /> : '$1/mo'}
+              </Button>
+            </div>
+
+            {/* Premium */}
+            <div className='border-2 border-frinder-orange rounded-lg p-4 relative overflow-hidden'>
+              <div className='absolute top-0 right-0 bg-frinder-orange text-white text-xs px-2 py-1 rounded-bl'>
+                Best Value
+              </div>
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center gap-3'>
+                  <div className='w-12 h-12 rounded-full bg-frinder-orange/10 flex items-center justify-center'>
+                    <Crown className='w-6 h-6 text-frinder-orange' />
+                  </div>
+                  <div>
+                    <h4 className='font-semibold dark:text-white'>Frinder Premium</h4>
+                    <ul className='text-sm text-muted-foreground space-y-0.5'>
+                      <li>• Unlimited Super Likes</li>
+                      <li>• No Ads</li>
+                      <li>• See who liked you</li>
+                      <li>• Priority in search</li>
+                      <li>• Read receipts</li>
+                    </ul>
+                  </div>
+                </div>
+                <Button
+                  onClick={handlePurchasePremium}
+                  disabled={purchasing || userSubscription?.isPremium}
+                  variant={userSubscription?.isPremium ? 'outline' : 'default'}
+                  className={userSubscription?.isPremium ? '' : 'bg-frinder-orange hover:bg-frinder-burnt text-white'}
+                >
+                  {userSubscription?.isPremium ? 'Active' : purchasing ? <Loader2 className='w-4 h-4 animate-spin' /> : '$5/mo'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

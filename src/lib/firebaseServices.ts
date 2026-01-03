@@ -14,7 +14,8 @@ import {
   arrayUnion,
   Timestamp,
   DocumentData,
-  deleteDoc
+  deleteDoc,
+  increment
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { UserProfile } from '@/contexts/AuthContext';
@@ -25,6 +26,28 @@ export interface Swipe {
   odToUserId: string;
   direction: 'left' | 'right' | 'superlike';
   timestamp: Timestamp;
+}
+
+// User Credits & Subscription Types
+export interface UserCredits {
+  superLikes: number;
+  lastFreeSuperLike: Timestamp | null;
+  totalSuperLikesPurchased: number;
+  swipeCount: number; // For ad tracking
+  lastSwipeCountReset: Timestamp | null;
+}
+
+export interface UserSubscription {
+  isPremium: boolean;
+  isAdFree: boolean;
+  premiumExpiresAt: Timestamp | null;
+  adFreeExpiresAt: Timestamp | null;
+  // Premium benefits
+  unlimitedSuperLikes: boolean;
+  canSeeWhoLikedYou: boolean;
+  unlimitedRewinds: boolean;
+  priorityInDiscovery: boolean;
+  advancedFilters: boolean;
 }
 
 export interface Match {
@@ -43,6 +66,22 @@ export interface Message {
   text: string;
   timestamp: Timestamp;
   read: boolean;
+}
+
+// Date Request types
+export interface DateRequest {
+  id: string;
+  matchId: string;
+  senderId: string;
+  recipientId: string;
+  title: string;
+  date: Timestamp;
+  time: string;
+  location: string;
+  description?: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: Timestamp;
+  respondedAt?: Timestamp;
 }
 
 export interface Group {
@@ -139,7 +178,7 @@ export async function recordSwipe(
   fromUserId: string,
   toUserId: string,
   direction: 'left' | 'right' | 'superlike'
-): Promise<{ isMatch: boolean; matchId?: string }> {
+): Promise<{ isMatch: boolean; matchId?: string; isSuperLike?: boolean }> {
   try {
     const swipeId = `${fromUserId}_${toUserId}`;
     await setDoc(doc(db, 'swipes', swipeId), {
@@ -149,8 +188,31 @@ export async function recordSwipe(
       timestamp: serverTimestamp()
     });
 
-    // Check if it's a match (other user also swiped right)
-    if (direction === 'right' || direction === 'superlike') {
+    // SUPER LIKE: Automatically creates a match and notifies the other user
+    if (direction === 'superlike') {
+      // Use the super like credit
+      const used = await useSuperLike(fromUserId);
+      if (!used) {
+        // Shouldn't happen if UI checked first, but handle gracefully
+        console.warn('Super like used but no credits available');
+      }
+      
+      // Create automatic match for super like
+      const matchId = await createMatch(fromUserId, toUserId, true);
+      
+      // Also record a "super liked" notification for the other user
+      await setDoc(doc(db, 'superLikes', `${fromUserId}_${toUserId}`), {
+        fromUserId,
+        toUserId,
+        timestamp: serverTimestamp(),
+        seen: false
+      });
+      
+      return { isMatch: true, matchId, isSuperLike: true };
+    }
+
+    // Regular right swipe - check if it's a mutual match
+    if (direction === 'right') {
       const reverseSwipeId = `${toUserId}_${fromUserId}`;
       const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
 
@@ -172,8 +234,14 @@ export async function recordSwipe(
 }
 
 // Create a match
-async function createMatch(userId1: string, userId2: string): Promise<string> {
+async function createMatch(userId1: string, userId2: string, isSuperLike: boolean = false): Promise<string> {
   const matchId = [userId1, userId2].sort().join('_');
+
+  // Check if match already exists (for super likes where they might already be matched)
+  const existingMatch = await getDoc(doc(db, 'matches', matchId));
+  if (existingMatch.exists()) {
+    return matchId; // Already matched
+  }
 
   // Get both user profiles
   const user1Doc = await getDoc(doc(db, 'users', userId1));
@@ -186,7 +254,9 @@ async function createMatch(userId1: string, userId2: string): Promise<string> {
   await setDoc(doc(db, 'matches', matchId), {
     users: [userId1, userId2],
     userProfiles,
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),
+    isSuperLike,
+    superLikedBy: isSuperLike ? userId1 : null
   });
 
   return matchId;
@@ -308,11 +378,22 @@ export async function sendMessage(
 
     await setDoc(messageDoc, messageData);
 
-    // Update match with last message
-    await updateDoc(doc(db, 'matches', matchId), {
+    // Get match to find the other user
+    const matchDoc = await getDoc(doc(db, 'matches', matchId));
+    const matchData = matchDoc.data();
+    const otherUserId = matchData?.users?.find((id: string) => id !== senderId);
+
+    // Update match with last message and increment unread count for other user
+    const updateData: Record<string, unknown> = {
       lastMessage: imageUrl ? '📷 Photo' : text,
       lastMessageTime: serverTimestamp()
-    });
+    };
+
+    if (otherUserId) {
+      updateData[`unreadCount.${otherUserId}`] = increment(1);
+    }
+
+    await updateDoc(doc(db, 'matches', matchId), updateData);
 
     return messageDoc.id;
   } catch (error) {
@@ -346,10 +427,107 @@ export async function markMessagesAsRead(matchId: string, userId: string): Promi
     const updates = unreadSnapshot.docs.map(doc => updateDoc(doc.ref, { read: true }));
 
     await Promise.all(updates);
+
+    // Reset unread count for this user on the match document
+    await updateDoc(doc(db, 'matches', matchId), {
+      [`unreadCount.${userId}`]: 0
+    });
   } catch (error) {
     console.error('Error marking messages as read:', error);
   }
 }
+
+// ==================== DATE REQUEST FUNCTIONS ====================
+
+// Create a date request
+export async function createDateRequest(
+  matchId: string,
+  senderId: string,
+  recipientId: string,
+  data: {
+    title: string;
+    date: Date;
+    time: string;
+    location: string;
+    description?: string;
+  }
+): Promise<string> {
+  try {
+    const dateRequestsRef = collection(db, 'matches', matchId, 'dateRequests');
+    const dateRequestDoc = doc(dateRequestsRef);
+
+    const dateRequest = {
+      senderId,
+      recipientId,
+      title: data.title,
+      date: Timestamp.fromDate(data.date),
+      time: data.time,
+      location: data.location,
+      description: data.description || '',
+      status: 'pending',
+      createdAt: serverTimestamp()
+    };
+
+    await setDoc(dateRequestDoc, dateRequest);
+
+    // Update match with last message
+    await updateDoc(doc(db, 'matches', matchId), {
+      lastMessage: `📅 Date request: ${data.title}`,
+      lastMessageTime: serverTimestamp()
+    });
+
+    return dateRequestDoc.id;
+  } catch (error) {
+    console.error('Error creating date request:', error);
+    throw error;
+  }
+}
+
+// Respond to a date request (accept or decline)
+export async function respondToDateRequest(
+  matchId: string,
+  dateRequestId: string,
+  status: 'accepted' | 'declined'
+): Promise<void> {
+  try {
+    const dateRequestRef = doc(db, 'matches', matchId, 'dateRequests', dateRequestId);
+    
+    await updateDoc(dateRequestRef, {
+      status,
+      respondedAt: serverTimestamp()
+    });
+
+    // Update match with response
+    const statusEmoji = status === 'accepted' ? '✅' : '❌';
+    await updateDoc(doc(db, 'matches', matchId), {
+      lastMessage: `${statusEmoji} Date request ${status}`,
+      lastMessageTime: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error responding to date request:', error);
+    throw error;
+  }
+}
+
+// Subscribe to date requests for a match
+export function subscribeToDateRequests(
+  matchId: string,
+  callback: (dateRequests: DateRequest[]) => void
+): () => void {
+  const dateRequestsRef = collection(db, 'matches', matchId, 'dateRequests');
+  const dateRequestsQuery = query(dateRequestsRef, orderBy('createdAt', 'asc'));
+
+  return onSnapshot(dateRequestsQuery, snapshot => {
+    const dateRequests = snapshot.docs.map(doc => ({
+      id: doc.id,
+      matchId,
+      ...doc.data()
+    })) as DateRequest[];
+    callback(dateRequests);
+  });
+}
+
+// ==================== END DATE REQUEST FUNCTIONS ====================
 
 // Get groups to swipe on (excludes groups user is member of and groups they created)
 export async function getGroupsToSwipe(currentUserId: string, limitCount: number = 10): Promise<Group[]> {
@@ -525,7 +703,7 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
   }
 }
 
-// Delete a group (admin only)
+// Delete a group (admin only) - deletes group, all messages, and associated data
 export async function deleteGroup(groupId: string, adminId: string): Promise<void> {
   try {
     const groupDoc = await getDoc(doc(db, 'groups', groupId));
@@ -537,6 +715,13 @@ export async function deleteGroup(groupId: string, adminId: string): Promise<voi
       throw new Error('Only the group admin can delete the group');
     }
     
+    // Delete all messages in the group
+    const messagesRef = collection(db, 'groups', groupId, 'messages');
+    const messagesSnapshot = await getDocs(messagesRef);
+    const deletePromises = messagesSnapshot.docs.map(msgDoc => deleteDoc(msgDoc.ref));
+    await Promise.all(deletePromises);
+    
+    // Delete the group document itself
     await deleteDoc(doc(db, 'groups', groupId));
   } catch (error) {
     console.error('Error deleting group:', error);
@@ -1268,5 +1453,296 @@ export function subscribeToGroupMessages(
     callback(messages);
   });
 }
+
+// ==================== CREDITS & SUBSCRIPTION SYSTEM ====================
+
+// Initialize user credits (called when user first signs up or if missing)
+export async function initializeUserCredits(userId: string): Promise<UserCredits> {
+  const creditsRef = doc(db, 'userCredits', userId);
+  const creditsDoc = await getDoc(creditsRef);
+  
+  if (!creditsDoc.exists()) {
+    const initialCredits: Omit<UserCredits, 'lastFreeSuperLike' | 'lastSwipeCountReset'> & { lastFreeSuperLike: null; lastSwipeCountReset: null } = {
+      superLikes: 1, // Start with 1 free super like
+      lastFreeSuperLike: null,
+      totalSuperLikesPurchased: 0,
+      swipeCount: 0,
+      lastSwipeCountReset: null
+    };
+    await setDoc(creditsRef, initialCredits);
+    return initialCredits as UserCredits;
+  }
+  
+  return creditsDoc.data() as UserCredits;
+}
+
+// Initialize user subscription
+export async function initializeUserSubscription(userId: string): Promise<UserSubscription> {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  const subDoc = await getDoc(subRef);
+  
+  if (!subDoc.exists()) {
+    const initialSub: UserSubscription = {
+      isPremium: false,
+      isAdFree: false,
+      premiumExpiresAt: null,
+      adFreeExpiresAt: null,
+      unlimitedSuperLikes: false,
+      canSeeWhoLikedYou: false,
+      unlimitedRewinds: false,
+      priorityInDiscovery: false,
+      advancedFilters: false
+    };
+    await setDoc(subRef, initialSub);
+    return initialSub;
+  }
+  
+  return subDoc.data() as UserSubscription;
+}
+
+// Get user credits
+export async function getUserCredits(userId: string): Promise<UserCredits> {
+  const creditsRef = doc(db, 'userCredits', userId);
+  const creditsDoc = await getDoc(creditsRef);
+  
+  if (!creditsDoc.exists()) {
+    return initializeUserCredits(userId);
+  }
+  
+  return creditsDoc.data() as UserCredits;
+}
+
+// Get user subscription
+export async function getUserSubscription(userId: string): Promise<UserSubscription> {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  const subDoc = await getDoc(subRef);
+  
+  if (!subDoc.exists()) {
+    return initializeUserSubscription(userId);
+  }
+  
+  // Check if subscriptions have expired
+  const sub = subDoc.data() as UserSubscription;
+  const now = new Date();
+  let needsUpdate = false;
+  const updates: Partial<UserSubscription> = {};
+  
+  if (sub.premiumExpiresAt && sub.premiumExpiresAt.toDate() < now) {
+    updates.isPremium = false;
+    updates.unlimitedSuperLikes = false;
+    updates.canSeeWhoLikedYou = false;
+    updates.unlimitedRewinds = false;
+    updates.priorityInDiscovery = false;
+    updates.advancedFilters = false;
+    needsUpdate = true;
+  }
+  
+  if (sub.adFreeExpiresAt && sub.adFreeExpiresAt.toDate() < now) {
+    updates.isAdFree = false;
+    needsUpdate = true;
+  }
+  
+  if (needsUpdate) {
+    await updateDoc(subRef, updates);
+    return { ...sub, ...updates };
+  }
+  
+  return sub;
+}
+
+// Subscribe to user credits in real-time
+export function subscribeToUserCredits(
+  userId: string,
+  callback: (credits: UserCredits) => void
+): () => void {
+  const creditsRef = doc(db, 'userCredits', userId);
+  
+  return onSnapshot(creditsRef, async (snapshot) => {
+    if (!snapshot.exists()) {
+      const credits = await initializeUserCredits(userId);
+      callback(credits);
+    } else {
+      callback(snapshot.data() as UserCredits);
+    }
+  });
+}
+
+// Subscribe to user subscription in real-time
+export function subscribeToUserSubscription(
+  userId: string,
+  callback: (subscription: UserSubscription) => void
+): () => void {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  
+  return onSnapshot(subRef, async (snapshot) => {
+    if (!snapshot.exists()) {
+      const sub = await initializeUserSubscription(userId);
+      callback(sub);
+    } else {
+      callback(snapshot.data() as UserSubscription);
+    }
+  });
+}
+
+// Check if user can use a super like (has credits or premium)
+export async function canUseSuperLike(userId: string): Promise<{ canUse: boolean; reason?: string }> {
+  const [credits, subscription] = await Promise.all([
+    getUserCredits(userId),
+    getUserSubscription(userId)
+  ]);
+  
+  // Premium users have unlimited super likes
+  if (subscription.isPremium && subscription.unlimitedSuperLikes) {
+    return { canUse: true };
+  }
+  
+  // Check if user has super likes available
+  if (credits.superLikes > 0) {
+    return { canUse: true };
+  }
+  
+  // Check if user can claim their daily free super like
+  const now = new Date();
+  const lastFree = credits.lastFreeSuperLike?.toDate();
+  
+  if (!lastFree || (now.getTime() - lastFree.getTime()) >= 24 * 60 * 60 * 1000) {
+    // Can claim daily free super like
+    return { canUse: true };
+  }
+  
+  // Calculate time until next free super like
+  const nextFreeTime = new Date(lastFree.getTime() + 24 * 60 * 60 * 1000);
+  const hoursLeft = Math.ceil((nextFreeTime.getTime() - now.getTime()) / (60 * 60 * 1000));
+  
+  return { 
+    canUse: false, 
+    reason: `No super likes available. Next free super like in ${hoursLeft} hours. Buy more or upgrade to Premium!`
+  };
+}
+
+// Use a super like
+export async function useSuperLike(userId: string): Promise<boolean> {
+  const creditsRef = doc(db, 'userCredits', userId);
+  const [credits, subscription] = await Promise.all([
+    getUserCredits(userId),
+    getUserSubscription(userId)
+  ]);
+  
+  // Premium users don't consume super likes
+  if (subscription.isPremium && subscription.unlimitedSuperLikes) {
+    return true;
+  }
+  
+  // Check if user has super likes
+  if (credits.superLikes > 0) {
+    await updateDoc(creditsRef, {
+      superLikes: increment(-1)
+    });
+    return true;
+  }
+  
+  // Check if can claim daily free
+  const now = new Date();
+  const lastFree = credits.lastFreeSuperLike?.toDate();
+  
+  if (!lastFree || (now.getTime() - lastFree.getTime()) >= 24 * 60 * 60 * 1000) {
+    // Claim and use daily free super like (don't add to count, just mark as used)
+    await updateDoc(creditsRef, {
+      lastFreeSuperLike: serverTimestamp()
+    });
+    return true;
+  }
+  
+  return false;
+}
+
+// Add super likes (after purchase)
+export async function addSuperLikes(userId: string, amount: number): Promise<void> {
+  const creditsRef = doc(db, 'userCredits', userId);
+  await getUserCredits(userId); // Ensure initialized
+  
+  await updateDoc(creditsRef, {
+    superLikes: increment(amount),
+    totalSuperLikesPurchased: increment(amount)
+  });
+}
+
+// Increment swipe count and check if ad should be shown
+export async function incrementSwipeCount(userId: string): Promise<{ showAd: boolean; swipeCount: number }> {
+  const creditsRef = doc(db, 'userCredits', userId);
+  const [credits, subscription] = await Promise.all([
+    getUserCredits(userId),
+    getUserSubscription(userId)
+  ]);
+  
+  // Premium or ad-free users don't see ads
+  if (subscription.isPremium || subscription.isAdFree) {
+    return { showAd: false, swipeCount: credits.swipeCount };
+  }
+  
+  const newCount = credits.swipeCount + 1;
+  const showAd = newCount % 10 === 0;
+  
+  await updateDoc(creditsRef, {
+    swipeCount: newCount
+  });
+  
+  return { showAd, swipeCount: newCount };
+}
+
+// Purchase premium subscription
+export async function purchasePremium(userId: string): Promise<void> {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  await getUserSubscription(userId); // Ensure initialized
+  
+  const expiresAt = new Date();
+  expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 month
+  
+  await updateDoc(subRef, {
+    isPremium: true,
+    premiumExpiresAt: Timestamp.fromDate(expiresAt),
+    // Premium benefits
+    unlimitedSuperLikes: true,
+    canSeeWhoLikedYou: true,
+    unlimitedRewinds: true,
+    priorityInDiscovery: true,
+    advancedFilters: true,
+    // Premium includes ad-free
+    isAdFree: true,
+    adFreeExpiresAt: Timestamp.fromDate(expiresAt)
+  });
+}
+
+// Purchase ad-free subscription
+export async function purchaseAdFree(userId: string): Promise<void> {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  await getUserSubscription(userId); // Ensure initialized
+  
+  const expiresAt = new Date();
+  expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 month
+  
+  await updateDoc(subRef, {
+    isAdFree: true,
+    adFreeExpiresAt: Timestamp.fromDate(expiresAt)
+  });
+}
+
+// Record a purchase transaction
+export async function recordPurchase(
+  userId: string,
+  type: 'super_likes' | 'premium' | 'ad_free',
+  amount: number,
+  transactionId?: string
+): Promise<void> {
+  const purchaseRef = doc(collection(db, 'purchases'));
+  await setDoc(purchaseRef, {
+    userId,
+    type,
+    amount,
+    transactionId: transactionId || null,
+    createdAt: serverTimestamp()
+  });
+}
+
 
 

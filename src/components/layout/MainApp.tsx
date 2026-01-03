@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Users, MessageCircle, User, Flame, Settings, LogOut, Sparkles, Search } from 'lucide-react';
+import { Heart, Users, MessageCircle, User, Flame, Settings, LogOut, Sparkles, Search, Star, Crown } from 'lucide-react';
 import SwipePeople from '@/components/swipe/SwipePeople';
 import SwipeGroups from '@/components/swipe/SwipeGroups';
 import Messages from '@/components/messages/Messages';
@@ -11,7 +11,7 @@ import Matches from '@/components/matches/Matches';
 import SearchComponent from '@/components/search/Search';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { subscribeToUnreadCount } from '@/lib/firebaseServices';
+import { subscribeToUnreadCount, subscribeToUserCredits, subscribeToUserSubscription, type UserCredits, type UserSubscription } from '@/lib/firebaseServices';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SettingsSheet } from '@/components/profile/SettingsSheet';
 
@@ -23,6 +23,8 @@ export default function MainApp() {
   const { user, userProfile, signOut } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [selectedChatInfo, setSelectedChatInfo] = useState<{
     matchId: string;
     name: string;
@@ -39,6 +41,19 @@ export default function MainApp() {
     });
 
     return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Subscribe to user credits and subscription
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubCredits = subscribeToUserCredits(user.uid, setUserCredits);
+    const unsubSub = subscribeToUserSubscription(user.uid, setUserSubscription);
+
+    return () => {
+      unsubCredits();
+      unsubSub();
+    };
   }, [user?.uid]);
 
   const tabs = [
@@ -183,6 +198,21 @@ export default function MainApp() {
               Frinder
             </span>
           </motion.div>
+          
+          {/* Credits Display - Mobile */}
+          <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 dark:bg-blue-500/20'>
+              <Star className='w-3.5 h-3.5 text-blue-500' fill='currentColor' />
+              <span className='text-xs font-semibold text-blue-600 dark:text-blue-400'>
+                {userSubscription?.unlimitedSuperLikes ? '∞' : (userCredits?.superLikes ?? 0)}
+              </span>
+            </div>
+            {userSubscription?.isPremium && (
+              <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
+                <Crown className='w-3.5 h-3.5 text-frinder-orange' />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Desktop Header */}

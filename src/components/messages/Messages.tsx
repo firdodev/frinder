@@ -5,6 +5,8 @@ import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from '
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   ChevronLeft,
   Send,
@@ -18,8 +20,8 @@ import {
   VolumeX,
   MoreVertical,
   Image as ImageIcon,
-  Smile,
   Heart,
+  HeartCrack,
   Sparkles,
   Loader2,
   Check,
@@ -32,7 +34,12 @@ import {
   Users,
   Crown,
   LogOut,
-  Trash2
+  Trash2,
+  Calendar,
+  Clock,
+  MapPin,
+  PartyPopper,
+  CalendarHeart
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -56,13 +63,18 @@ import {
   getGroupMembers,
   removeGroupMember,
   leaveGroup,
+  deleteGroup,
   subscribeToGroupMessages,
   sendGroupMessage,
+  createDateRequest,
+  respondToDateRequest,
+  subscribeToDateRequests,
   type Match as FirebaseMatch,
   type Message as FirebaseMessage,
   type CallData,
   type Group as FirebaseGroup,
-  type GroupMessage as FirebaseGroupMessage
+  type GroupMessage as FirebaseGroupMessage,
+  type DateRequest
 } from '@/lib/firebaseServices';
 import { uploadMessageImage, compressImage } from '@/lib/storageService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -678,6 +690,333 @@ function MessageBubble({ message, isOwn, matchName, onReply, onViewImage, swipeD
   );
 }
 
+// Date Request Bubble Component
+interface DateRequestBubbleProps {
+  dateRequest: DateRequest;
+  isOwn: boolean;
+  matchName: string;
+  onAccept: () => void;
+  onDecline: () => void;
+  isResponding: boolean;
+}
+
+function DateRequestBubble({ dateRequest, isOwn, matchName, onAccept, onDecline, isResponding }: DateRequestBubbleProps) {
+  const formatDate = (timestamp: any) => {
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const isPending = dateRequest.status === 'pending';
+  const isAccepted = dateRequest.status === 'accepted';
+  const isDeclined = dateRequest.status === 'declined';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} px-2`}
+    >
+      <div className={`relative max-w-[85%] sm:max-w-[75%]`}>
+        {/* Status emoji indicator */}
+        {!isPending && (
+          <motion.div
+            initial={{ scale: 0, rotate: -30 }}
+            animate={{ scale: 1, rotate: isDeclined ? 15 : 0 }}
+            transition={{ type: 'spring', delay: 0.2 }}
+            className={`absolute -top-3 ${isOwn ? '-left-3' : '-right-3'} z-10`}
+          >
+            {isAccepted ? (
+              <div className='w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shadow-lg'>
+                <PartyPopper className='w-5 h-5 text-white' />
+              </div>
+            ) : (
+              <div className='w-10 h-10 rounded-full bg-red-400 flex items-center justify-center shadow-lg transform rotate-12'>
+                <HeartCrack className='w-5 h-5 text-white' />
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        <div
+          className={`rounded-2xl overflow-hidden shadow-lg ${
+            isOwn
+              ? 'bg-gradient-to-br from-frinder-orange to-frinder-burnt'
+              : 'bg-gradient-to-br from-pink-500 to-rose-600'
+          } ${isDeclined ? 'opacity-60' : ''}`}
+        >
+          {/* Header */}
+          <div className='px-4 py-3 border-b border-white/20'>
+            <div className='flex items-center gap-2'>
+              <CalendarHeart className='w-5 h-5 text-white' />
+              <span className='text-white font-semibold text-sm'>Date Request</span>
+              {isPending && (
+                <Badge className='ml-auto bg-white/20 text-white text-[10px]'>Pending</Badge>
+              )}
+              {isAccepted && (
+                <Badge className='ml-auto bg-green-400/30 text-white text-[10px]'>Accepted! 🎉</Badge>
+              )}
+              {isDeclined && (
+                <Badge className='ml-auto bg-red-400/30 text-white text-[10px]'>Declined</Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className='px-4 py-3 space-y-3'>
+            <h3 className='text-white font-bold text-lg'>{dateRequest.title}</h3>
+            
+            <div className='space-y-2'>
+              <div className='flex items-center gap-2 text-white/90'>
+                <Calendar className='w-4 h-4' />
+                <span className='text-sm'>{formatDate(dateRequest.date)}</span>
+              </div>
+              <div className='flex items-center gap-2 text-white/90'>
+                <Clock className='w-4 h-4' />
+                <span className='text-sm'>{dateRequest.time}</span>
+              </div>
+              <div className='flex items-center gap-2 text-white/90'>
+                <MapPin className='w-4 h-4' />
+                <span className='text-sm'>{dateRequest.location}</span>
+              </div>
+            </div>
+
+            {dateRequest.description && (
+              <p className='text-white/80 text-sm italic'>&quot;{dateRequest.description}&quot;</p>
+            )}
+          </div>
+
+          {/* Action buttons for recipient */}
+          {!isOwn && isPending && (
+            <div className='px-4 py-3 border-t border-white/20 flex gap-2'>
+              <Button
+                onClick={onDecline}
+                disabled={isResponding}
+                variant='outline'
+                className='flex-1 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white'
+              >
+                {isResponding ? <Loader2 className='w-4 h-4 animate-spin' /> : 'Decline'}
+              </Button>
+              <Button
+                onClick={onAccept}
+                disabled={isResponding}
+                className='flex-1 bg-white text-rose-600 hover:bg-white/90'
+              >
+                {isResponding ? <Loader2 className='w-4 h-4 animate-spin' /> : "I'd love to! 💕"}
+              </Button>
+            </div>
+          )}
+
+          {/* Status message for sender */}
+          {isOwn && isPending && (
+            <div className='px-4 py-2 border-t border-white/20 text-center'>
+              <span className='text-white/70 text-xs'>Waiting for {matchName}&apos;s response...</span>
+            </div>
+          )}
+
+          {/* Timestamp */}
+          <div className='px-4 pb-2 flex justify-end'>
+            <span className='text-white/60 text-[10px]'>
+              {formatDate(dateRequest.createdAt)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// Full-screen Date Accepted Celebration
+interface DateAcceptedCelebrationProps {
+  show: boolean;
+  onClose: () => void;
+  dateRequest: DateRequest | null;
+  matchName: string;
+  matchPhoto: string;
+  isOwn: boolean;
+}
+
+function DateAcceptedCelebration({ show, onClose, dateRequest, matchName, matchPhoto, isOwn }: DateAcceptedCelebrationProps) {
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return '';
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  };
+
+  useEffect(() => {
+    if (show) {
+      const timer = setTimeout(() => onClose(), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [show, onClose]);
+
+  if (!show || !dateRequest) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className='fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm'
+      onClick={onClose}
+    >
+      {/* Confetti effect */}
+      <div className='absolute inset-0 pointer-events-none overflow-hidden'>
+        {[...Array(50)].map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ 
+              x: Math.random() * window.innerWidth, 
+              y: -20,
+              rotate: 0,
+              scale: Math.random() * 0.5 + 0.5
+            }}
+            animate={{ 
+              y: window.innerHeight + 20,
+              rotate: Math.random() * 720 - 360,
+            }}
+            transition={{ 
+              duration: Math.random() * 2 + 2,
+              delay: Math.random() * 0.5,
+              ease: 'linear'
+            }}
+            className={`absolute w-3 h-3 rounded-sm ${
+              ['bg-pink-500', 'bg-rose-500', 'bg-frinder-orange', 'bg-yellow-400', 'bg-red-500', 'bg-purple-500'][Math.floor(Math.random() * 6)]
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Hearts floating up */}
+      <div className='absolute inset-0 pointer-events-none overflow-hidden'>
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={`heart-${i}`}
+            initial={{ 
+              x: Math.random() * window.innerWidth, 
+              y: window.innerHeight + 50,
+              scale: Math.random() * 0.5 + 0.5,
+              opacity: 0.8
+            }}
+            animate={{ 
+              y: -50,
+              opacity: 0
+            }}
+            transition={{ 
+              duration: Math.random() * 3 + 3,
+              delay: Math.random() * 2,
+              ease: 'easeOut'
+            }}
+            className='absolute text-rose-500'
+          >
+            <Heart className='w-6 h-6' fill='currentColor' />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Main content */}
+      <motion.div
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', damping: 15, stiffness: 200 }}
+        className='text-center px-8 py-10 max-w-md mx-4'
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Party popper icons */}
+        <div className='flex justify-center gap-4 mb-6'>
+          <motion.div
+            animate={{ rotate: [-15, 0, -15], scale: [1, 1.1, 1] }}
+            transition={{ duration: 0.5, repeat: Infinity }}
+          >
+            <PartyPopper className='w-12 h-12 text-yellow-400' />
+          </motion.div>
+          <motion.div
+            animate={{ rotate: [15, 0, 15], scale: [1, 1.1, 1] }}
+            transition={{ duration: 0.5, repeat: Infinity, delay: 0.25 }}
+          >
+            <PartyPopper className='w-12 h-12 text-pink-400 transform scale-x-[-1]' />
+          </motion.div>
+        </div>
+
+        {/* Avatar with glow */}
+        <motion.div
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className='relative inline-block mb-6'
+        >
+          <div className='absolute inset-0 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full blur-xl opacity-50' />
+          <Avatar className='w-24 h-24 border-4 border-white shadow-2xl relative'>
+            <AvatarImage src={matchPhoto} alt={matchName} />
+            <AvatarFallback className='bg-gradient-to-br from-pink-500 to-rose-500 text-white text-2xl'>
+              {matchName[0]}
+            </AvatarFallback>
+          </Avatar>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring' }}
+            className='absolute -bottom-2 -right-2 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg'
+          >
+            <Check className='w-6 h-6 text-white' />
+          </motion.div>
+        </motion.div>
+
+        {/* Title */}
+        <motion.h1
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className='text-3xl font-bold text-white mb-2'
+        >
+          It&apos;s a Date! 🎉
+        </motion.h1>
+
+        <motion.p
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className='text-white/80 text-lg mb-6'
+        >
+          {isOwn ? `${matchName} accepted your date request!` : `You accepted the date with ${matchName}!`}
+        </motion.p>
+
+        {/* Date details card */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className='bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-6'
+        >
+          <h3 className='text-white font-semibold text-lg mb-3'>{dateRequest.title}</h3>
+          <div className='space-y-2 text-white/90 text-sm'>
+            <div className='flex items-center justify-center gap-2'>
+              <Calendar className='w-4 h-4' />
+              <span>{formatDate(dateRequest.date)}</span>
+            </div>
+            <div className='flex items-center justify-center gap-2'>
+              <Clock className='w-4 h-4' />
+              <span>{dateRequest.time}</span>
+            </div>
+            <div className='flex items-center justify-center gap-2'>
+              <MapPin className='w-4 h-4' />
+              <span>{dateRequest.location}</span>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.p
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className='text-white/60 text-sm'
+        >
+          Tap anywhere to continue
+        </motion.p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 interface ChatViewProps {
   match: Match;
   currentUserId: string;
@@ -710,10 +1049,48 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   const [activeCallData, setActiveCallData] = useState<CallData | null>(null);
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [showVoiceCall, setShowVoiceCall] = useState(false);
+  // Date request state
+  const [dateRequests, setDateRequests] = useState<DateRequest[]>([]);
+  const [showDateRequestDialog, setShowDateRequestDialog] = useState(false);
+  const [dateRequestData, setDateRequestData] = useState({
+    title: '',
+    date: '',
+    time: '',
+    location: '',
+    description: ''
+  });
+  const [sendingDateRequest, setSendingDateRequest] = useState(false);
+  const [respondingToDateRequest, setRespondingToDateRequest] = useState(false);
+  const [showDateAcceptedCelebration, setShowDateAcceptedCelebration] = useState(false);
+  const [celebratingDateRequest, setCelebratingDateRequest] = useState<DateRequest | null>(null);
+  const lastAcceptedDateRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  // Subscribe to date requests
+  useEffect(() => {
+    if (!match.id || match.isUnmatched) return;
+
+    const unsubscribe = subscribeToDateRequests(match.id, (requests) => {
+      // Check for newly accepted date requests to trigger celebration
+      requests.forEach(req => {
+        if (req.status === 'accepted' && lastAcceptedDateRef.current !== req.id) {
+          // Only show celebration if we haven't shown it for this request
+          const prevReq = dateRequests.find(r => r.id === req.id);
+          if (prevReq && prevReq.status === 'pending') {
+            lastAcceptedDateRef.current = req.id;
+            setCelebratingDateRequest(req);
+            setShowDateAcceptedCelebration(true);
+          }
+        }
+      });
+      setDateRequests(requests);
+    });
+
+    return () => unsubscribe();
+  }, [match.id, match.isUnmatched, dateRequests]);
 
   // Subscribe to other user's typing status
   useEffect(() => {
@@ -955,6 +1332,60 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
     setShowUnmatchDialog(false);
   };
 
+  // Date request handlers
+  const handleSendDateRequest = async () => {
+    if (!dateRequestData.title || !dateRequestData.date || !dateRequestData.time || !dateRequestData.location) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setSendingDateRequest(true);
+    try {
+      await createDateRequest(match.id, currentUserId, match.odMatchId, {
+        title: dateRequestData.title,
+        date: new Date(dateRequestData.date),
+        time: dateRequestData.time,
+        location: dateRequestData.location,
+        description: dateRequestData.description
+      });
+      
+      toast.success(`Date request sent to ${match.name}! 💕`);
+      setShowDateRequestDialog(false);
+      setDateRequestData({ title: '', date: '', time: '', location: '', description: '' });
+    } catch (error) {
+      console.error('Error sending date request:', error);
+      toast.error('Failed to send date request');
+    } finally {
+      setSendingDateRequest(false);
+    }
+  };
+
+  const handleAcceptDateRequest = async (dateRequestId: string) => {
+    setRespondingToDateRequest(true);
+    try {
+      await respondToDateRequest(match.id, dateRequestId, 'accepted');
+      // Celebration will be triggered by the subscription
+    } catch (error) {
+      console.error('Error accepting date request:', error);
+      toast.error('Failed to accept date request');
+    } finally {
+      setRespondingToDateRequest(false);
+    }
+  };
+
+  const handleDeclineDateRequest = async (dateRequestId: string) => {
+    setRespondingToDateRequest(true);
+    try {
+      await respondToDateRequest(match.id, dateRequestId, 'declined');
+      toast.info('Date request declined');
+    } catch (error) {
+      console.error('Error declining date request:', error);
+      toast.error('Failed to decline date request');
+    } finally {
+      setRespondingToDateRequest(false);
+    }
+  };
+
   const getStatusText = () => {
     if (isOnline) return 'Online';
     if (lastSeen) {
@@ -1092,29 +1523,70 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               <p className='text-xs sm:text-sm text-muted-foreground text-center'>Say hi and start the conversation</p>
             </div>
 
-            {/* Message bubbles */}
-            {messages.map(message => {
-              const isOwn = message.senderId === currentUserId;
-              const swipeDirection = isOwn ? -1 : 1; // Swipe left for own, right for others
-              
-              return (
-                <div 
-                  key={message.id} 
-                  ref={(el) => { messageRefs.current[message.id] = el; }}
-                  className={`transition-all duration-300 ${highlightedMessageId === message.id ? 'bg-frinder-orange/20 rounded-xl -mx-2 px-2 py-1' : ''}`}
-                >
-                  <MessageBubble
-                    message={message}
-                    isOwn={isOwn}
-                    matchName={match.name}
-                    onReply={() => handleReply(message)}
-                    onViewImage={() => setViewingImage(message.imageUrl!)}
-                    swipeDirection={swipeDirection}
-                    onScrollToMessage={scrollToMessage}
-                  />
-                </div>
-              );
-            })}
+            {/* Combined Messages and Date Requests Timeline */}
+            {(() => {
+              // Create timeline items from both messages and date requests
+              type TimelineItem = 
+                | { type: 'message'; data: Message; timestamp: Date }
+                | { type: 'dateRequest'; data: DateRequest; timestamp: Date };
+
+              const timeline: TimelineItem[] = [
+                ...messages.map(m => ({
+                  type: 'message' as const,
+                  data: m,
+                  timestamp: m.timestamp
+                })),
+                ...dateRequests.map(dr => ({
+                  type: 'dateRequest' as const,
+                  data: dr,
+                  timestamp: dr.createdAt?.toDate ? dr.createdAt.toDate() : new Date()
+                }))
+              ];
+
+              // Sort by timestamp
+              timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+              return timeline.map((item) => {
+                if (item.type === 'message') {
+                  const message = item.data;
+                  const isOwn = message.senderId === currentUserId;
+                  const swipeDirection = isOwn ? -1 : 1;
+                  
+                  return (
+                    <div 
+                      key={`msg-${message.id}`} 
+                      ref={(el) => { messageRefs.current[message.id] = el; }}
+                      className={`transition-all duration-300 ${highlightedMessageId === message.id ? 'bg-frinder-orange/20 rounded-xl -mx-2 px-2 py-1' : ''}`}
+                    >
+                      <MessageBubble
+                        message={message}
+                        isOwn={isOwn}
+                        matchName={match.name}
+                        onReply={() => handleReply(message)}
+                        onViewImage={() => setViewingImage(message.imageUrl!)}
+                        swipeDirection={swipeDirection}
+                        onScrollToMessage={scrollToMessage}
+                      />
+                    </div>
+                  );
+                } else {
+                  const dateRequest = item.data;
+                  const isOwn = dateRequest.senderId === currentUserId;
+                  
+                  return (
+                    <DateRequestBubble
+                      key={`dr-${dateRequest.id}`}
+                      dateRequest={dateRequest}
+                      isOwn={isOwn}
+                      matchName={match.name}
+                      onAccept={() => handleAcceptDateRequest(dateRequest.id)}
+                      onDecline={() => handleDeclineDateRequest(dateRequest.id)}
+                      isResponding={respondingToDateRequest}
+                    />
+                  );
+                }
+              });
+            })()}
             
             {/* Typing Indicator */}
             <AnimatePresence>
@@ -1295,8 +1767,12 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               <ImageIcon className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground hover:text-frinder-orange transition-colors' />
             )}
           </button>
-          <button className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-900 rounded-full'>
-            <Smile className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground' />
+          <button 
+            onClick={() => setShowDateRequestDialog(true)}
+            className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-900 rounded-full transition-colors group'
+            title='Request a Date'
+          >
+            <CalendarHeart className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground group-hover:text-pink-500 transition-colors' />
           </button>
           <Input
             ref={inputRef}
@@ -1326,6 +1802,112 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         </div>
       </div>
       )}
+
+      {/* Date Request Dialog */}
+      <Dialog open={showDateRequestDialog} onOpenChange={setShowDateRequestDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900'>
+          <DialogHeader>
+            <DialogTitle className='text-center flex flex-col items-center gap-2'>
+              <div className='w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center'>
+                <CalendarHeart className='w-7 h-7 text-white' />
+              </div>
+              <span className='text-xl'>Request a Date</span>
+            </DialogTitle>
+            <DialogDescription className='text-center'>
+              Ask {match.name} out on a date! Fill in the details below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-4 pt-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='date-title'>Date Title</Label>
+              <Input
+                id='date-title'
+                placeholder='e.g., Coffee Date, Dinner at the Beach'
+                value={dateRequestData.title}
+                onChange={e => setDateRequestData(prev => ({ ...prev, title: e.target.value }))}
+                className='dark:bg-gray-800 dark:border-gray-700'
+              />
+            </div>
+            <div className='grid grid-cols-2 gap-3'>
+              <div className='space-y-2'>
+                <Label htmlFor='date-date'>Date</Label>
+                <Input
+                  id='date-date'
+                  type='date'
+                  value={dateRequestData.date}
+                  onChange={e => setDateRequestData(prev => ({ ...prev, date: e.target.value }))}
+                  className='dark:bg-gray-800 dark:border-gray-700'
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='date-time'>Time</Label>
+                <Input
+                  id='date-time'
+                  type='time'
+                  value={dateRequestData.time}
+                  onChange={e => setDateRequestData(prev => ({ ...prev, time: e.target.value }))}
+                  className='dark:bg-gray-800 dark:border-gray-700'
+                />
+              </div>
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='date-location'>Location</Label>
+              <Input
+                id='date-location'
+                placeholder='Where do you want to meet?'
+                value={dateRequestData.location}
+                onChange={e => setDateRequestData(prev => ({ ...prev, location: e.target.value }))}
+                className='dark:bg-gray-800 dark:border-gray-700'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='date-description'>Message (optional)</Label>
+              <Textarea
+                id='date-description'
+                placeholder='Add a personal message...'
+                value={dateRequestData.description}
+                onChange={e => setDateRequestData(prev => ({ ...prev, description: e.target.value }))}
+                className='dark:bg-gray-800 dark:border-gray-700 resize-none'
+                rows={2}
+              />
+            </div>
+            <div className='flex gap-3 pt-2'>
+              <Button
+                variant='outline'
+                onClick={() => setShowDateRequestDialog(false)}
+                className='flex-1'
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendDateRequest}
+                disabled={sendingDateRequest || !dateRequestData.title || !dateRequestData.date || !dateRequestData.time || !dateRequestData.location}
+                className='flex-1 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white'
+              >
+                {sendingDateRequest ? (
+                  <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                ) : (
+                  <Heart className='w-4 h-4 mr-2' fill='currentColor' />
+                )}
+                Send Request
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Date Accepted Celebration */}
+      <AnimatePresence>
+        <DateAcceptedCelebration
+          show={showDateAcceptedCelebration}
+          onClose={() => setShowDateAcceptedCelebration(false)}
+          dateRequest={celebratingDateRequest}
+          matchName={match.name}
+          matchPhoto={match.photo}
+          isOwn={celebratingDateRequest?.senderId === currentUserId}
+        />
+      </AnimatePresence>
     </div>
   );
 }
@@ -1337,11 +1919,11 @@ interface GroupChatViewProps {
   currentUserName: string;
   currentUserPhoto: string;
   onBack: () => void;
-  onManageMembers: () => void;
+  onGroupDeleted: () => void;
 }
 
 // Group Chat View Component - Similar to ChatView but with member avatars like WhatsApp groups
-function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto, onBack, onManageMembers }: GroupChatViewProps) {
+function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto, onBack, onGroupDeleted }: GroupChatViewProps) {
   const [messages, setMessages] = useState<FirebaseGroupMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -1350,8 +1932,16 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<FirebaseGroupMessage | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showMembersDialog, setShowMembersDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const isAdmin = group.creatorId === currentUserId;
 
   // Subscribe to group messages
   useEffect(() => {
@@ -1366,6 +1956,53 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+  
+  // Load members when dialog opens
+  const handleViewMembers = async () => {
+    setShowMembersDialog(true);
+    setLoadingMembers(true);
+    try {
+      const members = await getGroupMembers(group.id);
+      setGroupMembers(members);
+    } catch (error) {
+      console.error('Error loading members:', error);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+  
+  // Remove a member (admin only)
+  const handleRemoveMember = async (memberId: string) => {
+    if (!isAdmin) return;
+    setRemovingMember(memberId);
+    try {
+      await removeGroupMember(group.id, memberId, currentUserId);
+      setGroupMembers(prev => prev.filter(m => m.uid !== memberId));
+      toast.success('Member removed from group');
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      toast.error('Failed to remove member');
+    } finally {
+      setRemovingMember(null);
+    }
+  };
+  
+  // Delete entire group (admin only)
+  const handleDeleteGroup = async () => {
+    if (!isAdmin) return;
+    setDeleting(true);
+    try {
+      await deleteGroup(group.id, currentUserId);
+      toast.success('Group deleted successfully');
+      onGroupDeleted();
+    } catch (error: any) {
+      console.error('Error deleting group:', error);
+      toast.error('Failed to delete group');
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
 
   const handleSend = async () => {
     if ((!newMessage.trim() && !selectedImage) || sending) return;
@@ -1463,20 +2100,138 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[150px] z-50'
+                className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[180px] z-50'
               >
                 <button
-                  onClick={() => { onManageMembers(); setShowMenu(false); }}
+                  onClick={() => { handleViewMembers(); setShowMenu(false); }}
                   className='w-full px-4 py-2 text-left text-sm hover:bg-muted dark:hover:bg-gray-800 dark:text-white flex items-center gap-2'
                 >
                   <Users className='w-4 h-4' />
                   View Members
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setShowDeleteDialog(true); setShowMenu(false); }}
+                    className='w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-950 text-red-500 flex items-center gap-2'
+                  >
+                    <Trash2 className='w-4 h-4' />
+                    Delete Group
+                  </button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Members Dialog */}
+      <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+        <DialogContent className='dark:bg-gray-950 dark:border-gray-800 max-w-md'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white flex items-center gap-2'>
+              <Users className='w-5 h-5 text-frinder-orange' />
+              {group.name} - Members
+            </DialogTitle>
+            <DialogDescription>
+              {isAdmin ? 'Manage group members. You can remove members from the group.' : 'View all members of this group.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-2 max-h-96 overflow-y-auto'>
+            {loadingMembers ? (
+              <div className='flex items-center justify-center py-8'>
+                <Loader2 className='w-8 h-8 animate-spin text-frinder-orange' />
+              </div>
+            ) : groupMembers.length > 0 ? (
+              groupMembers.map(member => (
+                <div 
+                  key={member.uid}
+                  className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
+                >
+                  <Avatar className='w-10 h-10'>
+                    <AvatarImage src={member.photos?.[0]} alt={member.displayName} />
+                    <AvatarFallback className='bg-frinder-orange text-white'>
+                      {member.displayName?.[0] || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className='flex-1 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <span className='font-medium dark:text-white truncate'>{member.displayName}</span>
+                      {member.uid === group.creatorId && (
+                        <Badge className='bg-frinder-gold text-white text-[10px]'>
+                          <Crown className='w-2.5 h-2.5 mr-1' />
+                          Admin
+                        </Badge>
+                      )}
+                    </div>
+                    {member.city && (
+                      <span className='text-xs text-muted-foreground'>{member.city}</span>
+                    )}
+                  </div>
+                  {isAdmin && member.uid !== group.creatorId && member.uid !== currentUserId && (
+                    <button
+                      onClick={() => handleRemoveMember(member.uid)}
+                      disabled={removingMember === member.uid}
+                      className='p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50'
+                      title='Remove member'
+                    >
+                      {removingMember === member.uid ? (
+                        <Loader2 className='w-4 h-4 animate-spin text-red-500' />
+                      ) : (
+                        <Trash2 className='w-4 h-4 text-red-500' />
+                      )}
+                    </button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className='text-center py-8 text-muted-foreground'>
+                <Users className='w-10 h-10 mx-auto mb-2 opacity-50' />
+                <p>No members found</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Group Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className='dark:bg-gray-950 dark:border-gray-800 max-w-md'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white flex items-center gap-2 text-red-500'>
+              <Trash2 className='w-5 h-5' />
+              Delete Group
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{group.name}</strong>? This will permanently delete all messages, images, and data associated with this group. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='flex gap-3 mt-4'>
+            <Button
+              variant='outline'
+              className='flex-1 dark:border-gray-700 dark:text-white'
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant='destructive'
+              className='flex-1'
+              onClick={handleDeleteGroup}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Group'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Messages Area */}
       <div className='flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4'>
@@ -1762,6 +2517,68 @@ export default function Messages() {
   // Incoming call state
   const [incomingCall, setIncomingCall] = useState<CallData | null>(null);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
+  // Track notified date requests to avoid duplicate toasts
+  const notifiedDateRequestsRef = useRef<Set<string>>(new Set());
+  const dateRequestStatesRef = useRef<Map<string, Map<string, string>>>(new Map());
+
+  // Subscribe to date requests for all matches and show toast when outside conversation
+  useEffect(() => {
+    if (!user?.uid || matches.length === 0) return;
+
+    const unsubscribers: (() => void)[] = [];
+
+    matches.forEach(match => {
+      if (match.isUnmatched) return;
+
+      const unsubscribe = subscribeToDateRequests(match.id, (dateRequests) => {
+        // Check if we're currently viewing this match's conversation
+        const isViewingThisConversation = selectedMatch?.id === match.id;
+
+        dateRequests.forEach(req => {
+          const notificationKey = `${match.id}-${req.id}-${req.status}`;
+          
+          // Get previous state for this date request
+          if (!dateRequestStatesRef.current.has(match.id)) {
+            dateRequestStatesRef.current.set(match.id, new Map());
+          }
+          const matchStates = dateRequestStatesRef.current.get(match.id)!;
+          const prevStatus = matchStates.get(req.id);
+
+          // If status changed and we haven't notified about this yet
+          if (prevStatus && prevStatus !== req.status && !notifiedDateRequestsRef.current.has(notificationKey)) {
+            // Only show toast if not viewing this conversation
+            if (!isViewingThisConversation) {
+              if (req.status === 'accepted') {
+                if (req.senderId === user.uid) {
+                  // User sent the request and it was accepted
+                  toast.success(`🎉 ${match.name} accepted your date request!`, {
+                    duration: 5000,
+                  });
+                }
+              } else if (req.status === 'declined') {
+                if (req.senderId === user.uid) {
+                  // User sent the request and it was declined
+                  toast.error(`${match.name} declined your date request`, {
+                    duration: 4000,
+                  });
+                }
+              }
+            }
+            notifiedDateRequestsRef.current.add(notificationKey);
+          }
+
+          // Update the state tracker
+          matchStates.set(req.id, req.status);
+        });
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [user?.uid, matches, selectedMatch?.id]);
 
   // Subscribe to user's groups
   useEffect(() => {
@@ -1974,7 +2791,7 @@ export default function Messages() {
         currentUserName={userProfile?.displayName || user.displayName || 'You'}
         currentUserPhoto={userProfile?.photos?.[0] || user.photoURL || '/placeholder-avatar.png'}
         onBack={handleCloseGroupChat}
-        onManageMembers={() => handleViewGroupMembers(selectedGroup)}
+        onGroupDeleted={handleCloseGroupChat}
       />
     );
   }
@@ -2111,33 +2928,46 @@ export default function Messages() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     onClick={() => setSelectedMatch(match)}
-                    className='w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-muted dark:hover:bg-gray-800 transition-colors'
+                    className={`w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-muted dark:hover:bg-gray-800 transition-colors ${
+                      match.unreadCount > 0 ? 'bg-frinder-orange/5 dark:bg-frinder-orange/10' : ''
+                    }`}
                   >
                     <div className='relative'>
-                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14'>
+                      <Avatar className={`w-12 h-12 sm:w-14 sm:h-14 ${match.unreadCount > 0 ? 'ring-2 ring-frinder-orange' : ''}`}>
                         <AvatarImage src={match.photo} alt={match.name} />
                         <AvatarFallback className='bg-frinder-orange text-white'>{match.name[0]}</AvatarFallback>
                       </Avatar>
-                      {match.isOnline && (
+                      {match.isOnline && !match.unreadCount && (
                         <span className='absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
+                      )}
+                      {match.unreadCount > 0 && (
+                        <span className='absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center bg-frinder-orange text-white text-[10px] font-bold rounded-full px-1 shadow-lg'>
+                          {match.unreadCount > 99 ? '99+' : match.unreadCount}
+                        </span>
                       )}
                     </div>
                     <div className='flex-1 text-left min-w-0'>
                       <div className='flex items-center justify-between mb-0.5 sm:mb-1'>
-                        <h3 className='font-semibold text-sm sm:text-base dark:text-white'>{match.name}</h3>
-                        <span className='text-[10px] sm:text-xs text-muted-foreground'>
+                        <h3 className={`font-semibold text-sm sm:text-base dark:text-white ${match.unreadCount > 0 ? 'text-frinder-orange' : ''}`}>{match.name}</h3>
+                        <span className={`text-[10px] sm:text-xs ${match.unreadCount > 0 ? 'text-frinder-orange font-medium' : 'text-muted-foreground'}`}>
                           {match.lastMessageTime && formatTime(match.lastMessageTime)}
                         </span>
                       </div>
                       <p
                         className={`text-xs sm:text-sm truncate ${
-                          match.unreadCount > 0 ? 'text-foreground dark:text-white font-medium' : 'text-muted-foreground'
+                          match.unreadCount > 0 ? 'text-foreground dark:text-white font-semibold' : 'text-muted-foreground'
                         }`}
                       >
-                        {match.lastMessage}
+                        {match.lastMessage || 'Start a conversation!'}
                       </p>
                     </div>
-                    {match.unreadCount > 0 && <Badge className='bg-frinder-orange text-white text-[10px] sm:text-xs'>{match.unreadCount}</Badge>}
+                    {match.unreadCount > 0 && (
+                      <div className='flex-shrink-0'>
+                        <Badge className='bg-frinder-orange text-white text-[10px] sm:text-xs font-bold px-2'>
+                          {match.unreadCount > 99 ? '99+' : match.unreadCount}
+                        </Badge>
+                      </div>
+                    )}
                   </motion.button>
                 ))}
               </AnimatePresence>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ interface AuthPageProps {
 }
 
 export default function AuthPage({ onBack }: AuthPageProps) {
-  const { signIn, signUp, updateProfile } = useAuth();
+  const { user, userProfile, signIn, signUp, updateProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,6 +29,14 @@ export default function AuthPage({ onBack }: AuthPageProps) {
   const [authStep, setAuthStep] = useState<AuthStep>('auth');
   const [verificationCode, setVerificationCode] = useState(['', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Check if user is logged in but email not verified - auto-show verification
+  useEffect(() => {
+    if (user && userProfile && !userProfile.isEmailVerified) {
+      setEmail(userProfile.email);
+      setAuthStep('verify');
+    }
+  }, [user, userProfile]);
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) {
