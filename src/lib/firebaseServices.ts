@@ -114,7 +114,7 @@ export async function getUsersToSwipe(
 
       // Sort by shared interests (more shared interests = higher priority)
       if (currentUserProfile.interests && currentUserProfile.interests.length > 0) {
-        users = users.map(user => ({
+        const usersWithScore = users.map(user => ({
           ...user,
           _sharedInterests: user.interests?.filter(
             interest => currentUserProfile.interests?.includes(interest)
@@ -122,7 +122,7 @@ export async function getUsersToSwipe(
         })).sort((a, b) => (b._sharedInterests || 0) - (a._sharedInterests || 0));
 
         // Remove the temporary field
-        users = users.map(({ _sharedInterests, ...user }) => user as UserProfile);
+        users = usersWithScore.map(({ _sharedInterests, ...user }) => user as UserProfile);
       }
     }
 
@@ -289,8 +289,8 @@ export async function getGroupsToSwipe(currentUserId: string, limitCount: number
       .map(doc => ({
         id: doc.id,
         ...doc.data()
-      }))
-      .filter(group => !group.members?.includes(currentUserId)) as Group[];
+      } as Group))
+      .filter(group => !group.members?.includes(currentUserId));
   } catch (error) {
     console.error('Error getting groups:', error);
     return [];
