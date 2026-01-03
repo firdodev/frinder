@@ -27,7 +27,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto dark:bg-gray-900 dark:border-gray-800">
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-gray-800">
         <SheetHeader>
           <SheetTitle className="dark:text-white">Privacy & Safety</SheetTitle>
         </SheetHeader>
@@ -40,7 +40,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
             </h3>
             
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
                 <div className="flex items-center gap-3">
                   {privacy.showOnlineStatus ? (
                     <Eye className="w-5 h-5 text-[#ed8c00]" />
@@ -61,7 +61,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-[#ed8c00]" />
                   <div>
@@ -78,7 +78,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
                 <div className="flex items-center gap-3">
                   <CheckCheck className="w-5 h-5 text-[#ed8c00]" />
                   <div>
@@ -105,7 +105,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
               Discoverability
             </h3>
             
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
               <div className="flex items-center gap-3">
                 <Mail className="w-5 h-5 text-[#ed8c00]" />
                 <div>
@@ -131,7 +131,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
               Safety
             </h3>
             
-            <button className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+            <button className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left">
               <UserX className="w-5 h-5 text-[#ed8c00]" />
               <div>
                 <p className="text-sm font-medium dark:text-white">Blocked Users</p>
@@ -141,7 +141,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
               </div>
             </button>
 
-            <button className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+            <button className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left">
               <Ban className="w-5 h-5 text-[#ed8c00]" />
               <div>
                 <p className="text-sm font-medium dark:text-white">Hidden Profiles</p>
@@ -151,7 +151,7 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
               </div>
             </button>
 
-            <button className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+            <button className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left">
               <Shield className="w-5 h-5 text-[#ed8c00]" />
               <div>
                 <p className="text-sm font-medium dark:text-white">Safety Tips</p>

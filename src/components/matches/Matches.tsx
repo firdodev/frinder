@@ -1,0 +1,413 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Heart,
+  MessageCircle,
+  Search,
+  Loader2,
+  MapPin,
+  Calendar,
+  Sparkles,
+  UserX,
+  MoreHorizontal,
+  X,
+  ChevronRight,
+  Users,
+  Clock
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  subscribeToMatches,
+  unmatchUser,
+  getUserProfile,
+  type Match as FirebaseMatch
+} from '@/lib/firebaseServices';
+import { toast } from 'sonner';
+
+interface MatchProfile {
+  id: string;
+  odMatchId: string;
+  name: string;
+  age?: number;
+  photo: string;
+  photos: string[];
+  bio?: string;
+  location?: string;
+  interests?: string[];
+  matchedAt: Date;
+  isOnline?: boolean;
+  lastSeen?: Date;
+}
+
+interface MatchesProps {
+  onStartChat: (matchId: string, matchName: string, matchPhoto: string, otherUserId: string) => void;
+}
+
+export default function Matches({ onStartChat }: MatchesProps) {
+  const { user } = useAuth();
+  const [matches, setMatches] = useState<MatchProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMatch, setSelectedMatch] = useState<MatchProfile | null>(null);
+  const [showUnmatchDialog, setShowUnmatchDialog] = useState(false);
+  const [matchToUnmatch, setMatchToUnmatch] = useState<MatchProfile | null>(null);
+  const [view, setView] = useState<'grid' | 'list'>('grid');
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    setLoading(true);
+    const unsubscribe = subscribeToMatches(user.uid, async (firebaseMatches: FirebaseMatch[]) => {
+      const mappedMatches: MatchProfile[] = await Promise.all(
+        firebaseMatches.map(async m => {
+          const otherUserIndex = m.users[0] === user.uid ? 1 : 0;
+          const otherUserId = m.users[otherUserIndex];
+          const otherUserProfile = m.userProfiles?.[otherUserId];
+
+          return {
+            id: m.id,
+            odMatchId: otherUserId,
+            name: otherUserProfile?.displayName || 'Unknown',
+            age: otherUserProfile?.age,
+            photo: otherUserProfile?.photos?.[0] || '',
+            photos: otherUserProfile?.photos || [],
+            bio: otherUserProfile?.bio,
+            location: otherUserProfile?.city
+              ? `${otherUserProfile.city}${otherUserProfile.country ? `, ${otherUserProfile.country}` : ''}`
+              : undefined,
+            interests: otherUserProfile?.interests || [],
+            matchedAt: m.createdAt instanceof Date ? m.createdAt : m.createdAt?.toDate() || new Date(),
+            isOnline: false
+          };
+        })
+      );
+
+      setMatches(mappedMatches);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  const handleUnmatch = async () => {
+    if (!matchToUnmatch) return;
+    try {
+      await unmatchUser(matchToUnmatch.id);
+      toast.success(`Unmatched with ${matchToUnmatch.name}`);
+      setMatches(prev => prev.filter(m => m.id !== matchToUnmatch.id));
+      if (selectedMatch?.id === matchToUnmatch.id) {
+        setSelectedMatch(null);
+      }
+    } catch (error) {
+      toast.error('Failed to unmatch');
+    }
+    setShowUnmatchDialog(false);
+    setMatchToUnmatch(null);
+  };
+
+  const filteredMatches = matches.filter(m =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const formatMatchDate = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <div className='h-full flex items-center justify-center dark:bg-black'>
+        <div className='text-center'>
+          <Loader2 className='w-12 h-12 animate-spin text-frinder-orange mx-auto mb-4' />
+          <p className='text-muted-foreground'>Loading your matches...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className='h-full flex flex-col dark:bg-black'>
+      {/* Unmatch Confirmation Dialog */}
+      <Dialog open={showUnmatchDialog} onOpenChange={setShowUnmatchDialog}>
+        <DialogContent className='dark:bg-black dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Unmatch {matchToUnmatch?.name}?</DialogTitle>
+            <DialogDescription>
+              This will remove your match and you won't be able to message each other anymore. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='flex gap-3 mt-4'>
+            <Button variant='outline' onClick={() => setShowUnmatchDialog(false)} className='flex-1'>
+              Cancel
+            </Button>
+            <Button variant='destructive' onClick={handleUnmatch} className='flex-1'>
+              <UserX className='w-4 h-4 mr-2' />
+              Unmatch
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Match Detail Sheet */}
+      <AnimatePresence>
+        {selectedMatch && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm'
+            onClick={() => setSelectedMatch(null)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+              className='absolute bottom-0 left-0 right-0 max-h-[90vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden'
+            >
+              {/* Match Profile Header */}
+              <div className='relative h-72'>
+                <img
+                  src={selectedMatch.photo}
+                  alt={selectedMatch.name}
+                  className='w-full h-full object-cover'
+                />
+                <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
+                <button
+                  onClick={() => setSelectedMatch(null)}
+                  className='absolute top-4 right-4 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors'
+                >
+                  <X className='w-5 h-5' />
+                </button>
+                <div className='absolute bottom-4 left-4 right-4'>
+                  <h2 className='text-2xl font-bold text-white'>
+                    {selectedMatch.name}{selectedMatch.age ? `, ${selectedMatch.age}` : ''}
+                  </h2>
+                  {selectedMatch.location && (
+                    <div className='flex items-center gap-1 text-white/80 mt-1'>
+                      <MapPin className='w-4 h-4' />
+                      <span className='text-sm'>{selectedMatch.location}</span>
+                    </div>
+                  )}
+                  <div className='flex items-center gap-1 text-white/60 mt-1'>
+                    <Calendar className='w-4 h-4' />
+                    <span className='text-sm'>Matched {formatMatchDate(selectedMatch.matchedAt)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Match Content */}
+              <div className='p-4 overflow-y-auto max-h-[calc(90vh-288px)]'>
+                {/* Action Buttons */}
+                <div className='flex gap-3 mb-6'>
+                  <Button
+                    onClick={() => {
+                      onStartChat(selectedMatch.id, selectedMatch.name, selectedMatch.photo, selectedMatch.odMatchId);
+                      setSelectedMatch(null);
+                    }}
+                    className='flex-1 bg-frinder-orange hover:bg-frinder-burnt h-12'
+                  >
+                    <MessageCircle className='w-5 h-5 mr-2' />
+                    Message
+                  </Button>
+                  <Button
+                    variant='outline'
+                    onClick={() => {
+                      setMatchToUnmatch(selectedMatch);
+                      setShowUnmatchDialog(true);
+                    }}
+                    className='h-12 px-4 text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20'
+                  >
+                    <UserX className='w-5 h-5' />
+                  </Button>
+                </div>
+
+                {/* Bio */}
+                {selectedMatch.bio && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>About</h3>
+                    <p className='text-muted-foreground text-sm leading-relaxed'>{selectedMatch.bio}</p>
+                  </div>
+                )}
+
+                {/* Interests */}
+                {selectedMatch.interests && selectedMatch.interests.length > 0 && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>Interests</h3>
+                    <div className='flex flex-wrap gap-2'>
+                      {selectedMatch.interests.filter(Boolean).map((interest, index) => (
+                        <Badge
+                          key={`${interest}-${index}`}
+                          className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'
+                        >
+                          {interest}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Photos Gallery */}
+                {selectedMatch.photos.length > 1 && (
+                  <div>
+                    <h3 className='font-semibold dark:text-white mb-2'>Photos</h3>
+                    <div className='grid grid-cols-3 gap-2'>
+                      {selectedMatch.photos.slice(1).map((photo, index) => (
+                        <div key={index} className='aspect-square rounded-xl overflow-hidden'>
+                          <img src={photo} alt={`Photo ${index + 2}`} className='w-full h-full object-cover' />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <div className='px-4 pt-4 pb-3 border-b dark:border-gray-800 bg-white dark:bg-black'>
+        <div className='flex items-center justify-between mb-4'>
+          <div className='flex items-center gap-2'>
+            <Heart className='w-6 h-6 text-frinder-orange' fill='currentColor' />
+            <h1 className='text-xl font-bold dark:text-white'>My Matches</h1>
+            <Badge variant='secondary' className='bg-frinder-orange/10 text-frinder-orange'>
+              {matches.length}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className='relative'>
+          <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+          <Input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder='Search matches...'
+            className='pl-10 dark:bg-gray-900 dark:border-gray-800'
+          />
+        </div>
+      </div>
+
+      {/* Matches Content */}
+      <div className='flex-1 overflow-y-auto p-4'>
+        {filteredMatches.length === 0 ? (
+          <div className='flex flex-col items-center justify-center h-full text-center px-6'>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className='w-20 h-20 rounded-full bg-frinder-orange/10 flex items-center justify-center mb-4'
+            >
+              {searchQuery ? (
+                <Search className='w-10 h-10 text-frinder-orange' />
+              ) : (
+                <Heart className='w-10 h-10 text-frinder-orange' />
+              )}
+            </motion.div>
+            <h2 className='text-xl font-bold mb-2 dark:text-white'>
+              {searchQuery ? 'No matches found' : 'No matches yet'}
+            </h2>
+            <p className='text-muted-foreground'>
+              {searchQuery
+                ? 'Try a different search term'
+                : 'Start swiping to find your perfect match!'}
+            </p>
+          </div>
+        ) : (
+          <div className='grid grid-cols-2 gap-3'>
+            {filteredMatches.map(match => (
+              <motion.div
+                key={match.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setSelectedMatch(match)}
+                className='cursor-pointer'
+              >
+                <Card className='overflow-hidden border-0 shadow-lg dark:bg-gray-900 hover:shadow-xl transition-shadow'>
+                  <div className='relative aspect-[3/4]'>
+                    <img
+                      src={match.photo}
+                      alt={match.name}
+                      className='w-full h-full object-cover'
+                    />
+                    <div className='absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent' />
+                    
+                    {/* Match indicator */}
+                    <div className='absolute top-2 left-2'>
+                      <div className='flex items-center gap-1 bg-frinder-orange/90 backdrop-blur-sm px-2 py-1 rounded-full'>
+                        <Sparkles className='w-3 h-3 text-white' />
+                        <span className='text-[10px] font-medium text-white'>Match</span>
+                      </div>
+                    </div>
+
+                    {/* More menu button */}
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setMatchToUnmatch(match);
+                        setShowUnmatchDialog(true);
+                      }}
+                      className='absolute top-2 right-2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors'
+                    >
+                      <MoreHorizontal className='w-4 h-4' />
+                    </button>
+
+                    {/* Profile info */}
+                    <div className='absolute bottom-0 left-0 right-0 p-3'>
+                      <h3 className='font-bold text-white text-lg'>
+                        {match.name}{match.age ? `, ${match.age}` : ''}
+                      </h3>
+                      {match.location && (
+                        <div className='flex items-center gap-1 text-white/80 text-xs mt-0.5'>
+                          <MapPin className='w-3 h-3' />
+                          <span className='truncate'>{match.location}</span>
+                        </div>
+                      )}
+                      <div className='flex items-center gap-1 text-white/60 text-xs mt-1'>
+                        <Clock className='w-3 h-3' />
+                        <span>{formatMatchDate(match.matchedAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action button */}
+                  <CardContent className='p-2'>
+                    <Button
+                      size='sm'
+                      onClick={e => {
+                        e.stopPropagation();
+                        onStartChat(match.id, match.name, match.photo, match.odMatchId);
+                      }}
+                      className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
+                    >
+                      <MessageCircle className='w-4 h-4 mr-2' />
+                      Message
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

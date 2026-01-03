@@ -13,7 +13,8 @@ import {
   updateDoc,
   arrayUnion,
   Timestamp,
-  DocumentData
+  DocumentData,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { UserProfile } from '@/contexts/AuthContext';
@@ -222,22 +223,62 @@ export function subscribeToMatches(userId: string, callback: (matches: Match[]) 
   });
 }
 
+// Subscribe to total unread message count across all matches
+export function subscribeToUnreadCount(userId: string, callback: (count: number) => void): () => void {
+  const matchesRef = collection(db, 'matches');
+  const matchesQuery = query(matchesRef, where('users', 'array-contains', userId));
+
+  return onSnapshot(matchesQuery, async (snapshot) => {
+    let totalUnread = 0;
+    
+    // For each match, count unread messages not sent by current user
+    const countPromises = snapshot.docs.map(async (matchDoc) => {
+      const messagesRef = collection(db, 'matches', matchDoc.id, 'messages');
+      // Only query for unread messages, then filter by sender client-side
+      const unreadQuery = query(messagesRef, where('read', '==', false));
+      const unreadSnapshot = await getDocs(unreadQuery);
+      
+      // Filter out messages sent by current user
+      return unreadSnapshot.docs.filter(doc => doc.data().senderId !== userId).length;
+    });
+    
+    const counts = await Promise.all(countPromises);
+    totalUnread = counts.reduce((sum, count) => sum + count, 0);
+    
+    callback(totalUnread);
+  });
+}
+
 // Send a message
-export async function sendMessage(matchId: string, senderId: string, text: string): Promise<string> {
+export async function sendMessage(matchId: string, senderId: string, text: string, imageUrl?: string): Promise<string> {
   try {
     const messagesRef = collection(db, 'matches', matchId, 'messages');
     const messageDoc = doc(messagesRef);
 
-    await setDoc(messageDoc, {
+    const messageData: {
+      senderId: string;
+      text: string;
+      timestamp: ReturnType<typeof serverTimestamp>;
+      read: boolean;
+      imageUrl?: string;
+      type: 'text' | 'image';
+    } = {
       senderId,
       text,
       timestamp: serverTimestamp(),
-      read: false
-    });
+      read: false,
+      type: imageUrl ? 'image' : 'text'
+    };
+
+    if (imageUrl) {
+      messageData.imageUrl = imageUrl;
+    }
+
+    await setDoc(messageDoc, messageData);
 
     // Update match with last message
     await updateDoc(doc(db, 'matches', matchId), {
-      lastMessage: text,
+      lastMessage: imageUrl ? '📷 Photo' : text,
       lastMessageTime: serverTimestamp()
     });
 
@@ -349,5 +390,138 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   } catch (error) {
     console.error('Error getting user profile:', error);
     return null;
+  }
+}
+
+// Update user online status
+export async function updateUserPresence(userId: string, isOnline: boolean): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'users', userId), {
+      isOnline,
+      lastSeen: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating presence:', error);
+  }
+}
+
+// Subscribe to a user's online status
+export function subscribeToUserPresence(userId: string, callback: (isOnline: boolean, lastSeen?: Date) => void): () => void {
+  return onSnapshot(doc(db, 'users', userId), (snapshot) => {
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      const isOnline = data.isOnline || false;
+      const lastSeen = data.lastSeen?.toDate();
+      callback(isOnline, lastSeen);
+    } else {
+      callback(false);
+    }
+  });
+}
+
+// Unmatch/unfriend a user
+export async function unmatchUser(matchId: string): Promise<void> {
+  try {
+    // Delete all messages in the match
+    const messagesRef = collection(db, 'matches', matchId, 'messages');
+    const messagesSnapshot = await getDocs(messagesRef);
+    const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    // Delete the match document
+    await deleteDoc(doc(db, 'matches', matchId));
+  } catch (error) {
+    console.error('Error unmatching user:', error);
+    throw error;
+  }
+}
+
+// Get match count for a user
+export async function getMatchCount(userId: string): Promise<number> {
+  try {
+    const matchesRef = collection(db, 'matches');
+    const matchesQuery = query(matchesRef, where('users', 'array-contains', userId));
+    const matchesSnapshot = await getDocs(matchesQuery);
+    return matchesSnapshot.size;
+  } catch (error) {
+    console.error('Error getting match count:', error);
+    return 0;
+  }
+}
+
+// Search for users by name
+export async function searchUsers(
+  currentUserId: string,
+  searchQuery: string,
+  limitCount: number = 20
+): Promise<(UserProfile & { id: string })[]> {
+  try {
+    if (!searchQuery.trim()) return [];
+
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+
+    // Filter users by name (case-insensitive)
+    const searchLower = searchQuery.toLowerCase();
+    const users = usersSnapshot.docs
+      .map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      } as UserProfile & { id: string }))
+      .filter(user => {
+        // Exclude current user
+        if (user.id === currentUserId) return false;
+        // Match by displayName
+        const nameMatch = user.displayName?.toLowerCase().includes(searchLower);
+        // Match by city
+        const cityMatch = user.city?.toLowerCase().includes(searchLower);
+        return nameMatch || cityMatch;
+      })
+      .slice(0, limitCount);
+
+    return users;
+  } catch (error) {
+    console.error('Error searching users:', error);
+    return [];
+  }
+}
+
+// Send a match request (swipe right on a specific user)
+export async function sendMatchRequest(
+  fromUserId: string,
+  toUserId: string
+): Promise<{ isMatch: boolean; matchId?: string }> {
+  return recordSwipe(fromUserId, toUserId, 'right');
+}
+
+// Check if users are already matched
+export async function checkIfMatched(userId1: string, userId2: string): Promise<{ isMatched: boolean; matchId?: string }> {
+  try {
+    const matchId = [userId1, userId2].sort().join('_');
+    const matchDoc = await getDoc(doc(db, 'matches', matchId));
+    
+    if (matchDoc.exists()) {
+      return { isMatched: true, matchId };
+    }
+    return { isMatched: false };
+  } catch (error) {
+    console.error('Error checking match status:', error);
+    return { isMatched: false };
+  }
+}
+
+// Check if user has already swiped on another user
+export async function checkSwipeStatus(fromUserId: string, toUserId: string): Promise<'none' | 'left' | 'right' | 'superlike'> {
+  try {
+    const swipeId = `${fromUserId}_${toUserId}`;
+    const swipeDoc = await getDoc(doc(db, 'swipes', swipeId));
+    
+    if (swipeDoc.exists()) {
+      return swipeDoc.data().direction;
+    }
+    return 'none';
+  } catch (error) {
+    console.error('Error checking swipe status:', error);
+    return 'none';
   }
 }

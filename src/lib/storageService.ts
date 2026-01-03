@@ -144,3 +144,43 @@ export async function compressImage(
     };
   });
 }
+
+/**
+ * Upload a message image to Firebase Storage
+ * @param matchId - The match/conversation ID
+ * @param senderId - The sender's user ID
+ * @param file - The file to upload
+ * @returns The download URL of the uploaded image
+ */
+export async function uploadMessageImage(
+  matchId: string,
+  senderId: string,
+  file: File
+): Promise<string> {
+  try {
+    // Create a unique filename
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filename = `${timestamp}_${senderId}.${extension}`;
+    
+    // Create reference to storage location
+    const imageRef = ref(storage, `messages/${matchId}/${filename}`);
+    
+    // Upload the file
+    const snapshot = await uploadBytes(imageRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        uploadedAt: new Date().toISOString(),
+        senderId
+      }
+    });
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading message image:', error);
+    throw new Error('Failed to upload image. Please try again.');
+  }
+}

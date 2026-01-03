@@ -22,7 +22,7 @@ interface HelpSheetProps {
 export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto dark:bg-gray-900 dark:border-gray-800">
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-gray-800">
         <SheetHeader>
           <SheetTitle className="dark:text-white">Help & Support</SheetTitle>
         </SheetHeader>
@@ -35,7 +35,7 @@ export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
             </h3>
             
             <div className="space-y-3">
-              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <HelpCircle className="w-5 h-5 text-[#ed8c00]" />
                   <div className="text-left">
@@ -48,7 +48,7 @@ export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
                 <ChevronRight className="w-5 h-5 text-gray-400" />
               </button>
 
-              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <BookOpen className="w-5 h-5 text-[#ed8c00]" />
                   <div className="text-left">
@@ -85,7 +85,7 @@ export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
                 <ExternalLink className="w-5 h-5 text-[#ed8c00]" />
               </button>
 
-              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-[#ed8c00]" />
                   <div className="text-left">
@@ -109,7 +109,7 @@ export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
             </h3>
             
             <div className="space-y-3">
-              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <Shield className="w-5 h-5 text-[#ed8c00]" />
                   <div className="text-left">
@@ -122,7 +122,7 @@ export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
                 <ChevronRight className="w-5 h-5 text-gray-400" />
               </button>
 
-              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <FileText className="w-5 h-5 text-[#ed8c00]" />
                   <div className="text-left">
@@ -146,16 +146,16 @@ export function HelpSheet({ open, onOpenChange }: HelpSheetProps) {
             </h3>
             
             <div className="flex flex-wrap gap-2">
-              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 Terms of Service
               </button>
-              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 Privacy Policy
               </button>
-              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 Cookie Policy
               </button>
-              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 Licenses
               </button>
             </div>

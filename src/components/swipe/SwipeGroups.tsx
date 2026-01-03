@@ -148,8 +148,8 @@ function SwipeGroupCard({ group, onSwipe, isTop }: SwipeGroupCardProps) {
             {/* Interests */}
             {group.interests.length > 0 && (
               <div className='flex flex-wrap gap-2'>
-                {group.interests.map(interest => (
-                  <Badge key={interest} variant='secondary' className='bg-white/20 text-white border-0'>
+                {group.interests.filter(i => i).map((interest, index) => (
+                  <Badge key={`${interest}-${index}`} variant='secondary' className='bg-white/20 text-white border-0'>
                     {interest}
                   </Badge>
                 ))}
@@ -171,11 +171,40 @@ export default function SwipeGroups() {
   const [newGroup, setNewGroup] = useState({
     name: '',
     description: '',
-    interests: '',
+    interests: [] as string[],
     activity: '',
     location: ''
   });
   const [creating, setCreating] = useState(false);
+  const [customInterest, setCustomInterest] = useState('');
+
+  // Predefined interest tags for better algorithm matching
+  const availableTags = [
+    'Sports', 'Fitness', 'Music', 'Art', 'Photography', 'Gaming', 'Travel',
+    'Food', 'Cooking', 'Reading', 'Movies', 'Tech', 'Coding', 'Fashion',
+    'Dance', 'Yoga', 'Hiking', 'Camping', 'Beach', 'Nature', 'Nightlife',
+    'Coffee', 'Wine', 'Pets', 'Dogs', 'Cats', 'Volunteering', 'Languages',
+    'Business', 'Startups', 'Networking', 'Study', 'Research', 'Writing'
+  ];
+
+  const toggleInterest = (interest: string) => {
+    setNewGroup(prev => ({
+      ...prev,
+      interests: prev.interests.includes(interest)
+        ? prev.interests.filter(i => i !== interest)
+        : [...prev.interests, interest]
+    }));
+  };
+
+  const addCustomInterest = () => {
+    if (customInterest.trim() && !newGroup.interests.includes(customInterest.trim())) {
+      setNewGroup(prev => ({
+        ...prev,
+        interests: [...prev.interests, customInterest.trim()]
+      }));
+      setCustomInterest('');
+    }
+  };
 
   // Load groups from Firebase
   useEffect(() => {
@@ -257,17 +286,15 @@ export default function SwipeGroups() {
       await createGroup(user.uid, {
         name: newGroup.name,
         description: newGroup.description,
-        interests: newGroup.interests
-          .split(',')
-          .map(i => i.trim())
-          .filter(Boolean),
+        interests: newGroup.interests,
         activity: newGroup.activity,
         location: newGroup.location,
         photo: ''
       });
 
       setShowCreateDialog(false);
-      setNewGroup({ name: '', description: '', interests: '', activity: '', location: '' });
+      setNewGroup({ name: '', description: '', interests: [], activity: '', location: '' });
+      setCustomInterest('');
     } catch (error) {
       console.error('Error creating group:', error);
     } finally {
@@ -290,59 +317,116 @@ export default function SwipeGroups() {
     <div className='h-full flex flex-col'>
       {/* Create Group Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className='sm:max-w-md'>
+        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-gray-800'>
           <DialogHeader>
-            <DialogTitle>Create a Group</DialogTitle>
+            <DialogTitle className='dark:text-white'>Create a Group</DialogTitle>
             <DialogDescription>Start a new group and invite others to join!</DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>
             <div>
-              <Label htmlFor='name'>Group Name</Label>
+              <Label htmlFor='name' className='dark:text-white'>Group Name</Label>
               <Input
                 id='name'
                 value={newGroup.name}
                 onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
                 placeholder='Weekend Hikers'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
               />
             </div>
             <div>
-              <Label htmlFor='description'>Description</Label>
+              <Label htmlFor='description' className='dark:text-white'>Description</Label>
               <Textarea
                 id='description'
                 value={newGroup.description}
                 onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
                 placeholder='What is your group about?'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
               />
             </div>
+            
+            {/* Interest Tags Section */}
             <div>
-              <Label htmlFor='interests'>Interests (comma separated)</Label>
-              <Input
-                id='interests'
-                value={newGroup.interests}
-                onChange={e => setNewGroup({ ...newGroup, interests: e.target.value })}
-                placeholder='Hiking, Nature, Adventure'
-              />
+              <Label className='dark:text-white'>Interests</Label>
+              <p className='text-xs text-muted-foreground mb-3'>Select tags that describe your group for better matching</p>
+              
+              {/* Selected Tags */}
+              {newGroup.interests.length > 0 && (
+                <div className='flex flex-wrap gap-2 mb-3 p-3 rounded-lg bg-frinder-orange/5 dark:bg-gray-900 border border-frinder-orange/20 dark:border-gray-800'>
+                  {newGroup.interests.map((interest, index) => (
+                    <Badge
+                      key={`selected-${interest}-${index}`}
+                      className='bg-frinder-orange text-white hover:bg-frinder-burnt cursor-pointer pr-1'
+                      onClick={() => toggleInterest(interest)}
+                    >
+                      {interest}
+                      <X className='w-3 h-3 ml-1' />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              
+              {/* Available Tags Grid */}
+              <div className='max-h-32 overflow-y-auto border rounded-lg p-3 dark:border-gray-800'>
+                <div className='flex flex-wrap gap-2'>
+                  {availableTags
+                    .filter(tag => !newGroup.interests.includes(tag))
+                    .map(tag => (
+                      <Badge
+                        key={tag}
+                        variant='outline'
+                        className='cursor-pointer hover:bg-frinder-orange/10 hover:border-frinder-orange transition-colors dark:border-gray-700 dark:text-white'
+                        onClick={() => toggleInterest(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                </div>
+              </div>
+              
+              {/* Custom Interest Input */}
+              <div className='flex gap-2 mt-3'>
+                <Input
+                  value={customInterest}
+                  onChange={e => setCustomInterest(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomInterest())}
+                  placeholder='Add custom interest...'
+                  className='flex-1 dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                />
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='icon'
+                  onClick={addCustomInterest}
+                  disabled={!customInterest.trim()}
+                  className='shrink-0'
+                >
+                  <Plus className='w-4 h-4' />
+                </Button>
+              </div>
             </div>
+
             <div>
-              <Label htmlFor='activity'>Activity Schedule</Label>
+              <Label htmlFor='activity' className='dark:text-white'>Activity Schedule</Label>
               <Input
                 id='activity'
                 value={newGroup.activity}
                 onChange={e => setNewGroup({ ...newGroup, activity: e.target.value })}
                 placeholder='Weekend trips'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
               />
             </div>
             <div>
-              <Label htmlFor='location'>Location</Label>
+              <Label htmlFor='location' className='dark:text-white'>Location</Label>
               <Input
                 id='location'
                 value={newGroup.location}
                 onChange={e => setNewGroup({ ...newGroup, location: e.target.value })}
                 placeholder='Campus or City'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
               />
             </div>
             <Button
-              className='w-full bg-[#ed8c00] hover:bg-[#cc5d00] text-white'
+              className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
               onClick={handleCreateGroup}
               disabled={creating || !newGroup.name || !newGroup.description}
             >

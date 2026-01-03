@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -16,6 +16,8 @@ import { SettingsSheet } from './SettingsSheet';
 import { PrivacySheet } from './PrivacySheet';
 import { NotificationsSheet } from './NotificationsSheet';
 import { HelpSheet } from './HelpSheet';
+import { uploadProfilePhoto, deleteProfilePhoto, compressImage } from '@/lib/storageService';
+import { toast } from 'sonner';
 import {
   Settings,
   Edit,
@@ -29,24 +31,30 @@ import {
   Star,
   Moon,
   Sun,
-  Verified
+  Verified,
+  X,
+  Plus,
+  Loader2
 } from 'lucide-react';
 
 export default function Profile() {
-  const { userProfile, updateProfile, signOut } = useAuth();
+  const { user, userProfile, updateProfile, signOut } = useAuth();
   const { darkMode, toggleDarkMode } = useSettings();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [deletingPhoto, setDeletingPhoto] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editData, setEditData] = useState({
     displayName: userProfile?.displayName || 'John Doe',
-    bio: userProfile?.bio || 'Coffee lover ☕ | Adventure seeker | Looking for meaningful connections',
+    bio: userProfile?.bio || 'Coffee lover | Adventure seeker | Looking for meaningful connections',
     age: userProfile?.age || 22
   });
 
-  // Profile data from Firebase
   const profile = {
     displayName: userProfile?.displayName || 'Your Name',
     bio: userProfile?.bio || 'Tell others about yourself...',
@@ -66,29 +74,125 @@ export default function Profile() {
     try {
       await updateProfile(editData);
       setIsEditing(false);
+      toast.success('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user) return;
+
+    const file = files[0];
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be less than 10MB');
+      return;
+    }
+
+    if (profile.photos.length >= 6) {
+      toast.error('Maximum 6 photos allowed');
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+      const compressedFile = await compressImage(file, 1024, 0.8);
+      const photoUrl = await uploadProfilePhoto(user.uid, compressedFile, profile.photos.length);
+      await updateProfile({ photos: [...profile.photos, photoUrl] });
+      toast.success('Photo uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast.error('Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeletePhoto = async (index: number) => {
+    if (!user) return;
+    const photoUrl = profile.photos[index];
+    if (!photoUrl) return;
+
+    try {
+      setDeletingPhoto(index);
+      await deleteProfilePhoto(photoUrl);
+      const newPhotos = profile.photos.filter((_, i) => i !== index);
+      await updateProfile({ photos: newPhotos });
+      toast.success('Photo deleted!');
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Failed to delete photo');
+    } finally {
+      setDeletingPhoto(null);
+    }
+  };
+
+  const handleSetMainPhoto = async (index: number) => {
+    if (index === 0 || !user) return;
+    try {
+      const newPhotos = [...profile.photos];
+      const [photo] = newPhotos.splice(index, 1);
+      newPhotos.unshift(photo);
+      await updateProfile({ photos: newPhotos });
+      toast.success('Main photo updated!');
+    } catch (error) {
+      console.error('Error setting main photo:', error);
+      toast.error('Failed to update main photo');
     }
   };
 
   return (
-    <div className='h-full overflow-y-auto bg-[#fff7ed] dark:bg-gray-900'>
-      {/* Header with profile photo */}
+    <div className='h-full overflow-y-auto bg-[#fff7ed] dark:bg-black'>
+      <input
+        ref={fileInputRef}
+        type='file'
+        accept='image/*'
+        onChange={handlePhotoUpload}
+        className='hidden'
+      />
+      
       <div className='relative h-56 sm:h-64'>
-        <div className='absolute inset-0 bg-[#ed8c00]' />
+        <div className='absolute inset-0 bg-frinder-orange' />
         <div className='absolute inset-0 flex flex-col items-center justify-center text-white'>
+          <div className='absolute top-4 left-4 right-4 flex justify-between'>
+            <button
+              onClick={toggleDarkMode}
+              className='w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors'
+            >
+              {darkMode ? <Moon className='w-5 h-5 text-white' /> : <Sun className='w-5 h-5 text-white' />}
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className='w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors'
+            >
+              <Settings className='w-5 h-5 text-white' />
+            </button>
+          </div>
+          
           <div className='relative'>
             <Avatar className='w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-xl'>
               <AvatarImage src={profile.photos[0]} alt={profile.displayName} />
-              <AvatarFallback className='text-2xl sm:text-3xl bg-[#cc5d00] text-white'>{profile.displayName[0]}</AvatarFallback>
+              <AvatarFallback className='text-2xl sm:text-3xl bg-frinder-burnt text-white'>{profile.displayName[0]}</AvatarFallback>
             </Avatar>
             {profile.verified && (
               <div className='absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500 flex items-center justify-center border-2 border-white'>
                 <Verified className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
               </div>
             )}
-            <button className='absolute bottom-0 left-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-lg flex items-center justify-center'>
-              <Camera className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#ed8c00]' />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className='absolute bottom-0 left-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform'
+            >
+              <Camera className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-frinder-orange' />
             </button>
           </div>
           <h1 className='text-xl sm:text-2xl font-bold mt-3 sm:mt-4'>
@@ -103,17 +207,16 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className='px-3 sm:px-4 -mt-6 relative z-10'>
-        <Card className='border-0 shadow-lg dark:bg-gray-800'>
+        <Card className='border-0 shadow-lg dark:bg-gray-900 dark:border-gray-800'>
           <CardContent className='p-3 sm:p-4'>
             <div className='grid grid-cols-3 gap-3 sm:gap-4 text-center'>
               <div>
-                <div className='text-xl sm:text-2xl font-bold text-[#ed8c00]'>{profile.stats.matches}</div>
+                <div className='text-xl sm:text-2xl font-bold text-frinder-orange'>{profile.stats.matches}</div>
                 <div className='text-[10px] sm:text-xs text-muted-foreground'>Matches</div>
               </div>
               <div>
-                <div className='text-xl sm:text-2xl font-bold text-[#ffbe42]'>{profile.stats.likes}</div>
+                <div className='text-xl sm:text-2xl font-bold text-frinder-gold'>{profile.stats.likes}</div>
                 <div className='text-[10px] sm:text-xs text-muted-foreground'>Likes</div>
               </div>
               <div>
@@ -125,19 +228,18 @@ export default function Profile() {
         </Card>
       </div>
 
-      {/* Bio & Interests */}
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
-        <Card className='border-0 shadow-md dark:bg-gray-800'>
+        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
           <CardContent className='p-3 sm:p-4'>
             <div className='flex items-center justify-between mb-2 sm:mb-3'>
               <h2 className='font-semibold text-sm sm:text-base dark:text-white'>About Me</h2>
               <Dialog open={isEditing} onOpenChange={setIsEditing}>
                 <DialogTrigger asChild>
-                  <button className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-700 rounded-full transition-colors'>
+                  <button className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-800 rounded-full transition-colors'>
                     <Edit className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground' />
                   </button>
                 </DialogTrigger>
-                <DialogContent className='sm:max-w-md mx-4 dark:bg-gray-800'>
+                <DialogContent className='sm:max-w-md mx-4 dark:bg-black dark:border-gray-800'>
                   <DialogHeader>
                     <DialogTitle className='dark:text-white'>Edit Profile</DialogTitle>
                   </DialogHeader>
@@ -148,7 +250,7 @@ export default function Profile() {
                         id='name'
                         value={editData.displayName}
                         onChange={e => setEditData(prev => ({ ...prev, displayName: e.target.value }))}
-                        className='dark:bg-gray-700 dark:border-gray-600 dark:text-white'
+                        className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
                       />
                     </div>
                     <div className='space-y-1.5 sm:space-y-2'>
@@ -158,7 +260,7 @@ export default function Profile() {
                         type='number'
                         value={editData.age}
                         onChange={e => setEditData(prev => ({ ...prev, age: parseInt(e.target.value) }))}
-                        className='dark:bg-gray-700 dark:border-gray-600 dark:text-white'
+                        className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
                       />
                     </div>
                     <div className='space-y-1.5 sm:space-y-2'>
@@ -167,10 +269,10 @@ export default function Profile() {
                         id='bio'
                         value={editData.bio}
                         onChange={e => setEditData(prev => ({ ...prev, bio: e.target.value }))}
-                        className='min-h-[100px] dark:bg-gray-700 dark:border-gray-600 dark:text-white'
+                        className='min-h-25 dark:bg-gray-900 dark:border-gray-800 dark:text-white'
                       />
                     </div>
-                    <Button onClick={handleSaveProfile} className='w-full bg-[#ed8c00] hover:bg-[#cc5d00]'>
+                    <Button onClick={handleSaveProfile} className='w-full bg-frinder-orange hover:bg-frinder-burnt'>
                       Save Changes
                     </Button>
                   </div>
@@ -181,11 +283,11 @@ export default function Profile() {
 
             <h3 className='font-semibold mb-1.5 sm:mb-2 text-sm sm:text-base dark:text-white'>Interests</h3>
             <div className='flex flex-wrap gap-1.5 sm:gap-2'>
-              {profile.interests.map(interest => (
+              {profile.interests.filter(interest => interest).map((interest, index) => (
                 <Badge
-                  key={interest}
+                  key={`${interest}-${index}`}
                   variant='secondary'
-                  className='bg-[#ed8c00]/10 text-[#ed8c00] hover:bg-[#ed8c00]/20 text-xs sm:text-sm'
+                  className='bg-frinder-orange/10 text-frinder-orange hover:bg-frinder-orange/20 text-xs sm:text-sm'
                 >
                   {interest}
                 </Badge>
@@ -195,139 +297,148 @@ export default function Profile() {
         </Card>
       </div>
 
-      {/* Photos */}
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
-        <Card className='border-0 shadow-md dark:bg-gray-800'>
+        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
           <CardContent className='p-3 sm:p-4'>
             <div className='flex items-center justify-between mb-2 sm:mb-3'>
               <h2 className='font-semibold text-sm sm:text-base dark:text-white'>My Photos</h2>
-              <button className='text-xs sm:text-sm text-[#ed8c00] font-medium'>Edit</button>
+              <button 
+                onClick={() => setIsEditingPhotos(!isEditingPhotos)}
+                className='text-xs sm:text-sm text-frinder-orange font-medium'
+              >
+                {isEditingPhotos ? 'Done' : 'Edit'}
+              </button>
             </div>
             <div className='grid grid-cols-3 gap-1.5 sm:gap-2'>
               {profile.photos.map((photo, index) => (
                 <motion.div
-                  key={index}
-                  whileHover={{ scale: 1.05 }}
-                  className='aspect-[3/4] rounded-lg overflow-hidden'
+                  key={`photo-${index}`}
+                  whileHover={{ scale: isEditingPhotos ? 1 : 1.05 }}
+                  className='aspect-3/4 rounded-lg overflow-hidden relative group'
                 >
                   <img src={photo} alt={`Photo ${index + 1}`} className='w-full h-full object-cover' />
+                  {index === 0 && (
+                    <div className='absolute top-1 left-1 bg-frinder-orange text-white text-[10px] px-1.5 py-0.5 rounded'>
+                      Main
+                    </div>
+                  )}
+                  {isEditingPhotos && (
+                    <div className='absolute inset-0 bg-black/40 flex items-center justify-center gap-2'>
+                      {deletingPhoto === index ? (
+                        <Loader2 className='w-6 h-6 text-white animate-spin' />
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleDeletePhoto(index)}
+                            className='w-8 h-8 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors'
+                          >
+                            <X className='w-4 h-4 text-white' />
+                          </button>
+                          {index !== 0 && (
+                            <button
+                              onClick={() => handleSetMainPhoto(index)}
+                              className='w-8 h-8 rounded-full bg-frinder-orange flex items-center justify-center hover:bg-frinder-burnt transition-colors'
+                            >
+                              <Star className='w-4 h-4 text-white' />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               ))}
-              {[...Array(Math.max(0, 6 - profile.photos.length))].map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className='aspect-[3/4] rounded-lg border-2 border-dashed border-muted dark:border-gray-700 flex items-center justify-center'
+              
+              {profile.photos.length < 6 && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className='aspect-3/4 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center hover:border-frinder-orange hover:bg-frinder-orange/5 transition-colors'
                 >
-                  <Camera className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground' />
-                </div>
-              ))}
+                  {uploadingPhoto ? (
+                    <Loader2 className='w-6 h-6 text-frinder-orange animate-spin' />
+                  ) : (
+                    <Plus className='w-6 h-6 text-gray-400' />
+                  )}
+                </motion.button>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Menu Items */}
-      <div className='px-3 sm:px-4 mt-3 sm:mt-4 pb-6 sm:pb-8'>
-        <Card className='border-0 shadow-md dark:bg-gray-800'>
-          <CardContent className='p-2'>
-            {/* Dark mode toggle */}
-            <button
-              onClick={toggleDarkMode}
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted dark:hover:bg-gray-700 transition-colors'
-            >
-              <div className='w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center'>
-                {darkMode ? <Moon className='w-5 h-5 text-purple-600 dark:text-purple-300' /> : <Sun className='w-5 h-5 text-yellow-600' />}
-              </div>
-              <span className='flex-1 text-left font-medium dark:text-white'>Dark Mode</span>
-              <div
-                className={`w-12 h-7 rounded-full transition-colors ${darkMode ? 'bg-[#ed8c00]' : 'bg-muted dark:bg-gray-600'} relative`}
-              >
-                <div
-                  className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                    darkMode ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </div>
-            </button>
-
-            {/* Settings */}
-            <button
+      <div className='px-3 sm:px-4 mt-3 sm:mt-4 pb-6'>
+        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
+          <CardContent className='p-0 divide-y dark:divide-gray-800'>
+            <button 
               onClick={() => setSettingsOpen(true)}
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted dark:hover:bg-gray-700 transition-colors'
+              className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
-              <div className='w-10 h-10 rounded-full bg-muted dark:bg-gray-700 flex items-center justify-center'>
-                <Settings className='w-5 h-5 text-muted-foreground' />
+              <div className='flex items-center gap-3'>
+                <div className='w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-frinder-orange/10 flex items-center justify-center'>
+                  <Settings className='w-4 h-4 sm:w-5 sm:h-5 text-frinder-orange' />
+                </div>
+                <span className='font-medium text-sm sm:text-base dark:text-white'>Settings</span>
               </div>
-              <span className='flex-1 text-left font-medium dark:text-white'>Settings</span>
-              <ChevronRight className='w-5 h-5 text-muted-foreground' />
+              <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-
-            {/* Privacy & Safety */}
-            <button
+            
+            <button 
               onClick={() => setPrivacyOpen(true)}
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted dark:hover:bg-gray-700 transition-colors'
+              className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
-              <div className='w-10 h-10 rounded-full bg-muted dark:bg-gray-700 flex items-center justify-center'>
-                <Shield className='w-5 h-5 text-muted-foreground' />
+              <div className='flex items-center gap-3'>
+                <div className='w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-500/10 flex items-center justify-center'>
+                  <Shield className='w-4 h-4 sm:w-5 sm:h-5 text-blue-500' />
+                </div>
+                <span className='font-medium text-sm sm:text-base dark:text-white'>Privacy</span>
               </div>
-              <span className='flex-1 text-left font-medium dark:text-white'>Privacy & Safety</span>
-              <ChevronRight className='w-5 h-5 text-muted-foreground' />
+              <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-
-            {/* Notifications */}
-            <button
+            
+            <button 
               onClick={() => setNotificationsOpen(true)}
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted dark:hover:bg-gray-700 transition-colors'
+              className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
-              <div className='w-10 h-10 rounded-full bg-muted dark:bg-gray-700 flex items-center justify-center'>
-                <Bell className='w-5 h-5 text-muted-foreground' />
+              <div className='flex items-center gap-3'>
+                <div className='w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-green-500/10 flex items-center justify-center'>
+                  <Bell className='w-4 h-4 sm:w-5 sm:h-5 text-green-500' />
+                </div>
+                <span className='font-medium text-sm sm:text-base dark:text-white'>Notifications</span>
               </div>
-              <span className='flex-1 text-left font-medium dark:text-white'>Notifications</span>
-              <ChevronRight className='w-5 h-5 text-muted-foreground' />
+              <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-
-            {/* Get Premium */}
-            <button
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted dark:hover:bg-gray-700 transition-colors'
-            >
-              <div className='w-10 h-10 rounded-full bg-gradient-to-r from-[#ed8c00] to-[#ffbe42] flex items-center justify-center'>
-                <Star className='w-5 h-5 text-white' />
-              </div>
-              <span className='flex-1 text-left font-medium dark:text-white'>Get Premium</span>
-              <Badge className='bg-[#ed8c00]'>NEW</Badge>
-              <ChevronRight className='w-5 h-5 text-muted-foreground' />
-            </button>
-
-            {/* Help & Support */}
-            <button
+            
+            <button 
               onClick={() => setHelpOpen(true)}
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted dark:hover:bg-gray-700 transition-colors'
+              className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
-              <div className='w-10 h-10 rounded-full bg-muted dark:bg-gray-700 flex items-center justify-center'>
-                <HelpCircle className='w-5 h-5 text-muted-foreground' />
+              <div className='flex items-center gap-3'>
+                <div className='w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-500/10 flex items-center justify-center'>
+                  <HelpCircle className='w-4 h-4 sm:w-5 sm:h-5 text-purple-500' />
+                </div>
+                <span className='font-medium text-sm sm:text-base dark:text-white'>Help & Support</span>
               </div>
-              <span className='flex-1 text-left font-medium dark:text-white'>Help & Support</span>
-              <ChevronRight className='w-5 h-5 text-muted-foreground' />
+              <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-
-            {/* Sign out */}
-            <button
-              onClick={() => signOut()}
-              className='w-full flex items-center gap-4 p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-500'
+            
+            <button 
+              onClick={signOut}
+              className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors'
             >
-              <div className='w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center'>
-                <LogOut className='w-5 h-5' />
+              <div className='flex items-center gap-3'>
+                <div className='w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-500/10 flex items-center justify-center'>
+                  <LogOut className='w-4 h-4 sm:w-5 sm:h-5 text-red-500' />
+                </div>
+                <span className='font-medium text-sm sm:text-base text-red-500'>Sign Out</span>
               </div>
-              <span className='flex-1 text-left font-medium'>Sign Out</span>
+              <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-red-400' />
             </button>
           </CardContent>
         </Card>
-
-        {/* App version */}
-        <p className='text-center text-xs text-muted-foreground mt-6'>Frinder v1.0.0</p>
       </div>
 
-      {/* Settings Sheets */}
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
       <PrivacySheet open={privacyOpen} onOpenChange={setPrivacyOpen} />
       <NotificationsSheet open={notificationsOpen} onOpenChange={setNotificationsOpen} />

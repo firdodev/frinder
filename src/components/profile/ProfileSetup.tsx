@@ -439,9 +439,9 @@ export default function ProfileSetup() {
                 </CardHeader>
                 <CardContent>
                   <div className='flex flex-wrap gap-2'>
-                    {INTERESTS.map(interest => (
+                    {INTERESTS.map((interest, index) => (
                       <motion.button
-                        key={interest}
+                        key={`${interest}-${index}`}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleInterestToggle(interest)}

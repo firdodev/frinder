@@ -172,8 +172,8 @@ function SwipeCard({
                 >
                   <p className='text-white/90 mb-2 sm:mb-3 text-sm sm:text-base'>{profile.bio}</p>
                   <div className='flex flex-wrap gap-1.5 sm:gap-2'>
-                    {profile.interests.map(interest => (
-                      <Badge key={interest} variant='secondary' className='bg-white/20 text-white border-0 text-xs sm:text-sm'>
+                    {profile.interests.filter(i => i).map((interest, index) => (
+                      <Badge key={`${interest}-${index}`} variant='secondary' className='bg-white/20 text-white border-0 text-xs sm:text-sm'>
                         {interest}
                       </Badge>
                     ))}
@@ -271,7 +271,7 @@ export default function SwipePeople() {
 
   if (loading) {
     return (
-      <div className='h-full flex items-center justify-center dark:bg-gray-900'>
+      <div className='h-full flex items-center justify-center dark:bg-black'>
         <div className='text-center'>
           <Loader2 className='w-12 h-12 animate-spin text-[#ed8c00] mx-auto mb-4' />
           <p className='text-muted-foreground'>Finding people near you...</p>
@@ -281,10 +281,10 @@ export default function SwipePeople() {
   }
 
   return (
-    <div className='h-full flex flex-col dark:bg-gray-900'>
+    <div className='h-full flex flex-col dark:bg-black'>
       {/* Match Dialog */}
       <Dialog open={showMatchDialog} onOpenChange={setShowMatchDialog}>
-        <DialogContent className='sm:max-w-md text-center mx-4 dark:bg-gray-800'>
+        <DialogContent className='sm:max-w-md text-center mx-4 dark:bg-black dark:border-gray-800'>
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', duration: 0.5 }}>
             <div className='py-4 sm:py-6'>
               <div className='flex justify-center items-center gap-2 sm:gap-4 mb-4 sm:mb-6'>
@@ -305,7 +305,7 @@ export default function SwipePeople() {
               <h2 className='text-2xl sm:text-3xl font-bold text-[#ed8c00] mb-2'>It&apos;s a Match!</h2>
               <p className='text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base'>You and {matchedProfile?.name} liked each other</p>
               <div className='flex gap-3 sm:gap-4 justify-center'>
-                <Button variant='outline' onClick={() => setShowMatchDialog(false)} className='text-sm dark:border-gray-600 dark:hover:bg-gray-700'>
+                <Button variant='outline' onClick={() => setShowMatchDialog(false)} className='text-sm dark:border-gray-800 dark:hover:bg-gray-900'>
                   Keep Swiping
                 </Button>
                 <Button
@@ -353,7 +353,7 @@ export default function SwipePeople() {
               whileTap={{ scale: 0.9 }}
               onClick={handleUndo}
               disabled={!lastAction}
-              className='w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center disabled:opacity-30 border border-muted dark:border-gray-700'
+              className='w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center disabled:opacity-30 border border-muted dark:border-gray-800'
             >
               <RotateCcw className='w-4 h-4 sm:w-5 sm:h-5 text-[#ffb100]' />
             </motion.button>
@@ -363,7 +363,7 @@ export default function SwipePeople() {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => handleButtonSwipe('left')}
-              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center border-2 border-red-100 dark:border-red-900'
+              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border-2 border-red-100 dark:border-red-900'
             >
               <X className='w-6 h-6 sm:w-8 sm:h-8 text-red-500' />
             </motion.button>
@@ -373,7 +373,7 @@ export default function SwipePeople() {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => handleButtonSwipe('up')}
-              className='w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center border border-muted dark:border-gray-700'
+              className='w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border border-muted dark:border-gray-800'
             >
               <Star className='w-5 h-5 sm:w-6 sm:h-6 text-blue-500' fill='currentColor' />
             </motion.button>
@@ -383,7 +383,7 @@ export default function SwipePeople() {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => handleButtonSwipe('right')}
-              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center border-2 border-green-100 dark:border-green-900'
+              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border-2 border-green-100 dark:border-green-900'
             >
               <Heart className='w-6 h-6 sm:w-8 sm:h-8 text-green-500' fill='currentColor' />
             </motion.button>
@@ -392,7 +392,7 @@ export default function SwipePeople() {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className='w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center border border-muted dark:border-gray-700'
+              className='w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border border-muted dark:border-gray-800'
             >
               <svg className='w-5 h-5 sm:w-6 sm:h-6 text-[#cc5d00]' viewBox='0 0 24 24' fill='currentColor'>
                 <path d='M13 3L4 14h7l-1 7 9-11h-7l1-7z' />

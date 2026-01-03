@@ -76,7 +76,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto dark:bg-gray-900 dark:border-gray-800">
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-gray-800">
         <SheetHeader>
           <SheetTitle className="dark:text-white">Settings</SheetTitle>
         </SheetHeader>
@@ -88,7 +88,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               Appearance
             </h3>
             
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
               <div className="flex items-center gap-3">
                 {darkMode ? (
                   <Moon className="w-5 h-5 text-[#ed8c00]" />
@@ -118,7 +118,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               Language & Region
             </h3>
             
-            <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <button className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <div className="flex items-center gap-3">
                 <Globe className="w-5 h-5 text-[#ed8c00]" />
                 <div className="text-left">
@@ -152,7 +152,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
             <Button 
               variant="outline" 
-              className="w-full justify-start gap-3 h-14 dark:border-gray-700 dark:hover:bg-gray-800"
+              className="w-full justify-start gap-3 h-14 dark:border-gray-800 dark:hover:bg-gray-900"
               onClick={handleLogout}
             >
               <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -177,7 +177,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
       {/* Delete Account Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-md dark:bg-gray-900">
+        <DialogContent className="sm:max-w-md dark:bg-black dark:border-gray-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="w-5 h-5" />
@@ -197,7 +197,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
                 placeholder="Your password"
-                className="dark:bg-gray-800 dark:border-gray-700"
+                className="dark:bg-gray-900 dark:border-gray-800"
               />
             </div>
           </div>
