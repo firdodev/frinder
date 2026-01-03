@@ -1,0 +1,37 @@
+# Frinder Robots.txt
+# https://frinder.co/robots.txt
+
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://frinder.co/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Google specific
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Google Images
+User-agent: Googlebot-Image
+Allow: /
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Block API routes from indexing (they're not user-facing pages)
+User-agent: *
+Disallow: /api/
+
+# Block internal app routes that shouldn't be indexed
+Disallow: /_next/
+Disallow: /static/
+
+# Host directive
+Host: https://frinder.co

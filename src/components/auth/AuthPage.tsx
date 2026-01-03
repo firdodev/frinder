@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type AuthStep = 'auth' | 'verify' | 'success';
@@ -249,9 +250,14 @@ export default function AuthPage({ onBack }: AuthPageProps) {
 
       {/* Logo */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className='text-center mb-8'>
-        <div className='w-20 h-20 rounded-full bg-[#ed8c00] flex items-center justify-center mx-auto mb-4 shadow-lg'>
-          <Heart className='w-10 h-10 text-white' fill='white' />
-        </div>
+        <Image 
+          src='/frinder-logo.png' 
+          alt='Frinder' 
+          width={80} 
+          height={80} 
+          className='rounded-full mx-auto mb-4 shadow-lg'
+          priority
+        />
         <h1 className='text-4xl font-bold text-[#ed8c00] mb-2'>Frinder</h1>
         <p className='text-[#666]'>Find your match at university</p>
       </motion.div>

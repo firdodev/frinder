@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { Heart, Users, MessageCircle, User, Flame, Settings, LogOut, Sparkles, Search, Star, Crown } from 'lucide-react';
 import SwipePeople from '@/components/swipe/SwipePeople';
 import SwipeGroups from '@/components/swipe/SwipeGroups';
@@ -100,9 +101,14 @@ export default function MainApp() {
             animate={{ opacity: 1, x: 0 }} 
             className='flex items-center gap-3'
           >
-            <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-frinder-orange to-frinder-gold flex items-center justify-center shadow-lg'>
-              <Flame className='w-6 h-6 text-white' />
-            </div>
+            <Image 
+              src='/frinder-logo.png' 
+              alt='Frinder' 
+              width={40} 
+              height={40} 
+              className='rounded-xl shadow-lg'
+              priority
+            />
             <div>
               <span className='text-2xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
                 Frinder
@@ -191,9 +197,11 @@ export default function MainApp() {
         {/* Mobile Header - hidden on desktop */}
         <div className='lg:hidden px-4 py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className='flex items-center gap-2'>
-            <div className='w-8 h-8 rounded-full bg-gradient-to-br from-frinder-orange to-frinder-gold flex items-center justify-center'>
-              <Heart className='w-4 h-4 text-white' fill='white' />
-            </div>
+            <img 
+              src='/frinder-logo.png' 
+              alt='Frinder' 
+              className='w-8 h-8 rounded-full'
+            />
             <span className='text-xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
               Frinder
             </span>

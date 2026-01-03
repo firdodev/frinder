@@ -876,6 +876,56 @@ export async function getMatchCount(userId: string): Promise<number> {
   }
 }
 
+// Get count of likes received (people who swiped right on this user)
+export async function getLikesReceivedCount(userId: string): Promise<number> {
+  try {
+    const swipesRef = collection(db, 'swipes');
+    // Count swipes where this user is the target and direction is 'right'
+    const likesQuery = query(
+      swipesRef,
+      where('toUserId', '==', userId),
+      where('direction', '==', 'right')
+    );
+    const likesSnapshot = await getDocs(likesQuery);
+    return likesSnapshot.size;
+  } catch (error) {
+    console.error('Error getting likes received count:', error);
+    return 0;
+  }
+}
+
+// Get count of super likes received
+export async function getSuperLikesReceivedCount(userId: string): Promise<number> {
+  try {
+    const superLikesRef = collection(db, 'superLikes');
+    // Query super likes where this user is the recipient
+    const superLikesQuery = query(
+      superLikesRef,
+      where('toUserId', '==', userId)
+    );
+    const superLikesSnapshot = await getDocs(superLikesQuery);
+    return superLikesSnapshot.size;
+  } catch (error) {
+    console.error('Error getting super likes received count:', error);
+    return 0;
+  }
+}
+
+// Get all profile stats at once
+export async function getUserProfileStats(userId: string): Promise<{
+  matches: number;
+  likesReceived: number;
+  superLikesReceived: number;
+}> {
+  const [matches, likesReceived, superLikesReceived] = await Promise.all([
+    getMatchCount(userId),
+    getLikesReceivedCount(userId),
+    getSuperLikesReceivedCount(userId)
+  ]);
+  
+  return { matches, likesReceived, superLikesReceived };
+}
+
 // Search for users by name
 export async function searchUsers(
   currentUserId: string,

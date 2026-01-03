@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,12 +11,22 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { SettingsSheet } from './SettingsSheet';
 import { PrivacySheet } from './PrivacySheet';
 import { NotificationsSheet } from './NotificationsSheet';
 import { HelpSheet } from './HelpSheet';
 import { uploadProfilePhoto, deleteProfilePhoto, compressImage } from '@/lib/storageService';
+import { 
+  getUserProfileStats, 
+  subscribeToUserCredits, 
+  subscribeToUserSubscription,
+  addSuperLikes,
+  purchasePremium,
+  purchaseAdFree,
+  type UserCredits,
+  type UserSubscription
+} from '@/lib/firebaseServices';
 import { toast } from 'sonner';
 import {
   Settings,
@@ -34,8 +44,26 @@ import {
   Verified,
   X,
   Plus,
-  Loader2
+  Loader2,
+  Crown,
+  Sparkles,
+  Zap,
+  Heart,
+  Ban,
+  Check,
+  Gift
 } from 'lucide-react';
+
+// Shop item types
+interface ShopItem {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+  icon: React.ReactNode;
+  color: string;
+  popular?: boolean;
+}
 
 export default function Profile() {
   const { user, userProfile, updateProfile, signOut } = useAuth();
@@ -49,11 +77,105 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Stats state
+  const [profileStats, setProfileStats] = useState({ matches: 0, likesReceived: 0, superLikesReceived: 0 });
+  const [loadingStats, setLoadingStats] = useState(true);
+  
+  // Credits and subscription state
+  const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+  
+  // Shop state
+  const [showShop, setShowShop] = useState(false);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
+
   const [editData, setEditData] = useState({
     displayName: userProfile?.displayName || 'John Doe',
     bio: userProfile?.bio || 'Coffee lover | Adventure seeker | Looking for meaningful connections',
     age: userProfile?.age || 22
   });
+
+  // Fetch profile stats from Firebase
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchStats = async () => {
+      setLoadingStats(true);
+      try {
+        const stats = await getUserProfileStats(user.uid);
+        setProfileStats(stats);
+      } catch (error) {
+        console.error('Error fetching profile stats:', error);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, [user?.uid]);
+
+  // Subscribe to user credits
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = subscribeToUserCredits(user.uid, setUserCredits);
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Subscribe to user subscription
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = subscribeToUserSubscription(user.uid, setUserSubscription);
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Shop items configuration
+  const superLikePackages: ShopItem[] = [
+    { id: 'superlike_5', name: '5 Super Likes', description: 'Stand out from the crowd', price: '$2', icon: <Star className='w-5 h-5' />, color: 'text-blue-500' },
+  ];
+
+  const subscriptionPackages: ShopItem[] = [
+    { 
+      id: 'pro_monthly', 
+      name: 'Frinder Pro', 
+      description: '15 monthly super likes, no ads, priority discovery, advanced filters', 
+      price: '$5/mo', 
+      icon: <Crown className='w-5 h-5' />, 
+      color: 'text-frinder-orange',
+      popular: true 
+    },
+    { 
+      id: 'adfree_monthly', 
+      name: 'Ad-Free Experience', 
+      description: 'Remove all ads for a seamless experience', 
+      price: '$3.99/mo', 
+      icon: <Ban className='w-5 h-5' />, 
+      color: 'text-green-500' 
+    },
+  ];
+
+  const handlePurchase = async (itemId: string) => {
+    if (!user?.uid) return;
+    
+    setPurchasing(itemId);
+    try {
+      if (itemId === 'superlike_5') {
+        await addSuperLikes(user.uid, 5);
+        toast.success('5 Super Likes added! 💙');
+      } else if (itemId === 'pro_monthly') {
+        await purchasePremium(user.uid);
+        toast.success('Welcome to Frinder Pro! 👑');
+      } else if (itemId === 'adfree_monthly') {
+        await purchaseAdFree(user.uid);
+        toast.success('Ad-free experience activated! 🎉');
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(null);
+    }
+  };
 
   const profile = {
     displayName: userProfile?.displayName || 'Your Name',
@@ -62,12 +184,7 @@ export default function Profile() {
     photos: userProfile?.photos || [],
     interests: userProfile?.interests || [],
     location: userProfile?.city ? `${userProfile.city}, ${userProfile.country}` : '',
-    verified: userProfile?.isEmailVerified || false,
-    stats: {
-      matches: 0,
-      likes: 0,
-      superLikes: 0
-    }
+    verified: userProfile?.isEmailVerified || false
   };
 
   const handleSaveProfile = async () => {
@@ -212,21 +329,304 @@ export default function Profile() {
           <CardContent className='p-3 sm:p-4'>
             <div className='grid grid-cols-3 gap-3 sm:gap-4 text-center'>
               <div>
-                <div className='text-xl sm:text-2xl font-bold text-frinder-orange'>{profile.stats.matches}</div>
+                {loadingStats ? (
+                  <Loader2 className='w-5 h-5 animate-spin mx-auto text-frinder-orange' />
+                ) : (
+                  <div className='text-xl sm:text-2xl font-bold text-frinder-orange'>{profileStats.matches}</div>
+                )}
                 <div className='text-[10px] sm:text-xs text-muted-foreground'>Matches</div>
               </div>
               <div>
-                <div className='text-xl sm:text-2xl font-bold text-frinder-gold'>{profile.stats.likes}</div>
+                {loadingStats ? (
+                  <Loader2 className='w-5 h-5 animate-spin mx-auto text-frinder-gold' />
+                ) : (
+                  <div className='text-xl sm:text-2xl font-bold text-frinder-gold'>{profileStats.likesReceived}</div>
+                )}
                 <div className='text-[10px] sm:text-xs text-muted-foreground'>Likes</div>
               </div>
               <div>
-                <div className='text-xl sm:text-2xl font-bold text-blue-500'>{profile.stats.superLikes}</div>
+                {loadingStats ? (
+                  <Loader2 className='w-5 h-5 animate-spin mx-auto text-blue-500' />
+                ) : (
+                  <div className='text-xl sm:text-2xl font-bold text-blue-500'>{profileStats.superLikesReceived}</div>
+                )}
                 <div className='text-[10px] sm:text-xs text-muted-foreground'>Super Likes</div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Premium/Credits Shop Section */}
+      <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
+        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800 overflow-hidden'>
+          <div className='bg-frinder-orange p-3 sm:p-4'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <div className='w-10 h-10 rounded-full bg-white/20 flex items-center justify-center'>
+                  {userSubscription?.isPremium ? (
+                    <Crown className='w-5 h-5 text-white' />
+                  ) : (
+                    <Sparkles className='w-5 h-5 text-white' />
+                  )}
+                </div>
+                <div>
+                  <h2 className='font-bold text-white text-sm sm:text-base'>
+                    {userSubscription?.isPremium ? 'Frinder Pro' : 'Upgrade Your Experience'}
+                  </h2>
+                  <p className='text-white/80 text-xs'>
+                    {userSubscription?.isPremium 
+                      ? 'Enjoying Pro features!' 
+                      : 'Get more matches with Pro'}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => setShowShop(true)}
+                variant='secondary'
+                size='sm'
+                className='bg-white text-frinder-orange hover:bg-white/90'
+              >
+                <Gift className='w-4 h-4 mr-1' />
+                Shop
+              </Button>
+            </div>
+          </div>
+          <CardContent className='p-3 sm:p-4'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-3'>
+                <div className='w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center'>
+                  <Star className='w-5 h-5 text-blue-500' />
+                </div>
+                <div>
+                  <div className='font-semibold text-sm dark:text-white'>Super Likes</div>
+                  <div className='text-xs text-muted-foreground'>Available to send</div>
+                </div>
+              </div>
+              <div className='text-right'>
+                <div className='text-xl font-bold text-blue-500'>
+                  {userCredits?.superLikes ?? 0}
+                </div>
+                {userSubscription?.isPremium && (
+                  <Badge className='bg-frinder-orange text-white text-[10px]'>Pro</Badge>
+                )}
+              </div>
+            </div>
+            
+            {/* Quick benefits preview */}
+            {!userSubscription?.isPremium && (
+              <div className='mt-3 pt-3 border-t dark:border-gray-800'>
+                <div className='text-xs text-muted-foreground mb-2'>Pro Benefits:</div>
+                <div className='grid grid-cols-2 gap-2'>
+                  <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+                    <Check className='w-3 h-3 text-green-500' />
+                    <span>15 Monthly Super Likes</span>
+                  </div>
+                  <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+                    <Check className='w-3 h-3 text-green-500' />
+                    <span>No Ads</span>
+                  </div>
+                  <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+                    <Check className='w-3 h-3 text-green-500' />
+                    <span>Priority Discovery</span>
+                  </div>
+                  <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+                    <Check className='w-3 h-3 text-green-500' />
+                    <span>Advanced Filters</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Shop Dialog */}
+      <Dialog open={showShop} onOpenChange={setShowShop}>
+        <DialogContent className='sm:max-w-md max-h-[80vh] overflow-y-auto dark:bg-gray-900'>
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-2 dark:text-white'>
+              <Gift className='w-5 h-5 text-frinder-orange' />
+              Frinder Shop
+            </DialogTitle>
+            <DialogDescription>
+              Upgrade your experience and get more matches!
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className='space-y-4 pt-2'>
+            {/* Super Likes Section */}
+            <div>
+              <h3 className='font-semibold text-sm mb-2 dark:text-white flex items-center gap-2'>
+                <Star className='w-4 h-4 text-blue-500' />
+                Super Likes
+              </h3>
+              <div className='space-y-2'>
+                {superLikePackages.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative p-3 rounded-lg border ${
+                      item.popular 
+                        ? 'border-blue-500 bg-blue-500/5' 
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`}
+                  >
+                    {item.popular && (
+                      <Badge className='absolute -top-2 right-2 bg-blue-500 text-white text-[10px]'>
+                        Most Popular
+                      </Badge>
+                    )}
+                    <div className='flex items-center justify-between'>
+                      <div className='flex items-center gap-3'>
+                        <div className={`w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center ${item.color}`}>
+                          {item.icon}
+                        </div>
+                        <div>
+                          <div className='font-medium text-sm dark:text-white'>{item.name}</div>
+                          <div className='text-xs text-muted-foreground'>{item.description}</div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handlePurchase(item.id)}
+                        disabled={purchasing === item.id}
+                        size='sm'
+                        className='bg-blue-500 hover:bg-blue-600 text-white'
+                      >
+                        {purchasing === item.id ? (
+                          <Loader2 className='w-4 h-4 animate-spin' />
+                        ) : (
+                          item.price
+                        )}
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Subscriptions Section */}
+            <div>
+              <h3 className='font-semibold text-sm mb-2 dark:text-white flex items-center gap-2'>
+                <Crown className='w-4 h-4 text-frinder-orange' />
+                Subscriptions
+              </h3>
+              <div className='space-y-2'>
+                {subscriptionPackages.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative p-3 rounded-lg border ${
+                      item.popular 
+                        ? 'border-frinder-orange bg-frinder-orange/5' 
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`}
+                  >
+                    {item.popular && (
+                      <Badge className='absolute -top-2 right-2 bg-frinder-orange text-white text-[10px]'>
+                        Best Value
+                      </Badge>
+                    )}
+                    <div className='flex items-center justify-between'>
+                      <div className='flex items-center gap-3'>
+                        <div className={`w-10 h-10 rounded-full ${
+                          item.id.includes('pro') ? 'bg-frinder-orange/10' : 'bg-green-500/10'
+                        } flex items-center justify-center ${item.color}`}>
+                          {item.icon}
+                        </div>
+                        <div>
+                          <div className='font-medium text-sm dark:text-white'>{item.name}</div>
+                          <div className='text-xs text-muted-foreground'>{item.description}</div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handlePurchase(item.id)}
+                        disabled={
+                          purchasing === item.id || 
+                          (item.id === 'pro_monthly' && userSubscription?.isPremium) ||
+                          (item.id === 'adfree_monthly' && userSubscription?.isAdFree)
+                        }
+                        size='sm'
+                        className={item.id.includes('pro') 
+                          ? 'bg-frinder-orange hover:bg-frinder-burnt text-white' 
+                          : 'bg-green-500 hover:bg-green-600 text-white'
+                        }
+                      >
+                        {purchasing === item.id ? (
+                          <Loader2 className='w-4 h-4 animate-spin' />
+                        ) : (item.id === 'pro_monthly' && userSubscription?.isPremium) || 
+                           (item.id === 'adfree_monthly' && userSubscription?.isAdFree) ? (
+                          <Check className='w-4 h-4' />
+                        ) : (
+                          item.price
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* Pro benefits detail */}
+                    {item.id === 'pro_monthly' && (
+                      <div className='mt-3 pt-2 border-t dark:border-gray-700'>
+                        <div className='grid grid-cols-2 gap-1.5'>
+                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+                            <Check className='w-3 h-3 text-green-500' />
+                            <span>15 Monthly Super Likes</span>
+                          </div>
+                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+                            <Check className='w-3 h-3 text-green-500' />
+                            <span>No Ads</span>
+                          </div>
+                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+                            <Check className='w-3 h-3 text-green-500' />
+                            <span>Priority Discovery</span>
+                          </div>
+                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+                            <Check className='w-3 h-3 text-green-500' />
+                            <span>Advanced Filters</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Current Status */}
+            <div className='p-3 rounded-lg bg-muted/50 dark:bg-gray-800'>
+              <div className='text-xs text-muted-foreground mb-2'>Your Current Status</div>
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center gap-2'>
+                  <Star className='w-4 h-4 text-blue-500' />
+                  <span className='text-sm dark:text-white'>Super Likes</span>
+                </div>
+                <span className='font-bold text-blue-500'>
+                  {userCredits?.superLikes ?? 0}
+                </span>
+              </div>
+              <div className='flex items-center justify-between mt-1'>
+                <div className='flex items-center gap-2'>
+                  <Crown className='w-4 h-4 text-frinder-orange' />
+                  <span className='text-sm dark:text-white'>Pro</span>
+                </div>
+                <Badge className={userSubscription?.isPremium ? 'bg-frinder-orange text-white' : 'bg-gray-200 dark:bg-gray-700'}>
+                  {userSubscription?.isPremium ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              <div className='flex items-center justify-between mt-1'>
+                <div className='flex items-center gap-2'>
+                  <Ban className='w-4 h-4 text-green-500' />
+                  <span className='text-sm dark:text-white'>Ad-Free</span>
+                </div>
+                <Badge className={userSubscription?.isAdFree || userSubscription?.isPremium ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}>
+                  {userSubscription?.isAdFree || userSubscription?.isPremium ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
         <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>

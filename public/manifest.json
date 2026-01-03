@@ -1,22 +1,95 @@
 {
-  "name": "Frinder - University Dating",
+  "name": "Frinder - Find Friends & Meaningful Connections",
   "short_name": "Frinder",
-  "description": "Find your match at Universiteti i Polisë",
+  "description": "The #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests.",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
   "background_color": "#ffffff",
   "theme_color": "#ed8c00",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["social", "lifestyle", "dating"],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/frinder-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/frinder-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/frinder-logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/frinder-logo.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Frinder - Find Your Match"
+    },
+    {
+      "src": "/frinder-logo.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Frinder Mobile Experience"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Swipe",
+      "short_name": "Swipe",
+      "description": "Start swiping to find matches",
+      "url": "/?view=swipe",
+      "icons": [{ "src": "/frinder-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Messages",
+      "short_name": "Chat",
+      "description": "View your messages",
+      "url": "/?view=messages",
+      "icons": [{ "src": "/frinder-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Matches",
+      "short_name": "Matches",
+      "description": "View your matches",
+      "url": "/?view=matches",
+      "icons": [{ "src": "/frinder-logo.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=co.frinder.app",
+      "id": "co.frinder.app"
+    },
+    {
+      "platform": "itunes",
+      "url": "https://apps.apple.com/app/frinder/id123456789"
+    }
+  ],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
 }
