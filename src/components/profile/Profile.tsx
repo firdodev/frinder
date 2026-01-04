@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -21,9 +22,6 @@ import {
   getUserProfileStats, 
   subscribeToUserCredits, 
   subscribeToUserSubscription,
-  addSuperLikes,
-  purchasePremium,
-  purchaseAdFree,
   type UserCredits,
   type UserSubscription
 } from '@/lib/firebaseServices';
@@ -51,21 +49,19 @@ import {
   Heart,
   Ban,
   Check,
-  Gift
+  Gift,
+  Users
 } from 'lucide-react';
-
-// Shop item types
-interface ShopItem {
-  id: string;
-  name: string;
-  description: string;
-  price: string;
-  icon: React.ReactNode;
-  color: string;
-  popular?: boolean;
-}
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function Profile() {
+  const router = useRouter();
   const { user, userProfile, updateProfile, signOut } = useAuth();
   const { darkMode, toggleDarkMode } = useSettings();
   const [isEditing, setIsEditing] = useState(false);
@@ -85,15 +81,15 @@ export default function Profile() {
   // Credits and subscription state
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
-  
-  // Shop state
-  const [showShop, setShowShop] = useState(false);
-  const [purchasing, setPurchasing] = useState<string | null>(null);
 
   const [editData, setEditData] = useState({
     displayName: userProfile?.displayName || 'John Doe',
     bio: userProfile?.bio || 'Coffee lover | Adventure seeker | Looking for meaningful connections',
-    age: userProfile?.age || 22
+    age: userProfile?.age || 22,
+    gender: userProfile?.gender || 'other' as 'male' | 'female' | 'other',
+    city: userProfile?.city || '',
+    country: userProfile?.country || '',
+    relationshipGoal: userProfile?.relationshipGoal || 'relationship' as 'relationship' | 'casual' | 'friends'
   });
 
   // Fetch profile stats from Firebase
@@ -129,62 +125,18 @@ export default function Profile() {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  // Shop items configuration
-  const superLikePackages: ShopItem[] = [
-    { id: 'superlike_5', name: '5 Super Likes', description: 'Stand out from the crowd', price: '$2', icon: <Star className='w-5 h-5' />, color: 'text-blue-500' },
-  ];
-
-  const subscriptionPackages: ShopItem[] = [
-    { 
-      id: 'pro_monthly', 
-      name: 'Frinder Pro', 
-      description: '15 monthly super likes, no ads, priority discovery, advanced filters', 
-      price: '$5/mo', 
-      icon: <Crown className='w-5 h-5' />, 
-      color: 'text-frinder-orange',
-      popular: true 
-    },
-    { 
-      id: 'adfree_monthly', 
-      name: 'Ad-Free Experience', 
-      description: 'Remove all ads for a seamless experience', 
-      price: '$3.99/mo', 
-      icon: <Ban className='w-5 h-5' />, 
-      color: 'text-green-500' 
-    },
-  ];
-
-  const handlePurchase = async (itemId: string) => {
-    if (!user?.uid) return;
-    
-    setPurchasing(itemId);
-    try {
-      if (itemId === 'superlike_5') {
-        await addSuperLikes(user.uid, 5);
-        toast.success('5 Super Likes added! 💙');
-      } else if (itemId === 'pro_monthly') {
-        await purchasePremium(user.uid);
-        toast.success('Welcome to Frinder Pro! 👑');
-      } else if (itemId === 'adfree_monthly') {
-        await purchaseAdFree(user.uid);
-        toast.success('Ad-free experience activated! 🎉');
-      }
-    } catch (error) {
-      console.error('Purchase error:', error);
-      toast.error('Purchase failed. Please try again.');
-    } finally {
-      setPurchasing(null);
-    }
-  };
-
   const profile = {
     displayName: userProfile?.displayName || 'Your Name',
     bio: userProfile?.bio || 'Tell others about yourself...',
     age: userProfile?.age || 22,
+    gender: userProfile?.gender || 'other',
+    city: userProfile?.city || '',
+    country: userProfile?.country || '',
     photos: userProfile?.photos || [],
     interests: userProfile?.interests || [],
     location: userProfile?.city ? `${userProfile.city}, ${userProfile.country}` : '',
-    verified: userProfile?.isEmailVerified || false
+    verified: userProfile?.isEmailVerified || false,
+    relationshipGoal: userProfile?.relationshipGoal || 'relationship'
   };
 
   const handleSaveProfile = async () => {
@@ -382,7 +334,7 @@ export default function Profile() {
                 </div>
               </div>
               <Button 
-                onClick={() => setShowShop(true)}
+                onClick={() => router.push('/shop')}
                 variant='secondary'
                 size='sm'
                 className='bg-white text-frinder-orange hover:bg-white/90'
@@ -441,193 +393,6 @@ export default function Profile() {
         </Card>
       </div>
 
-      {/* Shop Dialog */}
-      <Dialog open={showShop} onOpenChange={setShowShop}>
-        <DialogContent className='sm:max-w-md max-h-[80vh] overflow-y-auto dark:bg-gray-900'>
-          <DialogHeader>
-            <DialogTitle className='flex items-center gap-2 dark:text-white'>
-              <Gift className='w-5 h-5 text-frinder-orange' />
-              Frinder Shop
-            </DialogTitle>
-            <DialogDescription>
-              Upgrade your experience and get more matches!
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className='space-y-4 pt-2'>
-            {/* Super Likes Section */}
-            <div>
-              <h3 className='font-semibold text-sm mb-2 dark:text-white flex items-center gap-2'>
-                <Star className='w-4 h-4 text-blue-500' />
-                Super Likes
-              </h3>
-              <div className='space-y-2'>
-                {superLikePackages.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`relative p-3 rounded-lg border ${
-                      item.popular 
-                        ? 'border-blue-500 bg-blue-500/5' 
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    {item.popular && (
-                      <Badge className='absolute -top-2 right-2 bg-blue-500 text-white text-[10px]'>
-                        Most Popular
-                      </Badge>
-                    )}
-                    <div className='flex items-center justify-between'>
-                      <div className='flex items-center gap-3'>
-                        <div className={`w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center ${item.color}`}>
-                          {item.icon}
-                        </div>
-                        <div>
-                          <div className='font-medium text-sm dark:text-white'>{item.name}</div>
-                          <div className='text-xs text-muted-foreground'>{item.description}</div>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => handlePurchase(item.id)}
-                        disabled={purchasing === item.id}
-                        size='sm'
-                        className='bg-blue-500 hover:bg-blue-600 text-white'
-                      >
-                        {purchasing === item.id ? (
-                          <Loader2 className='w-4 h-4 animate-spin' />
-                        ) : (
-                          item.price
-                        )}
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* Subscriptions Section */}
-            <div>
-              <h3 className='font-semibold text-sm mb-2 dark:text-white flex items-center gap-2'>
-                <Crown className='w-4 h-4 text-frinder-orange' />
-                Subscriptions
-              </h3>
-              <div className='space-y-2'>
-                {subscriptionPackages.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`relative p-3 rounded-lg border ${
-                      item.popular 
-                        ? 'border-frinder-orange bg-frinder-orange/5' 
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    {item.popular && (
-                      <Badge className='absolute -top-2 right-2 bg-frinder-orange text-white text-[10px]'>
-                        Best Value
-                      </Badge>
-                    )}
-                    <div className='flex items-center justify-between'>
-                      <div className='flex items-center gap-3'>
-                        <div className={`w-10 h-10 rounded-full ${
-                          item.id.includes('pro') ? 'bg-frinder-orange/10' : 'bg-green-500/10'
-                        } flex items-center justify-center ${item.color}`}>
-                          {item.icon}
-                        </div>
-                        <div>
-                          <div className='font-medium text-sm dark:text-white'>{item.name}</div>
-                          <div className='text-xs text-muted-foreground'>{item.description}</div>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => handlePurchase(item.id)}
-                        disabled={
-                          purchasing === item.id || 
-                          (item.id === 'pro_monthly' && userSubscription?.isPremium) ||
-                          (item.id === 'adfree_monthly' && userSubscription?.isAdFree)
-                        }
-                        size='sm'
-                        className={item.id.includes('pro') 
-                          ? 'bg-frinder-orange hover:bg-frinder-burnt text-white' 
-                          : 'bg-green-500 hover:bg-green-600 text-white'
-                        }
-                      >
-                        {purchasing === item.id ? (
-                          <Loader2 className='w-4 h-4 animate-spin' />
-                        ) : (item.id === 'pro_monthly' && userSubscription?.isPremium) || 
-                           (item.id === 'adfree_monthly' && userSubscription?.isAdFree) ? (
-                          <Check className='w-4 h-4' />
-                        ) : (
-                          item.price
-                        )}
-                      </Button>
-                    </div>
-                    
-                    {/* Pro benefits detail */}
-                    {item.id === 'pro_monthly' && (
-                      <div className='mt-3 pt-2 border-t dark:border-gray-700'>
-                        <div className='grid grid-cols-2 gap-1.5'>
-                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
-                            <Check className='w-3 h-3 text-green-500' />
-                            <span>15 Monthly Super Likes</span>
-                          </div>
-                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
-                            <Check className='w-3 h-3 text-green-500' />
-                            <span>No Ads</span>
-                          </div>
-                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
-                            <Check className='w-3 h-3 text-green-500' />
-                            <span>Priority Discovery</span>
-                          </div>
-                          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
-                            <Check className='w-3 h-3 text-green-500' />
-                            <span>Advanced Filters</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* Current Status */}
-            <div className='p-3 rounded-lg bg-muted/50 dark:bg-gray-800'>
-              <div className='text-xs text-muted-foreground mb-2'>Your Current Status</div>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center gap-2'>
-                  <Star className='w-4 h-4 text-blue-500' />
-                  <span className='text-sm dark:text-white'>Super Likes</span>
-                </div>
-                <span className='font-bold text-blue-500'>
-                  {userCredits?.superLikes ?? 0}
-                </span>
-              </div>
-              <div className='flex items-center justify-between mt-1'>
-                <div className='flex items-center gap-2'>
-                  <Crown className='w-4 h-4 text-frinder-orange' />
-                  <span className='text-sm dark:text-white'>Pro</span>
-                </div>
-                <Badge className={userSubscription?.isPremium ? 'bg-frinder-orange text-white' : 'bg-gray-200 dark:bg-gray-700'}>
-                  {userSubscription?.isPremium ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-              <div className='flex items-center justify-between mt-1'>
-                <div className='flex items-center gap-2'>
-                  <Ban className='w-4 h-4 text-green-500' />
-                  <span className='text-sm dark:text-white'>Ad-Free</span>
-                </div>
-                <Badge className={userSubscription?.isAdFree || userSubscription?.isPremium ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}>
-                  {userSubscription?.isAdFree || userSubscription?.isPremium ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
         <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
           <CardContent className='p-3 sm:p-4'>
@@ -639,11 +404,34 @@ export default function Profile() {
                     <Edit className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground' />
                   </button>
                 </DialogTrigger>
-                <DialogContent className='sm:max-w-md mx-4 dark:bg-black dark:border-gray-800'>
+                <DialogContent className='sm:max-w-md mx-4 dark:bg-black dark:border-gray-800 max-h-[90vh] overflow-y-auto'>
                   <DialogHeader>
                     <DialogTitle className='dark:text-white'>Edit Profile</DialogTitle>
+                    <DialogDescription className='text-muted-foreground'>
+                      Update your profile information
+                    </DialogDescription>
                   </DialogHeader>
                   <div className='space-y-3 sm:space-y-4 py-3 sm:py-4'>
+                    {/* Relationship Goal */}
+                    <div className='space-y-1.5 sm:space-y-2'>
+                      <Label className='dark:text-white'>What are you looking for?</Label>
+                      <Select
+                        value={editData.relationshipGoal}
+                        onValueChange={(value: 'relationship' | 'casual' | 'friends') => 
+                          setEditData(prev => ({ ...prev, relationshipGoal: value }))
+                        }
+                      >
+                        <SelectTrigger className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'>
+                          <SelectValue placeholder='Select what you are looking for' />
+                        </SelectTrigger>
+                        <SelectContent className='dark:bg-gray-900 dark:border-gray-800'>
+                          <SelectItem value='relationship'>💕 Relationship</SelectItem>
+                          <SelectItem value='casual'>😎 Casual</SelectItem>
+                          <SelectItem value='friends'>🤝 Just Friends</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className='space-y-1.5 sm:space-y-2'>
                       <Label htmlFor='name' className='dark:text-white'>Display Name</Label>
                       <Input
@@ -653,16 +441,61 @@ export default function Profile() {
                         className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
                       />
                     </div>
-                    <div className='space-y-1.5 sm:space-y-2'>
-                      <Label htmlFor='age' className='dark:text-white'>Age</Label>
-                      <Input
-                        id='age'
-                        type='number'
-                        value={editData.age}
-                        onChange={e => setEditData(prev => ({ ...prev, age: parseInt(e.target.value) }))}
-                        className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
-                      />
+
+                    <div className='grid grid-cols-2 gap-3'>
+                      <div className='space-y-1.5 sm:space-y-2'>
+                        <Label htmlFor='age' className='dark:text-white'>Age</Label>
+                        <Input
+                          id='age'
+                          type='number'
+                          value={editData.age}
+                          onChange={e => setEditData(prev => ({ ...prev, age: parseInt(e.target.value) || 18 }))}
+                          className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                        />
+                      </div>
+                      <div className='space-y-1.5 sm:space-y-2'>
+                        <Label className='dark:text-white'>Gender</Label>
+                        <Select
+                          value={editData.gender}
+                          onValueChange={(value: 'male' | 'female' | 'other') => 
+                            setEditData(prev => ({ ...prev, gender: value }))
+                          }
+                        >
+                          <SelectTrigger className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'>
+                            <SelectValue placeholder='Select gender' />
+                          </SelectTrigger>
+                          <SelectContent className='dark:bg-gray-900 dark:border-gray-800'>
+                            <SelectItem value='male'>Male</SelectItem>
+                            <SelectItem value='female'>Female</SelectItem>
+                            <SelectItem value='other'>Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
+
+                    <div className='grid grid-cols-2 gap-3'>
+                      <div className='space-y-1.5 sm:space-y-2'>
+                        <Label htmlFor='city' className='dark:text-white'>City</Label>
+                        <Input
+                          id='city'
+                          value={editData.city}
+                          onChange={e => setEditData(prev => ({ ...prev, city: e.target.value }))}
+                          placeholder='Your city'
+                          className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                        />
+                      </div>
+                      <div className='space-y-1.5 sm:space-y-2'>
+                        <Label htmlFor='country' className='dark:text-white'>Country</Label>
+                        <Input
+                          id='country'
+                          value={editData.country}
+                          onChange={e => setEditData(prev => ({ ...prev, country: e.target.value }))}
+                          placeholder='Your country'
+                          className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                        />
+                      </div>
+                    </div>
+
                     <div className='space-y-1.5 sm:space-y-2'>
                       <Label htmlFor='bio' className='dark:text-white'>Bio</Label>
                       <Textarea
@@ -670,8 +503,10 @@ export default function Profile() {
                         value={editData.bio}
                         onChange={e => setEditData(prev => ({ ...prev, bio: e.target.value }))}
                         className='min-h-25 dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                        placeholder='Tell others about yourself...'
                       />
                     </div>
+
                     <Button onClick={handleSaveProfile} className='w-full bg-frinder-orange hover:bg-frinder-burnt'>
                       Save Changes
                     </Button>
@@ -679,6 +514,21 @@ export default function Profile() {
                 </DialogContent>
               </Dialog>
             </div>
+
+            {/* Relationship Goal Badge */}
+            {profile.relationshipGoal && (
+              <div className='mb-3'>
+                <Badge 
+                  variant='outline' 
+                  className='text-xs sm:text-sm border-frinder-orange/30 text-frinder-orange'
+                >
+                  {profile.relationshipGoal === 'relationship' && '💕 Looking for a relationship'}
+                  {profile.relationshipGoal === 'casual' && '😎 Something casual'}
+                  {profile.relationshipGoal === 'friends' && '🤝 Just making friends'}
+                </Badge>
+              </div>
+            )}
+
             <p className='text-muted-foreground text-xs sm:text-sm mb-3 sm:mb-4'>{profile.bio}</p>
 
             <h3 className='font-semibold mb-1.5 sm:mb-2 text-sm sm:text-base dark:text-white'>Interests</h3>

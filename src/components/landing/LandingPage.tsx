@@ -113,7 +113,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <img 
                 src='/frinder-logo.png' 
                 alt='Frinder - Find Friends & Meaningful Connections' 
-                className='w-10 h-10 rounded-xl shadow-lg shadow-orange-200'
+                className='w-9 h-9 rounded-lg shadow-md shadow-orange-200/50'
               />
               <span className='text-2xl font-bold bg-gradient-to-r from-[#ed8c00] to-[#e8763d] bg-clip-text text-transparent'>
                 Frinder

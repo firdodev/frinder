@@ -34,6 +34,7 @@ interface Profile {
   interests: string[];
   distance?: string;
   course?: string;
+  relationshipGoal?: 'relationship' | 'casual' | 'friends';
 }
 
 // Firework particle for celebration
@@ -610,6 +611,16 @@ function SwipeCard({
                     <span className='text-xs sm:text-sm drop-shadow'>{profile.distance}</span>
                   </div>
                 )}
+                {profile.relationshipGoal && (
+                  <div className='flex items-center gap-2 text-white/90 mt-1'>
+                    <Heart className='w-3 h-3 sm:w-4 sm:h-4' />
+                    <span className='text-xs sm:text-sm drop-shadow'>
+                      {profile.relationshipGoal === 'relationship' && 'Looking for a relationship'}
+                      {profile.relationshipGoal === 'casual' && 'Something casual'}
+                      {profile.relationshipGoal === 'friends' && 'Just friends'}
+                    </span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); setShowInfo(!showInfo); }}
@@ -714,7 +725,8 @@ export default function SwipePeople() {
           photos: u.photos && u.photos.length > 0 ? u.photos : ['/placeholder-avatar.png'],
           interests: u.interests || [],
           course: u.city ? `${u.city}, ${u.country}` : '',
-          distance: u.city === userProfile.city ? 'Same city' : u.country === userProfile.country ? 'Same country' : ''
+          distance: u.city === userProfile.city ? 'Same city' : u.country === userProfile.country ? 'Same country' : '',
+          relationshipGoal: u.relationshipGoal
         }));
 
         setProfiles(mappedProfiles);

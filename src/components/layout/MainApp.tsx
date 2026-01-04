@@ -96,38 +96,41 @@ export default function MainApp() {
       <aside className='hidden lg:flex flex-col w-72 border-r bg-white dark:bg-black dark:border-gray-800'>
         {/* Logo */}
         <div className='p-6 border-b dark:border-gray-800'>
-          <motion.div 
+          <motion.button 
             initial={{ opacity: 0, x: -20 }} 
             animate={{ opacity: 1, x: 0 }} 
-            className='flex items-center gap-3'
+            onClick={() => setActiveTab('swipe')}
+            className='flex items-center gap-3 hover:opacity-80 transition-opacity'
           >
             <Image 
               src='/frinder-logo.png' 
               alt='Frinder' 
-              width={40} 
-              height={40} 
-              className='rounded-xl shadow-lg'
+              width={36} 
+              height={36} 
+              className='rounded-lg'
               priority
             />
-            <div>
+            <div className='text-left'>
               <span className='text-2xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
                 Frinder
               </span>
               <p className='text-xs text-muted-foreground'>Find your match</p>
             </div>
-          </motion.div>
+          </motion.button>
         </div>
 
         {/* User Profile Card */}
         <div className='p-4'>
           <div className='bg-gradient-to-br from-frinder-orange/10 to-frinder-gold/10 dark:from-frinder-orange/20 dark:to-frinder-gold/20 rounded-xl p-4'>
             <div className='flex items-center gap-3'>
-              <Avatar className='w-12 h-12 border-2 border-frinder-orange'>
-                <AvatarImage src={userProfile?.photos?.[0]} alt={userProfile?.displayName} />
-                <AvatarFallback className='bg-frinder-orange text-white'>
-                  {userProfile?.displayName?.[0] || 'U'}
-                </AvatarFallback>
-              </Avatar>
+              <button onClick={() => setActiveTab('profile')} className='hover:opacity-80 transition-opacity'>
+                <Avatar className='w-12 h-12 border-2 border-frinder-orange cursor-pointer'>
+                  <AvatarImage src={userProfile?.photos?.[0]} alt={userProfile?.displayName} />
+                  <AvatarFallback className='bg-frinder-orange text-white'>
+                    {userProfile?.displayName?.[0] || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
               <div className='flex-1 min-w-0'>
                 <h3 className='font-semibold text-sm truncate dark:text-white'>
                   {userProfile?.displayName || 'User'}
@@ -196,16 +199,21 @@ export default function MainApp() {
       <div className='flex-1 flex flex-col min-w-0'>
         {/* Mobile Header - hidden on desktop */}
         <div className='lg:hidden px-4 py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className='flex items-center gap-2'>
+          <motion.button 
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            onClick={() => setActiveTab('swipe')}
+            className='flex items-center gap-2 hover:opacity-80 transition-opacity'
+          >
             <img 
               src='/frinder-logo.png' 
               alt='Frinder' 
-              className='w-8 h-8 rounded-full'
+              className='w-8 h-8 rounded-lg'
             />
             <span className='text-xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
               Frinder
             </span>
-          </motion.div>
+          </motion.button>
           
           {/* Credits Display - Mobile */}
           <div className='flex items-center gap-2'>
@@ -277,9 +285,9 @@ export default function MainApp() {
                 <div className='relative'>
                   <tab.icon
                     className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
-                      activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
+                      activeTab === tab.id || tab.id === 'swipe' ? 'text-frinder-orange' : 'text-muted-foreground'
                     }`}
-                    fill={activeTab === tab.id && tab.fillActive ? 'currentColor' : 'none'}
+                    fill={(activeTab === tab.id && tab.fillActive) || tab.id === 'swipe' ? 'currentColor' : 'none'}
                   />
                   {tab.id === 'messages' && unreadCount > 0 && (
                     <span className='absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1'>
@@ -289,7 +297,7 @@ export default function MainApp() {
                 </div>
                 <span
                   className={`text-[10px] sm:text-xs font-medium transition-colors ${
-                    activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
+                    activeTab === tab.id || tab.id === 'swipe' ? 'text-frinder-orange' : 'text-muted-foreground'
                   }`}
                 >
                   {tab.label}

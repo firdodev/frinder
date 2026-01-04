@@ -101,6 +101,12 @@ interface Match {
   odMatchId: string;
   name: string;
   photo: string;
+  photos?: string[];
+  bio?: string;
+  age?: number;
+  location?: string;
+  interests?: string[];
+  relationshipGoal?: 'relationship' | 'casual' | 'friends';
   lastMessage?: string;
   lastMessageTime?: Date;
   unreadCount: number;
@@ -1035,6 +1041,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   const [lastSeen, setLastSeen] = useState<Date | undefined>();
   const [showMenu, setShowMenu] = useState(false);
   const [showUnmatchDialog, setShowUnmatchDialog] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -1439,12 +1446,119 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         </DialogContent>
       </Dialog>
 
+      {/* Profile View Dialog */}
+      <AnimatePresence>
+        {showProfileDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end lg:items-center lg:justify-center'
+            onClick={() => setShowProfileDialog(false)}
+          >
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+              className='w-full max-h-[90vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
+            >
+              {/* Profile Header */}
+              <div className='relative h-72 lg:h-64'>
+                <img
+                  src={match.photo}
+                  alt={match.name}
+                  className='w-full h-full object-cover'
+                />
+                <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
+                <button
+                  onClick={() => setShowProfileDialog(false)}
+                  className='absolute top-4 right-4 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors'
+                >
+                  <X className='w-5 h-5' />
+                </button>
+                <div className='absolute bottom-4 left-4 right-4'>
+                  <h2 className='text-2xl font-bold text-white'>
+                    {match.name}{match.age ? `, ${match.age}` : ''}
+                  </h2>
+                  {match.location && (
+                    <div className='flex items-center gap-1 text-white/80 mt-1'>
+                      <MapPin className='w-4 h-4' />
+                      <span className='text-sm'>{match.location}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Profile Content */}
+              <div className='p-4 overflow-y-auto max-h-[calc(90vh-288px)] lg:max-h-[calc(85vh-256px)]'>
+                {/* Looking For */}
+                {match.relationshipGoal && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
+                    <Badge className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'>
+                      <Heart className='w-3 h-3 mr-1.5' />
+                      {match.relationshipGoal === 'relationship' && 'A relationship'}
+                      {match.relationshipGoal === 'casual' && 'Something casual'}
+                      {match.relationshipGoal === 'friends' && 'Just friends'}
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Bio */}
+                {match.bio && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>About</h3>
+                    <p className='text-muted-foreground text-sm leading-relaxed'>{match.bio}</p>
+                  </div>
+                )}
+
+                {/* Interests */}
+                {match.interests && match.interests.length > 0 && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>Interests</h3>
+                    <div className='flex flex-wrap gap-2'>
+                      {match.interests.filter(Boolean).map((interest, index) => (
+                        <Badge
+                          key={`${interest}-${index}`}
+                          className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'
+                        >
+                          {interest}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Photos Gallery */}
+                {match.photos && match.photos.length > 1 && (
+                  <div>
+                    <h3 className='font-semibold dark:text-white mb-2'>Photos</h3>
+                    <div className='grid grid-cols-3 gap-2'>
+                      {match.photos.slice(1).map((photo, index) => (
+                        <div key={index} className='aspect-square rounded-xl overflow-hidden'>
+                          <img src={photo} alt={`Photo ${index + 2}`} className='w-full h-full object-cover' />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Chat header */}
       <div className='px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 border-b bg-white dark:bg-black dark:border-gray-800'>
         <button onClick={onBack} className='p-1 hover:bg-muted dark:hover:bg-gray-800 rounded-full'>
           <ChevronLeft className='w-5 h-5 sm:w-6 sm:h-6 dark:text-white' />
         </button>
-        <div className='relative'>
+        <button 
+          onClick={() => setShowProfileDialog(true)}
+          className='relative hover:opacity-80 transition-opacity'
+        >
           <Avatar className={`w-9 h-9 sm:w-10 sm:h-10 ${match.isUnmatched ? 'grayscale' : ''}`}>
             <AvatarImage src={match.photo} alt={match.name} />
             <AvatarFallback className={match.isUnmatched ? 'bg-gray-400 text-white' : 'bg-frinder-orange text-white'}>{match.name[0]}</AvatarFallback>
@@ -1452,8 +1566,11 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           {isOnline && !match.isUnmatched && (
             <span className='absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-black' />
           )}
-        </div>
-        <div className='flex-1'>
+        </button>
+        <button 
+          onClick={() => setShowProfileDialog(true)}
+          className='flex-1 text-left hover:opacity-80 transition-opacity'
+        >
           <div className='flex items-center gap-2'>
             <h3 className='font-semibold text-sm sm:text-base dark:text-white'>{match.name}</h3>
             {match.isUnmatched && (
@@ -1465,7 +1582,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           <p className={`text-[10px] sm:text-xs ${match.isUnmatched ? 'text-gray-400' : isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
             {match.isUnmatched ? 'Chat disabled' : getStatusText()}
           </p>
-        </div>
+        </button>
         {!match.isUnmatched && (
         <div className='flex items-center gap-1 sm:gap-2'>
           <button 
@@ -2520,12 +2637,20 @@ export default function Messages() {
   // Track notified date requests to avoid duplicate toasts
   const notifiedDateRequestsRef = useRef<Set<string>>(new Set());
   const dateRequestStatesRef = useRef<Map<string, Map<string, string>>>(new Map());
+  // Accepted dates state
+  interface AcceptedDate {
+    dateRequest: DateRequest;
+    match: Match;
+  }
+  const [acceptedDates, setAcceptedDates] = useState<AcceptedDate[]>([]);
 
   // Subscribe to date requests for all matches and show toast when outside conversation
   useEffect(() => {
     if (!user?.uid || matches.length === 0) return;
 
     const unsubscribers: (() => void)[] = [];
+    // Track all accepted dates from all matches
+    const allAcceptedDates: Map<string, AcceptedDate[]> = new Map();
 
     matches.forEach(match => {
       if (match.isUnmatched) return;
@@ -2533,6 +2658,34 @@ export default function Messages() {
       const unsubscribe = subscribeToDateRequests(match.id, (dateRequests) => {
         // Check if we're currently viewing this match's conversation
         const isViewingThisConversation = selectedMatch?.id === match.id;
+
+        // Collect accepted dates for this match
+        const matchAcceptedDates = dateRequests
+          .filter(req => req.status === 'accepted')
+          .map(req => ({ dateRequest: req, match }));
+        allAcceptedDates.set(match.id, matchAcceptedDates);
+
+        // Update the global accepted dates state
+        const allDates = Array.from(allAcceptedDates.values()).flat();
+        const now = new Date();
+        // Sort: upcoming dates first (nearest first), then past dates (most recent first)
+        allDates.sort((a, b) => {
+          const dateA = a.dateRequest.date instanceof Date ? a.dateRequest.date : a.dateRequest.date.toDate();
+          const dateB = b.dateRequest.date instanceof Date ? b.dateRequest.date : b.dateRequest.date.toDate();
+          const aIsPast = dateA < now;
+          const bIsPast = dateB < now;
+          
+          // Upcoming dates come before past dates
+          if (!aIsPast && bIsPast) return -1;
+          if (aIsPast && !bIsPast) return 1;
+          
+          // Within upcoming: sort by nearest date first
+          if (!aIsPast && !bIsPast) return dateA.getTime() - dateB.getTime();
+          
+          // Within past: sort by most recent first
+          return dateB.getTime() - dateA.getTime();
+        });
+        setAcceptedDates(allDates);
 
         dateRequests.forEach(req => {
           const notificationKey = `${match.id}-${req.id}-${req.status}`;
@@ -2693,6 +2846,14 @@ export default function Messages() {
           odMatchId: otherUserId,
           name: otherUserName,
           photo: otherUserPhoto,
+          photos: otherUserProfile?.photos || [],
+          bio: otherUserProfile?.bio,
+          age: otherUserProfile?.age,
+          location: otherUserProfile?.city
+            ? `${otherUserProfile.city}${otherUserProfile.country ? `, ${otherUserProfile.country}` : ''}`
+            : undefined,
+          interests: otherUserProfile?.interests || [],
+          relationshipGoal: otherUserProfile?.relationshipGoal,
           lastMessage: m.lastMessage,
           lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
           unreadCount: (m as any).unreadCount?.[user.uid] || 0,
@@ -2739,6 +2900,14 @@ export default function Messages() {
           odMatchId: otherUserId,
           name: otherUserName,
           photo: otherUserPhoto,
+          photos: otherUserProfile?.photos || [],
+          bio: otherUserProfile?.bio,
+          age: otherUserProfile?.age,
+          location: otherUserProfile?.city
+            ? `${otherUserProfile.city}${otherUserProfile.country ? `, ${otherUserProfile.country}` : ''}`
+            : undefined,
+          interests: otherUserProfile?.interests || [],
+          relationshipGoal: otherUserProfile?.relationshipGoal,
           lastMessage: m.lastMessage,
           lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
           unreadCount: 0,
@@ -2900,9 +3069,9 @@ export default function Messages() {
                   className='flex flex-col items-center gap-1.5 sm:gap-2 min-w-[60px] sm:min-w-[72px]'
                 >
                   <div className='relative'>
-                    <Avatar className='w-14 h-14 sm:w-16 sm:h-16 border-2 border-[#ed8c00] animate-pulse-glow'>
-                      <AvatarImage src={match.photo} alt={match.name} />
-                      <AvatarFallback className='bg-[#ed8c00] text-white'>{match.name[0]}</AvatarFallback>
+                    <Avatar className='w-14 h-14 sm:w-16 sm:h-16 ring-2 ring-frinder-orange ring-offset-2 ring-offset-white dark:ring-offset-gray-900 shadow-md'>
+                      <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
+                      <AvatarFallback className='bg-frinder-orange text-white font-medium'>{match.name[0]}</AvatarFallback>
                     </Avatar>
                     {match.isOnline && (
                       <span className='absolute bottom-1 right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
@@ -2933,9 +3102,9 @@ export default function Messages() {
                     }`}
                   >
                     <div className='relative'>
-                      <Avatar className={`w-12 h-12 sm:w-14 sm:h-14 ${match.unreadCount > 0 ? 'ring-2 ring-frinder-orange' : ''}`}>
-                        <AvatarImage src={match.photo} alt={match.name} />
-                        <AvatarFallback className='bg-frinder-orange text-white'>{match.name[0]}</AvatarFallback>
+                      <Avatar className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${match.unreadCount > 0 ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : 'border border-gray-200 dark:border-gray-700'}`}>
+                        <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
+                        <AvatarFallback className='bg-frinder-orange text-white font-medium'>{match.name[0]}</AvatarFallback>
                       </Avatar>
                       {match.isOnline && !match.unreadCount && (
                         <span className='absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
@@ -3036,8 +3205,8 @@ export default function Messages() {
                     className='w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50 transition-colors text-left'
                   >
                     <div className='relative'>
-                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14'>
-                        <AvatarImage src={group.photo} alt={group.name} />
+                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14 shadow-sm border border-gray-200 dark:border-gray-700'>
+                        <AvatarImage src={group.photo} alt={group.name} className='object-cover' />
                         <AvatarFallback className='bg-frinder-orange text-white'>
                           <Users className='w-5 h-5' />
                         </AvatarFallback>
@@ -3083,6 +3252,93 @@ export default function Messages() {
                     </div>
                   </motion.button>
                 ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* Upcoming Dates Section */}
+        {acceptedDates.length > 0 && (
+          <div className='px-3 sm:px-4 mt-4'>
+            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
+              <CalendarHeart className='w-3 h-3 text-frinder-orange' />
+              Upcoming Dates
+            </h2>
+            <div className='space-y-1.5 sm:space-y-2'>
+              <AnimatePresence>
+                {acceptedDates.map(({ dateRequest, match }) => {
+                  const dateObj = dateRequest.date instanceof Date 
+                    ? dateRequest.date 
+                    : dateRequest.date.toDate();
+                  const isPast = dateObj < new Date();
+                  const isToday = dateObj.toDateString() === new Date().toDateString();
+                  
+                  return (
+                    <motion.button
+                      key={dateRequest.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      onClick={() => setSelectedMatch(match)}
+                      className={`w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-colors text-left ${
+                        isPast 
+                          ? 'bg-muted/30 dark:bg-gray-800/30' 
+                          : isToday
+                            ? 'bg-frinder-orange/10 dark:bg-frinder-orange/20 border border-frinder-orange/30'
+                            : 'bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50'
+                      }`}
+                    >
+                      <div className='relative'>
+                        <Avatar className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${isToday ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : 'border border-gray-200 dark:border-gray-700'}`}>
+                          <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
+                          <AvatarFallback className='bg-frinder-orange text-white font-medium'>
+                            {match.name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        {isToday && (
+                          <div className='absolute -top-1 -right-1 w-5 h-5 bg-frinder-orange rounded-full flex items-center justify-center'>
+                            <PartyPopper className='w-3 h-3 text-white' />
+                          </div>
+                        )}
+                      </div>
+                      <div className='flex-1 text-left min-w-0'>
+                        <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
+                          <h3 className={`font-semibold text-sm sm:text-base truncate ${isPast ? 'text-muted-foreground' : 'dark:text-white'}`}>
+                            {dateRequest.title}
+                          </h3>
+                          {isToday && (
+                            <Badge className='bg-frinder-orange text-white text-[10px] shrink-0'>
+                              Today!
+                            </Badge>
+                          )}
+                          {isPast && (
+                            <Badge variant='outline' className='text-[10px] shrink-0 opacity-60'>
+                              Past
+                            </Badge>
+                          )}
+                        </div>
+                        <div className='flex items-center gap-3 text-xs sm:text-sm text-muted-foreground'>
+                          <span className='flex items-center gap-1'>
+                            <Calendar className='w-3 h-3' />
+                            {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                          <span className='flex items-center gap-1'>
+                            <Clock className='w-3 h-3' />
+                            {dateRequest.time}
+                          </span>
+                        </div>
+                        <div className='flex items-center gap-1 mt-0.5 text-xs text-muted-foreground'>
+                          <MapPin className='w-3 h-3 shrink-0' />
+                          <span className='truncate'>{dateRequest.location}</span>
+                        </div>
+                      </div>
+                      <div className='flex flex-col items-end gap-1'>
+                        <span className='text-xs text-muted-foreground'>with</span>
+                        <span className='text-xs font-medium text-frinder-orange'>{match.name}</span>
+                      </div>
+                    </motion.button>
+                  );
+                })}
               </AnimatePresence>
             </div>
           </div>

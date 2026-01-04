@@ -8,6 +8,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendEmailVerification,
+  sendPasswordResetEmail,
   deleteUser,
   EmailAuthProvider,
   reauthenticateWithCredential
@@ -16,6 +17,7 @@ import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, writ
 import { ref, listAll, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateUserProfileInMatches } from '@/lib/firebaseServices';
+import { checkRateLimit, sanitizeProfileData } from '@/lib/security';
 
 export interface UserProfile {
   uid: string;
@@ -29,6 +31,7 @@ export interface UserProfile {
   photos: string[];
   interests: string[];
   lookingFor: 'people' | 'groups' | 'both';
+  relationshipGoal: 'relationship' | 'casual' | 'friends';
   createdAt: Date;
   isProfileComplete: boolean;
   isEmailVerified: boolean;
@@ -43,6 +46,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -188,15 +192,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserProfile(null);
   };
 
+  const resetPassword = async (email: string) => {
+    if (!validateEmail(email)) {
+      throw new Error(`Only ${ALLOWED_EMAIL_DOMAIN} email addresses are allowed`);
+    }
+    
+    // Rate limit password reset requests
+    const { allowed, resetIn } = checkRateLimit(email, 'passwordReset');
+    if (!allowed) {
+      const resetInMinutes = Math.ceil(resetIn / 60000);
+      throw new Error(`Too many reset attempts. Please try again in ${resetInMinutes} minute(s).`);
+    }
+    
+    await sendPasswordResetEmail(auth, email, {
+      url: window.location.origin,
+      handleCodeInApp: false
+    });
+  };
+
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user) throw new Error('No user logged in');
 
-    const updatedProfile = { ...userProfile, ...data } as UserProfile;
+    // Rate limit profile updates
+    const { allowed, resetIn } = checkRateLimit(user.uid, 'profileUpdate');
+    if (!allowed) {
+      const resetInSeconds = Math.ceil(resetIn / 1000);
+      throw new Error(`Please wait ${resetInSeconds} seconds before updating again.`);
+    }
+
+    // Sanitize profile data
+    const sanitizedData = sanitizeProfileData(data) as Partial<UserProfile>;
+    
+    const updatedProfile = { ...userProfile, ...sanitizedData } as UserProfile;
     await setDoc(doc(db, 'users', user.uid), updatedProfile);
     setUserProfile(updatedProfile);
     
     // Update profile in all matches (async, non-blocking)
-    updateUserProfileInMatches(user.uid, data).catch(console.error);
+    updateUserProfileInMatches(user.uid, sanitizedData).catch(console.error);
   };
 
   const deleteAccount = async (password: string) => {
@@ -240,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,17 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
-type AuthStep = 'auth' | 'verify' | 'success';
+type AuthStep = 'auth' | 'verify' | 'success' | 'forgot-password' | 'reset-sent';
 
 interface AuthPageProps {
   onBack?: () => void;
 }
 
 export default function AuthPage({ onBack }: AuthPageProps) {
-  const { user, userProfile, signIn, signUp, updateProfile } = useAuth();
+  const { user, userProfile, signIn, signUp, updateProfile, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -148,6 +148,27 @@ export default function AuthPage({ onBack }: AuthPageProps) {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setAuthStep('reset-sent');
+      toast.success('Password reset email sent!');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (authStep === 'verify') {
     return (
       <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
@@ -234,6 +255,121 @@ export default function AuthPage({ onBack }: AuthPageProps) {
     );
   }
 
+  if (authStep === 'forgot-password') {
+    return (
+      <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className='w-full max-w-md'>
+          <Card className='shadow-xl border-0'>
+            <CardHeader className='text-center relative'>
+              <button
+                onClick={() => {
+                  setAuthStep('auth');
+                  setError('');
+                }}
+                className='absolute left-4 top-4 p-2 hover:bg-muted rounded-full'
+              >
+                <ArrowLeft className='w-5 h-5' />
+              </button>
+              <div className='w-16 h-16 rounded-full bg-[#ed8c00] flex items-center justify-center mx-auto mb-4'>
+                <KeyRound className='w-8 h-8 text-white' />
+              </div>
+              <CardTitle className='text-2xl'>Forgot Password?</CardTitle>
+              <CardDescription>
+                No worries! Enter your email and we&apos;ll send you a reset link.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className='space-y-4'>
+                <div className='space-y-2'>
+                  <Label htmlFor='reset-email'>Email</Label>
+                  <div className='relative'>
+                    <Mail className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+                    <Input
+                      id='reset-email'
+                      type='email'
+                      placeholder='yourname@universitetipolis.edu.al'
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      className='pl-10'
+                      required
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className='text-sm text-destructive text-center'
+                  >
+                    {error}
+                  </motion.p>
+                )}
+
+                <Button
+                  type='submit'
+                  className='w-full bg-[#ed8c00] hover:bg-[#cc5d00] text-white h-12'
+                  disabled={loading}
+                >
+                  {loading ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+
+                <p className='text-center text-sm text-muted-foreground'>
+                  Remember your password?{' '}
+                  <button
+                    type='button'
+                    onClick={() => {
+                      setAuthStep('auth');
+                      setError('');
+                    }}
+                    className='text-[#ed8c00] font-semibold hover:underline'
+                  >
+                    Sign In
+                  </button>
+                </p>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (authStep === 'reset-sent') {
+    return (
+      <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', duration: 0.5 }}
+          className='text-center max-w-md'
+        >
+          <div className='w-24 h-24 rounded-full bg-[#ed8c00] flex items-center justify-center mx-auto mb-6'>
+            <Mail className='w-12 h-12 text-white' />
+          </div>
+          <h1 className='text-3xl font-bold text-[#1a1a1a] mb-2'>Check Your Email</h1>
+          <p className='text-[#666] mb-6'>
+            We&apos;ve sent a password reset link to<br />
+            <span className='font-semibold text-[#ed8c00]'>{email}</span>
+          </p>
+          <p className='text-sm text-[#999] mb-6'>
+            Click the link in the email to reset your password. If you don&apos;t see it, check your spam folder.
+          </p>
+          <Button
+            onClick={() => {
+              setAuthStep('auth');
+              setError('');
+              setEmail('');
+            }}
+            className='bg-[#ed8c00] hover:bg-[#cc5d00] text-white h-12 px-8'
+          >
+            Back to Sign In
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
       {/* Back button */}
@@ -253,9 +389,9 @@ export default function AuthPage({ onBack }: AuthPageProps) {
         <Image 
           src='/frinder-logo.png' 
           alt='Frinder' 
-          width={80} 
-          height={80} 
-          className='rounded-full mx-auto mb-4 shadow-lg'
+          width={72} 
+          height={72} 
+          className='rounded-2xl mx-auto mb-4 shadow-lg'
           priority
         />
         <h1 className='text-4xl font-bold text-[#ed8c00] mb-2'>Frinder</h1>
@@ -312,7 +448,19 @@ export default function AuthPage({ onBack }: AuthPageProps) {
                       </div>
                     </div>
                     <div className='space-y-2'>
-                      <Label htmlFor='password'>Password</Label>
+                      <div className='flex items-center justify-between'>
+                        <Label htmlFor='password'>Password</Label>
+                        <button
+                          type='button'
+                          onClick={() => {
+                            setError('');
+                            setAuthStep('forgot-password');
+                          }}
+                          className='text-xs text-[#ed8c00] hover:underline'
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
                       <div className='relative'>
                         <Lock className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
                         <Input

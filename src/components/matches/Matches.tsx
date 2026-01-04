@@ -54,6 +54,7 @@ interface MatchProfile {
   matchedAt: Date;
   isOnline?: boolean;
   lastSeen?: Date;
+  relationshipGoal?: 'relationship' | 'casual' | 'friends';
 }
 
 interface MatchesProps {
@@ -101,7 +102,8 @@ export default function Matches({ onStartChat }: MatchesProps) {
               : undefined,
             interests: otherUserProfile?.interests || [],
             matchedAt: m.createdAt instanceof Date ? m.createdAt : m.createdAt?.toDate() || new Date(),
-            isOnline: false
+            isOnline: false,
+            relationshipGoal: otherUserProfile?.relationshipGoal
           };
         })
       );
@@ -220,26 +222,26 @@ export default function Matches({ onStartChat }: MatchesProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Match Detail Sheet */}
+      {/* Match Detail Sheet/Dialog */}
       <AnimatePresence>
         {selectedMatch && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm'
+            className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end lg:items-center lg:justify-center'
             onClick={() => setSelectedMatch(null)}
           >
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className='absolute bottom-0 left-0 right-0 max-h-[90vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden'
+              className='w-full max-h-[90vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
             >
               {/* Match Profile Header */}
-              <div className='relative h-72'>
+              <div className='relative h-72 lg:h-64'>
                 <img
                   src={selectedMatch.photo}
                   alt={selectedMatch.name}
@@ -270,7 +272,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
               </div>
 
               {/* Match Content */}
-              <div className='p-4 overflow-y-auto max-h-[calc(90vh-288px)]'>
+              <div className='p-4 overflow-y-auto max-h-[calc(90vh-288px)] lg:max-h-[calc(85vh-256px)]'>
                 {/* Action Buttons */}
                 <div className='flex gap-3 mb-6'>
                   <Button
@@ -294,6 +296,19 @@ export default function Matches({ onStartChat }: MatchesProps) {
                     <UserX className='w-5 h-5' />
                   </Button>
                 </div>
+
+                {/* Looking For */}
+                {selectedMatch.relationshipGoal && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
+                    <Badge className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'>
+                      <Heart className='w-3 h-3 mr-1.5' />
+                      {selectedMatch.relationshipGoal === 'relationship' && 'A relationship'}
+                      {selectedMatch.relationshipGoal === 'casual' && 'Something casual'}
+                      {selectedMatch.relationshipGoal === 'friends' && 'Just friends'}
+                    </Badge>
+                  </div>
+                )}
 
                 {/* Bio */}
                 {selectedMatch.bio && (
@@ -406,23 +421,23 @@ export default function Matches({ onStartChat }: MatchesProps) {
           </div>
         )}
 
-        {/* Pending Request Detail Sheet */}
+        {/* Pending Request Detail Sheet/Dialog */}
         <AnimatePresence>
           {selectedPending && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm'
+              className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end lg:items-center lg:justify-center'
               onClick={() => setSelectedPending(null)}
             >
               <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 onClick={e => e.stopPropagation()}
-                className='absolute bottom-0 left-0 right-0 max-h-[80vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden'
+                className='w-full max-h-[80vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
               >
                 {/* Pending Profile Header */}
                 <div className='relative h-64'>
@@ -467,6 +482,19 @@ export default function Matches({ onStartChat }: MatchesProps) {
                       Waiting for {selectedPending.displayName?.split(' ')[0]} to like you back
                     </p>
                   </div>
+
+                  {/* Looking For */}
+                  {selectedPending.relationshipGoal && (
+                    <div className='mb-4'>
+                      <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
+                      <Badge className='bg-frinder-gold/10 text-frinder-gold border border-frinder-gold/20'>
+                        <Heart className='w-3 h-3 mr-1.5' />
+                        {selectedPending.relationshipGoal === 'relationship' && 'A relationship'}
+                        {selectedPending.relationshipGoal === 'casual' && 'Something casual'}
+                        {selectedPending.relationshipGoal === 'friends' && 'Just friends'}
+                      </Badge>
+                    </div>
+                  )}
 
                   {/* Bio */}
                   {selectedPending.bio && (
@@ -559,23 +587,23 @@ export default function Matches({ onStartChat }: MatchesProps) {
           </div>
         )}
 
-        {/* Incoming Request Detail Sheet */}
+        {/* Incoming Request Detail Sheet/Dialog */}
         <AnimatePresence>
           {selectedIncoming && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm'
+              className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end lg:items-center lg:justify-center'
               onClick={() => setSelectedIncoming(null)}
             >
               <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 onClick={e => e.stopPropagation()}
-                className='absolute bottom-0 left-0 right-0 max-h-[80vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden'
+                className='w-full max-h-[80vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
               >
                 {/* Incoming Profile Header */}
                 <div className='relative h-64'>
@@ -620,6 +648,19 @@ export default function Matches({ onStartChat }: MatchesProps) {
                       {selectedIncoming.displayName?.split(' ')[0]} wants to match with you!
                     </p>
                   </div>
+
+                  {/* Looking For */}
+                  {selectedIncoming.relationshipGoal && (
+                    <div className='mb-4'>
+                      <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
+                      <Badge className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'>
+                        <Heart className='w-3 h-3 mr-1.5' />
+                        {selectedIncoming.relationshipGoal === 'relationship' && 'A relationship'}
+                        {selectedIncoming.relationshipGoal === 'casual' && 'Something casual'}
+                        {selectedIncoming.relationshipGoal === 'friends' && 'Just friends'}
+                      </Badge>
+                    </div>
+                  )}
 
                   {/* Bio */}
                   {selectedIncoming.bio && (
@@ -709,79 +750,29 @@ export default function Matches({ onStartChat }: MatchesProps) {
             </p>
           </div>
         ) : (
-          <div className='grid grid-cols-2 gap-3'>
+          <div className='grid grid-cols-4 gap-1.5'>
             {filteredMatches.map(match => (
               <motion.div
                 key={match.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedMatch(match)}
                 className='cursor-pointer'
               >
-                <Card className='overflow-hidden border-0 shadow-lg dark:bg-gray-900 hover:shadow-xl transition-shadow'>
-                  <div className='relative aspect-[3/4]'>
-                    <img
-                      src={match.photo}
-                      alt={match.name}
-                      className='w-full h-full object-cover'
-                    />
-                    <div className='absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent' />
-                    
-                    {/* Match indicator */}
-                    <div className='absolute top-2 left-2'>
-                      <div className='flex items-center gap-1 bg-frinder-orange/90 backdrop-blur-sm px-2 py-1 rounded-full'>
-                        <Sparkles className='w-3 h-3 text-white' />
-                        <span className='text-[10px] font-medium text-white'>Match</span>
-                      </div>
-                    </div>
-
-                    {/* More menu button */}
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        setMatchToUnmatch(match);
-                        setShowUnmatchDialog(true);
-                      }}
-                      className='absolute top-2 right-2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors'
-                    >
-                      <MoreHorizontal className='w-4 h-4' />
-                    </button>
-
-                    {/* Profile info */}
-                    <div className='absolute bottom-0 left-0 right-0 p-3'>
-                      <h3 className='font-bold text-white text-lg'>
-                        {match.name}{match.age ? `, ${match.age}` : ''}
-                      </h3>
-                      {match.location && (
-                        <div className='flex items-center gap-1 text-white/80 text-xs mt-0.5'>
-                          <MapPin className='w-3 h-3' />
-                          <span className='truncate'>{match.location}</span>
-                        </div>
-                      )}
-                      <div className='flex items-center gap-1 text-white/60 text-xs mt-1'>
-                        <Clock className='w-3 h-3' />
-                        <span>{formatMatchDate(match.matchedAt)}</span>
-                      </div>
-                    </div>
+                <div className='relative aspect-square rounded-lg overflow-hidden'>
+                  <img
+                    src={match.photo}
+                    alt={match.name}
+                    className='w-full h-full object-cover'
+                  />
+                  <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent' />
+                  <div className='absolute bottom-0 left-0 right-0 p-1'>
+                    <p className='text-white text-[10px] font-medium truncate'>
+                      {match.name.split(' ')[0]}
+                    </p>
                   </div>
-
-                  {/* Action button */}
-                  <CardContent className='p-2'>
-                    <Button
-                      size='sm'
-                      onClick={e => {
-                        e.stopPropagation();
-                        onStartChat(match.id, match.name, match.photo, match.odMatchId);
-                      }}
-                      className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
-                    >
-                      <MessageCircle className='w-4 h-4 mr-2' />
-                      Message
-                    </Button>
-                  </CardContent>
-                </Card>
+                </div>
               </motion.div>
             ))}
           </div>

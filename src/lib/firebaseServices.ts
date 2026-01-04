@@ -19,6 +19,14 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { UserProfile } from '@/contexts/AuthContext';
+import { 
+  checkRateLimit, 
+  sanitizeMessage, 
+  sanitizeInput,
+  sanitizeDisplayName,
+  sanitizeBio,
+  sanitizeInterests
+} from './security';
 
 // Types
 export interface Swipe {
@@ -180,6 +188,14 @@ export async function recordSwipe(
   direction: 'left' | 'right' | 'superlike'
 ): Promise<{ isMatch: boolean; matchId?: string; isSuperLike?: boolean }> {
   try {
+    // Rate limit check
+    const rateLimitAction = direction === 'superlike' ? 'superlike' : 'swipe';
+    const { allowed, resetIn } = checkRateLimit(fromUserId, rateLimitAction);
+    if (!allowed) {
+      const resetInMinutes = Math.ceil(resetIn / 60000);
+      throw new Error(`Too many ${direction === 'superlike' ? 'super likes' : 'swipes'}. Please wait ${resetInMinutes} minute(s).`);
+    }
+
     const swipeId = `${fromUserId}_${toUserId}`;
     await setDoc(doc(db, 'swipes', swipeId), {
       fromUserId,
@@ -349,6 +365,25 @@ export async function sendMessage(
   replyTo?: { id: string; text: string; senderId: string }
 ): Promise<string> {
   try {
+    // Rate limit check
+    const { allowed, resetIn } = checkRateLimit(senderId, 'message');
+    if (!allowed) {
+      const resetInSeconds = Math.ceil(resetIn / 1000);
+      throw new Error(`Slow down! Please wait ${resetInSeconds} seconds before sending another message.`);
+    }
+
+    // Sanitize message text
+    const sanitizedText = sanitizeMessage(text);
+    if (!sanitizedText && !imageUrl) {
+      throw new Error('Message cannot be empty');
+    }
+
+    // Sanitize reply text if present
+    const sanitizedReplyTo = replyTo ? {
+      ...replyTo,
+      text: sanitizeMessage(replyTo.text)
+    } : undefined;
+
     const messagesRef = collection(db, 'matches', matchId, 'messages');
     const messageDoc = doc(messagesRef);
 
@@ -362,7 +397,7 @@ export async function sendMessage(
       replyTo?: { id: string; text: string; senderId: string };
     } = {
       senderId,
-      text,
+      text: sanitizedText,
       timestamp: serverTimestamp(),
       read: false,
       type: imageUrl ? 'image' : 'text'
@@ -372,8 +407,8 @@ export async function sendMessage(
       messageData.imageUrl = imageUrl;
     }
 
-    if (replyTo) {
-      messageData.replyTo = replyTo;
+    if (sanitizedReplyTo) {
+      messageData.replyTo = sanitizedReplyTo;
     }
 
     await setDoc(messageDoc, messageData);
@@ -385,7 +420,7 @@ export async function sendMessage(
 
     // Update match with last message and increment unread count for other user
     const updateData: Record<string, unknown> = {
-      lastMessage: imageUrl ? '📷 Photo' : text,
+      lastMessage: imageUrl ? '📷 Photo' : sanitizedText,
       lastMessageTime: serverTimestamp()
     };
 
@@ -574,12 +609,29 @@ export async function createGroup(
   groupData: Omit<Group, 'id' | 'creatorId' | 'members' | 'memberProfiles' | 'createdAt'>
 ): Promise<string> {
   try {
+    // Rate limit check
+    const { allowed, resetIn } = checkRateLimit(creatorId, 'groupCreate');
+    if (!allowed) {
+      const resetInMinutes = Math.ceil(resetIn / 60000);
+      throw new Error(`You can only create a limited number of groups. Please wait ${resetInMinutes} minute(s).`);
+    }
+
+    // Sanitize group data
+    const sanitizedGroupData = {
+      ...groupData,
+      name: sanitizeInput(groupData.name, { maxLength: 100, allowNewlines: false }),
+      description: sanitizeBio(groupData.description),
+      activity: sanitizeInput(groupData.activity, { maxLength: 100, allowNewlines: false }),
+      location: groupData.location ? sanitizeInput(groupData.location, { maxLength: 100, allowNewlines: false }) : undefined,
+      interests: sanitizeInterests(groupData.interests)
+    };
+
     const userDoc = await getDoc(doc(db, 'users', creatorId));
     const userData = userDoc.data();
 
     const groupRef = doc(collection(db, 'groups'));
     await setDoc(groupRef, {
-      ...groupData,
+      ...sanitizedGroupData,
       creatorId,
       members: [creatorId],
       memberProfiles: { [creatorId]: userData },
@@ -1441,6 +1493,28 @@ export async function sendGroupMessage(
   replyTo?: { id: string; text: string; senderId: string; senderName: string }
 ): Promise<string> {
   try {
+    // Rate limit check (use same message limit)
+    const { allowed, resetIn } = checkRateLimit(senderId, 'message');
+    if (!allowed) {
+      const resetInSeconds = Math.ceil(resetIn / 1000);
+      throw new Error(`Slow down! Please wait ${resetInSeconds} seconds before sending another message.`);
+    }
+
+    // Sanitize message text
+    const sanitizedText = sanitizeMessage(text);
+    const sanitizedSenderName = sanitizeDisplayName(senderName);
+    
+    if (!sanitizedText && !imageUrl) {
+      throw new Error('Message cannot be empty');
+    }
+
+    // Sanitize reply text if present
+    const sanitizedReplyTo = replyTo ? {
+      ...replyTo,
+      text: sanitizeMessage(replyTo.text),
+      senderName: sanitizeDisplayName(replyTo.senderName)
+    } : undefined;
+
     const messagesRef = collection(db, 'groups', groupId, 'messages');
     const messageDoc = doc(messagesRef);
 
@@ -1455,9 +1529,9 @@ export async function sendGroupMessage(
       replyTo?: { id: string; text: string; senderId: string; senderName: string };
     } = {
       senderId,
-      senderName,
+      senderName: sanitizedSenderName,
       senderPhoto,
-      text,
+      text: sanitizedText,
       timestamp: serverTimestamp(),
       type: imageUrl ? 'image' : 'text'
     };
@@ -1466,17 +1540,17 @@ export async function sendGroupMessage(
       messageData.imageUrl = imageUrl;
     }
 
-    if (replyTo) {
-      messageData.replyTo = replyTo;
+    if (sanitizedReplyTo) {
+      messageData.replyTo = sanitizedReplyTo;
     }
 
     await setDoc(messageDoc, messageData);
 
     // Update group with last message
     await updateDoc(doc(db, 'groups', groupId), {
-      lastMessage: imageUrl ? '📷 Photo' : text,
+      lastMessage: imageUrl ? '📷 Photo' : sanitizedText,
       lastMessageTime: serverTimestamp(),
-      lastMessageSender: senderName
+      lastMessageSender: sanitizedSenderName
     });
 
     return messageDoc.id;

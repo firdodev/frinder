@@ -378,6 +378,41 @@
   }
 }
 
+/* Custom scrollbar styles for checkout */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-gray-300::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-thumb-gray-300::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 4px;
+}
+
+.dark .scrollbar-thumb-gray-700::-webkit-scrollbar-thumb,
+.dark .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+  background-color: #374151;
+}
+
+/* Hide scrollbar on mobile but keep functionality */
+@media (hover: none) and (pointer: coarse) {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 0;
+    display: none;
+  }
+  .scrollbar-thin {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}
+
 /* Prevent text selection on swipe cards */
 .swipe-card * {
   -webkit-user-select: none;
