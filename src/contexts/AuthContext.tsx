@@ -174,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       photos: [],
       interests: [],
       lookingFor: 'both',
+      relationshipGoal: 'friends',
       createdAt: new Date(),
       isProfileComplete: false,
       isEmailVerified: false
