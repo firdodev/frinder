@@ -13,7 +13,19 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, writeBatch, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  updateDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 import { ref, listAll, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
 import { updateUserProfileInMatches } from '@/lib/firebaseServices';
@@ -197,14 +209,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!validateEmail(email)) {
       throw new Error(`Only ${ALLOWED_EMAIL_DOMAIN} email addresses are allowed`);
     }
-    
+
     // Rate limit password reset requests
     const { allowed, resetIn } = checkRateLimit(email, 'passwordReset');
     if (!allowed) {
       const resetInMinutes = Math.ceil(resetIn / 60000);
       throw new Error(`Too many reset attempts. Please try again in ${resetInMinutes} minute(s).`);
     }
-    
+
     await sendPasswordResetEmail(auth, email, {
       url: window.location.origin,
       handleCodeInApp: false
@@ -223,11 +235,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Sanitize profile data
     const sanitizedData = sanitizeProfileData(data) as Partial<UserProfile>;
-    
+
     const updatedProfile = { ...userProfile, ...sanitizedData } as UserProfile;
     await setDoc(doc(db, 'users', user.uid), updatedProfile);
     setUserProfile(updatedProfile);
-    
+
     // Update profile in all matches (async, non-blocking)
     updateUserProfileInMatches(user.uid, sanitizedData).catch(console.error);
   };
@@ -273,7 +285,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount, resetPassword }}>
+    <AuthContext.Provider
+      value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount, resetPassword }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -19,9 +19,9 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { UserProfile } from '@/contexts/AuthContext';
-import { 
-  checkRateLimit, 
-  sanitizeMessage, 
+import {
+  checkRateLimit,
+  sanitizeMessage,
   sanitizeInput,
   sanitizeDisplayName,
   sanitizeBio,
@@ -56,6 +56,9 @@ export interface UserSubscription {
   unlimitedRewinds: boolean;
   priorityInDiscovery: boolean;
   advancedFilters: boolean;
+  // Whop subscription management
+  membershipId?: string | null;
+  cancelAtPeriodEnd?: boolean;
 }
 
 export interface Match {
@@ -140,9 +143,9 @@ export async function getUsersToSwipe(
     // Apply filters if current user profile is available
     if (currentUserProfile) {
       // Filter by opposite gender
-      const oppositeGender = currentUserProfile.gender === 'male' ? 'female' : 
-                            currentUserProfile.gender === 'female' ? 'male' : null;
-      
+      const oppositeGender =
+        currentUserProfile.gender === 'male' ? 'female' : currentUserProfile.gender === 'female' ? 'male' : null;
+
       if (oppositeGender) {
         users = users.filter(user => user.gender === oppositeGender);
       }
@@ -162,12 +165,13 @@ export async function getUsersToSwipe(
 
       // Sort by shared interests (more shared interests = higher priority)
       if (currentUserProfile.interests && currentUserProfile.interests.length > 0) {
-        const usersWithScore = users.map(user => ({
-          ...user,
-          _sharedInterests: user.interests?.filter(
-            interest => currentUserProfile.interests?.includes(interest)
-          ).length || 0
-        })).sort((a, b) => (b._sharedInterests || 0) - (a._sharedInterests || 0));
+        const usersWithScore = users
+          .map(user => ({
+            ...user,
+            _sharedInterests:
+              user.interests?.filter(interest => currentUserProfile.interests?.includes(interest)).length || 0
+          }))
+          .sort((a, b) => (b._sharedInterests || 0) - (a._sharedInterests || 0));
 
         // Remove the temporary field
         users = usersWithScore.map(({ _sharedInterests, ...user }) => user as UserProfile);
@@ -193,7 +197,9 @@ export async function recordSwipe(
     const { allowed, resetIn } = checkRateLimit(fromUserId, rateLimitAction);
     if (!allowed) {
       const resetInMinutes = Math.ceil(resetIn / 60000);
-      throw new Error(`Too many ${direction === 'superlike' ? 'super likes' : 'swipes'}. Please wait ${resetInMinutes} minute(s).`);
+      throw new Error(
+        `Too many ${direction === 'superlike' ? 'super likes' : 'swipes'}. Please wait ${resetInMinutes} minute(s).`
+      );
     }
 
     const swipeId = `${fromUserId}_${toUserId}`;
@@ -212,10 +218,10 @@ export async function recordSwipe(
         // Shouldn't happen if UI checked first, but handle gracefully
         console.warn('Super like used but no credits available');
       }
-      
+
       // Create automatic match for super like
       const matchId = await createMatch(fromUserId, toUserId, true);
-      
+
       // Also record a "super liked" notification for the other user
       await setDoc(doc(db, 'superLikes', `${fromUserId}_${toUserId}`), {
         fromUserId,
@@ -223,7 +229,7 @@ export async function recordSwipe(
         timestamp: serverTimestamp(),
         seen: false
       });
-      
+
       return { isMatch: true, matchId, isSuperLike: true };
     }
 
@@ -313,9 +319,9 @@ export function subscribeToMatches(userId: string, callback: (matches: Match[]) 
 
 // Subscribe to unmatched conversations (for showing old messages with disabled chat)
 export function subscribeToUnmatchedConversations(
-  userId: string, 
-  callback: (matches: (Match & { unmatched: boolean; unmatchedAt?: Timestamp })[]
-) => void): () => void {
+  userId: string,
+  callback: (matches: (Match & { unmatched: boolean; unmatchedAt?: Timestamp })[]) => void
+): () => void {
   const matchesRef = collection(db, 'matches');
   const matchesQuery = query(matchesRef, where('users', 'array-contains', userId), orderBy('createdAt', 'desc'));
 
@@ -325,7 +331,10 @@ export function subscribeToUnmatchedConversations(
         id: doc.id,
         ...doc.data()
       }))
-      .filter(match => (match as any).unmatched === true && (match as any).lastMessage) as (Match & { unmatched: boolean; unmatchedAt?: Timestamp })[];
+      .filter(match => (match as any).unmatched === true && (match as any).lastMessage) as (Match & {
+      unmatched: boolean;
+      unmatchedAt?: Timestamp;
+    })[];
     callback(unmatchedMatches);
   });
 }
@@ -335,32 +344,32 @@ export function subscribeToUnreadCount(userId: string, callback: (count: number)
   const matchesRef = collection(db, 'matches');
   const matchesQuery = query(matchesRef, where('users', 'array-contains', userId));
 
-  return onSnapshot(matchesQuery, async (snapshot) => {
+  return onSnapshot(matchesQuery, async snapshot => {
     let totalUnread = 0;
-    
+
     // For each match, count unread messages not sent by current user
-    const countPromises = snapshot.docs.map(async (matchDoc) => {
+    const countPromises = snapshot.docs.map(async matchDoc => {
       const messagesRef = collection(db, 'matches', matchDoc.id, 'messages');
       // Only query for unread messages, then filter by sender client-side
       const unreadQuery = query(messagesRef, where('read', '==', false));
       const unreadSnapshot = await getDocs(unreadQuery);
-      
+
       // Filter out messages sent by current user
       return unreadSnapshot.docs.filter(doc => doc.data().senderId !== userId).length;
     });
-    
+
     const counts = await Promise.all(countPromises);
     totalUnread = counts.reduce((sum, count) => sum + count, 0);
-    
+
     callback(totalUnread);
   });
 }
 
 // Send a message
 export async function sendMessage(
-  matchId: string, 
-  senderId: string, 
-  text: string, 
+  matchId: string,
+  senderId: string,
+  text: string,
   imageUrl?: string,
   replyTo?: { id: string; text: string; senderId: string }
 ): Promise<string> {
@@ -379,10 +388,12 @@ export async function sendMessage(
     }
 
     // Sanitize reply text if present
-    const sanitizedReplyTo = replyTo ? {
-      ...replyTo,
-      text: sanitizeMessage(replyTo.text)
-    } : undefined;
+    const sanitizedReplyTo = replyTo
+      ? {
+          ...replyTo,
+          text: sanitizeMessage(replyTo.text)
+        }
+      : undefined;
 
     const messagesRef = collection(db, 'matches', matchId, 'messages');
     const messageDoc = doc(messagesRef);
@@ -526,7 +537,7 @@ export async function respondToDateRequest(
 ): Promise<void> {
   try {
     const dateRequestRef = doc(db, 'matches', matchId, 'dateRequests', dateRequestId);
-    
+
     await updateDoc(dateRequestRef, {
       status,
       respondedAt: serverTimestamp()
@@ -545,10 +556,7 @@ export async function respondToDateRequest(
 }
 
 // Subscribe to date requests for a match
-export function subscribeToDateRequests(
-  matchId: string,
-  callback: (dateRequests: DateRequest[]) => void
-): () => void {
+export function subscribeToDateRequests(matchId: string, callback: (dateRequests: DateRequest[]) => void): () => void {
   const dateRequestsRef = collection(db, 'matches', matchId, 'dateRequests');
   const dateRequestsQuery = query(dateRequestsRef, orderBy('createdAt', 'asc'));
 
@@ -572,13 +580,17 @@ export async function getGroupsToSwipe(currentUserId: string, limitCount: number
     const groupsSnapshot = await getDocs(groupsQuery);
 
     return groupsSnapshot.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Group))
-      .filter(group => 
-        !group.members?.includes(currentUserId) && // Not a member
-        group.creatorId !== currentUserId // Not the creator
+      .map(
+        doc =>
+          ({
+            id: doc.id,
+            ...doc.data()
+          } as Group)
+      )
+      .filter(
+        group =>
+          !group.members?.includes(currentUserId) && // Not a member
+          group.creatorId !== currentUserId // Not the creator
       )
       .slice(0, limitCount);
   } catch (error) {
@@ -622,7 +634,9 @@ export async function createGroup(
       name: sanitizeInput(groupData.name, { maxLength: 100, allowNewlines: false }),
       description: sanitizeBio(groupData.description),
       activity: sanitizeInput(groupData.activity, { maxLength: 100, allowNewlines: false }),
-      location: groupData.location ? sanitizeInput(groupData.location, { maxLength: 100, allowNewlines: false }) : undefined,
+      location: groupData.location
+        ? sanitizeInput(groupData.location, { maxLength: 100, allowNewlines: false })
+        : undefined,
       interests: sanitizeInterests(groupData.interests)
     };
 
@@ -652,10 +666,13 @@ export async function getUserGroups(userId: string): Promise<Group[]> {
     const groupsQuery = query(groupsRef, where('members', 'array-contains', userId));
     const groupsSnapshot = await getDocs(groupsQuery);
 
-    return groupsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Group));
+    return groupsSnapshot.docs.map(
+      doc =>
+        ({
+          id: doc.id,
+          ...doc.data()
+        } as Group)
+    );
   } catch (error) {
     console.error('Error getting user groups:', error);
     return [];
@@ -663,18 +680,18 @@ export async function getUserGroups(userId: string): Promise<Group[]> {
 }
 
 // Subscribe to user's groups in real-time
-export function subscribeToUserGroups(
-  userId: string,
-  callback: (groups: Group[]) => void
-): () => void {
+export function subscribeToUserGroups(userId: string, callback: (groups: Group[]) => void): () => void {
   const groupsRef = collection(db, 'groups');
   const groupsQuery = query(groupsRef, where('members', 'array-contains', userId));
-  
-  return onSnapshot(groupsQuery, (snapshot) => {
-    const groups = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Group));
+
+  return onSnapshot(groupsQuery, snapshot => {
+    const groups = snapshot.docs.map(
+      doc =>
+        ({
+          id: doc.id,
+          ...doc.data()
+        } as Group)
+    );
     callback(groups);
   });
 }
@@ -684,10 +701,10 @@ export async function getGroupMembers(groupId: string): Promise<UserProfile[]> {
   try {
     const groupDoc = await getDoc(doc(db, 'groups', groupId));
     if (!groupDoc.exists()) return [];
-    
+
     const groupData = groupDoc.data();
     const memberProfiles = groupData.memberProfiles || {};
-    
+
     return Object.values(memberProfiles) as UserProfile[];
   } catch (error) {
     console.error('Error getting group members:', error);
@@ -700,24 +717,24 @@ export async function removeGroupMember(groupId: string, memberId: string, admin
   try {
     const groupDoc = await getDoc(doc(db, 'groups', groupId));
     if (!groupDoc.exists()) throw new Error('Group not found');
-    
+
     const groupData = groupDoc.data();
-    
+
     // Check if user is admin (creator)
     if (groupData.creatorId !== adminId) {
       throw new Error('Only the group admin can remove members');
     }
-    
+
     // Cannot remove yourself as admin
     if (memberId === adminId) {
       throw new Error('Admin cannot be removed from the group');
     }
-    
+
     // Remove member from members array and memberProfiles
     const updatedMembers = (groupData.members || []).filter((id: string) => id !== memberId);
     const updatedProfiles = { ...groupData.memberProfiles };
     delete updatedProfiles[memberId];
-    
+
     await updateDoc(doc(db, 'groups', groupId), {
       members: updatedMembers,
       memberProfiles: updatedProfiles
@@ -733,18 +750,18 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
   try {
     const groupDoc = await getDoc(doc(db, 'groups', groupId));
     if (!groupDoc.exists()) throw new Error('Group not found');
-    
+
     const groupData = groupDoc.data();
-    
+
     // Admin cannot leave (must delete group instead)
     if (groupData.creatorId === userId) {
       throw new Error('Admin cannot leave the group. Delete the group instead.');
     }
-    
+
     const updatedMembers = (groupData.members || []).filter((id: string) => id !== userId);
     const updatedProfiles = { ...groupData.memberProfiles };
     delete updatedProfiles[userId];
-    
+
     await updateDoc(doc(db, 'groups', groupId), {
       members: updatedMembers,
       memberProfiles: updatedProfiles
@@ -760,19 +777,19 @@ export async function deleteGroup(groupId: string, adminId: string): Promise<voi
   try {
     const groupDoc = await getDoc(doc(db, 'groups', groupId));
     if (!groupDoc.exists()) throw new Error('Group not found');
-    
+
     const groupData = groupDoc.data();
-    
+
     if (groupData.creatorId !== adminId) {
       throw new Error('Only the group admin can delete the group');
     }
-    
+
     // Delete all messages in the group
     const messagesRef = collection(db, 'groups', groupId, 'messages');
     const messagesSnapshot = await getDocs(messagesRef);
     const deletePromises = messagesSnapshot.docs.map(msgDoc => deleteDoc(msgDoc.ref));
     await Promise.all(deletePromises);
-    
+
     // Delete the group document itself
     await deleteDoc(doc(db, 'groups', groupId));
   } catch (error) {
@@ -802,17 +819,17 @@ export async function updateUserProfileInMatches(userId: string, profileData: Pa
     const matchesRef = collection(db, 'matches');
     const matchesQuery = query(matchesRef, where('users', 'array-contains', userId));
     const matchesSnapshot = await getDocs(matchesQuery);
-    
+
     // Update user profile in each match
-    const updatePromises = matchesSnapshot.docs.map(async (matchDoc) => {
+    const updatePromises = matchesSnapshot.docs.map(async matchDoc => {
       const matchData = matchDoc.data();
       const currentUserProfile = matchData.userProfiles?.[userId] || {};
-      
+
       await updateDoc(doc(db, 'matches', matchDoc.id), {
         [`userProfiles.${userId}`]: { ...currentUserProfile, ...profileData }
       });
     });
-    
+
     await Promise.all(updatePromises);
   } catch (error) {
     console.error('Error updating user profile in matches:', error);
@@ -845,11 +862,11 @@ export async function updateTypingStatus(matchId: string, userId: string, isTypi
 
 // Subscribe to typing status for a match
 export function subscribeToTypingStatus(
-  matchId: string, 
-  otherUserId: string, 
+  matchId: string,
+  otherUserId: string,
   callback: (isTyping: boolean) => void
 ): () => void {
-  return onSnapshot(doc(db, 'matches', matchId), (snapshot) => {
+  return onSnapshot(doc(db, 'matches', matchId), snapshot => {
     if (snapshot.exists()) {
       const data = snapshot.data();
       const typingTimestamp = data.typing?.[otherUserId];
@@ -868,8 +885,11 @@ export function subscribeToTypingStatus(
 }
 
 // Subscribe to a user's online status
-export function subscribeToUserPresence(userId: string, callback: (isOnline: boolean, lastSeen?: Date) => void): () => void {
-  return onSnapshot(doc(db, 'users', userId), (snapshot) => {
+export function subscribeToUserPresence(
+  userId: string,
+  callback: (isOnline: boolean, lastSeen?: Date) => void
+): () => void {
+  return onSnapshot(doc(db, 'users', userId), snapshot => {
     if (snapshot.exists()) {
       const data = snapshot.data();
       const isOnline = data.isOnline || false;
@@ -886,22 +906,22 @@ export async function unmatchUser(matchId: string): Promise<void> {
   try {
     // Get the match document to retrieve user IDs
     const matchDoc = await getDoc(doc(db, 'matches', matchId));
-    
+
     if (matchDoc.exists()) {
       const matchData = matchDoc.data();
       const users = matchData.users as string[];
-      
+
       if (users && users.length === 2) {
         // Delete swipe records in both directions
         const swipeId1 = `${users[0]}_${users[1]}`;
         const swipeId2 = `${users[1]}_${users[0]}`;
-        
+
         await Promise.all([
           deleteDoc(doc(db, 'swipes', swipeId1)).catch(() => {}), // Ignore if doesn't exist
-          deleteDoc(doc(db, 'swipes', swipeId2)).catch(() => {})  // Ignore if doesn't exist
+          deleteDoc(doc(db, 'swipes', swipeId2)).catch(() => {}) // Ignore if doesn't exist
         ]);
       }
-      
+
       // Mark the match as unmatched instead of deleting
       // This preserves chat history but prevents new messages
       await updateDoc(doc(db, 'matches', matchId), {
@@ -933,11 +953,7 @@ export async function getLikesReceivedCount(userId: string): Promise<number> {
   try {
     const swipesRef = collection(db, 'swipes');
     // Count swipes where this user is the target and direction is 'right'
-    const likesQuery = query(
-      swipesRef,
-      where('toUserId', '==', userId),
-      where('direction', '==', 'right')
-    );
+    const likesQuery = query(swipesRef, where('toUserId', '==', userId), where('direction', '==', 'right'));
     const likesSnapshot = await getDocs(likesQuery);
     return likesSnapshot.size;
   } catch (error) {
@@ -951,10 +967,7 @@ export async function getSuperLikesReceivedCount(userId: string): Promise<number
   try {
     const superLikesRef = collection(db, 'superLikes');
     // Query super likes where this user is the recipient
-    const superLikesQuery = query(
-      superLikesRef,
-      where('toUserId', '==', userId)
-    );
+    const superLikesQuery = query(superLikesRef, where('toUserId', '==', userId));
     const superLikesSnapshot = await getDocs(superLikesQuery);
     return superLikesSnapshot.size;
   } catch (error) {
@@ -974,7 +987,7 @@ export async function getUserProfileStats(userId: string): Promise<{
     getLikesReceivedCount(userId),
     getSuperLikesReceivedCount(userId)
   ]);
-  
+
   return { matches, likesReceived, superLikesReceived };
 }
 
@@ -993,10 +1006,13 @@ export async function searchUsers(
     // Filter users by name (case-insensitive)
     const searchLower = searchQuery.toLowerCase();
     const users = usersSnapshot.docs
-      .map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      } as UserProfile & { id: string }))
+      .map(
+        doc =>
+          ({
+            ...doc.data(),
+            id: doc.id
+          } as UserProfile & { id: string })
+      )
       .filter(user => {
         // Exclude current user
         if (user.id === currentUserId) return false;
@@ -1024,11 +1040,14 @@ export async function sendMatchRequest(
 }
 
 // Check if users are already matched
-export async function checkIfMatched(userId1: string, userId2: string): Promise<{ isMatched: boolean; matchId?: string }> {
+export async function checkIfMatched(
+  userId1: string,
+  userId2: string
+): Promise<{ isMatched: boolean; matchId?: string }> {
   try {
     const matchId = [userId1, userId2].sort().join('_');
     const matchDoc = await getDoc(doc(db, 'matches', matchId));
-    
+
     if (matchDoc.exists()) {
       const data = matchDoc.data();
       // Check if match was unmatched
@@ -1045,11 +1064,14 @@ export async function checkIfMatched(userId1: string, userId2: string): Promise<
 }
 
 // Check if user has already swiped on another user
-export async function checkSwipeStatus(fromUserId: string, toUserId: string): Promise<'none' | 'left' | 'right' | 'superlike'> {
+export async function checkSwipeStatus(
+  fromUserId: string,
+  toUserId: string
+): Promise<'none' | 'left' | 'right' | 'superlike'> {
   try {
     const swipeId = `${fromUserId}_${toUserId}`;
     const swipeDoc = await getDoc(doc(db, 'swipes', swipeId));
-    
+
     if (swipeDoc.exists()) {
       return swipeDoc.data().direction;
     }
@@ -1071,22 +1093,22 @@ export async function getPendingRequests(userId: string): Promise<(UserProfile &
       where('direction', 'in', ['right', 'superlike'])
     );
     const swipesSnapshot = await getDocs(swipesQuery);
-    
+
     const pendingRequests: (UserProfile & { swipedAt: Date })[] = [];
-    
+
     for (const swipeDoc of swipesSnapshot.docs) {
       const swipeData = swipeDoc.data();
       const targetUserId = swipeData.toUserId;
-      
+
       // Check if there's already a match (excluding unmatched)
       const matchId = [userId, targetUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
-      
+
       if (matchDoc.exists() && !matchDoc.data().unmatched) {
         // Already matched, skip
         continue;
       }
-      
+
       // Get the target user's profile
       const userDoc = await getDoc(doc(db, 'users', targetUserId));
       if (userDoc.exists()) {
@@ -1097,10 +1119,10 @@ export async function getPendingRequests(userId: string): Promise<(UserProfile &
         });
       }
     }
-    
+
     // Sort by most recent
     pendingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
-    
+
     return pendingRequests;
   } catch (error) {
     console.error('Error getting pending requests:', error);
@@ -1119,22 +1141,22 @@ export function subscribeToPendingRequests(
     where('fromUserId', '==', userId),
     where('direction', 'in', ['right', 'superlike'])
   );
-  
-  return onSnapshot(swipesQuery, async (snapshot) => {
+
+  return onSnapshot(swipesQuery, async snapshot => {
     const pendingRequests: (UserProfile & { swipedAt: Date })[] = [];
-    
+
     for (const swipeDoc of snapshot.docs) {
       const swipeData = swipeDoc.data();
       const targetUserId = swipeData.toUserId;
-      
+
       // Check if there's already a match (excluding unmatched)
       const matchId = [userId, targetUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
-      
+
       if (matchDoc.exists() && !matchDoc.data().unmatched) {
         continue;
       }
-      
+
       // Get the target user's profile
       const userDoc = await getDoc(doc(db, 'users', targetUserId));
       if (userDoc.exists()) {
@@ -1145,7 +1167,7 @@ export function subscribeToPendingRequests(
         });
       }
     }
-    
+
     pendingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
     callback(pendingRequests);
   });
@@ -1173,22 +1195,22 @@ export async function getIncomingRequests(userId: string): Promise<(UserProfile 
       where('direction', 'in', ['right', 'superlike'])
     );
     const swipesSnapshot = await getDocs(swipesQuery);
-    
+
     const incomingRequests: (UserProfile & { swipedAt: Date })[] = [];
-    
+
     for (const swipeDoc of swipesSnapshot.docs) {
       const swipeData = swipeDoc.data();
       const fromUserId = swipeData.fromUserId;
-      
+
       // Check if there's already a match (excluding unmatched)
       const matchId = [userId, fromUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
-      
+
       if (matchDoc.exists() && !matchDoc.data().unmatched) {
         // Already matched, skip
         continue;
       }
-      
+
       // Check if current user already swiped on this person
       const reverseSwipeId = `${userId}_${fromUserId}`;
       const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
@@ -1196,7 +1218,7 @@ export async function getIncomingRequests(userId: string): Promise<(UserProfile 
         // Already responded, skip
         continue;
       }
-      
+
       // Get the from user's profile
       const userDoc = await getDoc(doc(db, 'users', fromUserId));
       if (userDoc.exists()) {
@@ -1207,10 +1229,10 @@ export async function getIncomingRequests(userId: string): Promise<(UserProfile 
         });
       }
     }
-    
+
     // Sort by most recent
     incomingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
-    
+
     return incomingRequests;
   } catch (error) {
     console.error('Error getting incoming requests:', error);
@@ -1229,29 +1251,29 @@ export function subscribeToIncomingRequests(
     where('toUserId', '==', userId),
     where('direction', 'in', ['right', 'superlike'])
   );
-  
-  return onSnapshot(swipesQuery, async (snapshot) => {
+
+  return onSnapshot(swipesQuery, async snapshot => {
     const incomingRequests: (UserProfile & { swipedAt: Date })[] = [];
-    
+
     for (const swipeDoc of snapshot.docs) {
       const swipeData = swipeDoc.data();
       const fromUserId = swipeData.fromUserId;
-      
+
       // Check if there's already a match (excluding unmatched)
       const matchId = [userId, fromUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
-      
+
       if (matchDoc.exists() && !matchDoc.data().unmatched) {
         continue;
       }
-      
+
       // Check if current user already swiped on this person
       const reverseSwipeId = `${userId}_${fromUserId}`;
       const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
       if (reverseSwipeDoc.exists()) {
         continue;
       }
-      
+
       const userDoc = await getDoc(doc(db, 'users', fromUserId));
       if (userDoc.exists()) {
         const userData = userDoc.data() as UserProfile;
@@ -1261,7 +1283,7 @@ export function subscribeToIncomingRequests(
         });
       }
     }
-    
+
     incomingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
     callback(incomingRequests);
   });
@@ -1401,12 +1423,9 @@ export async function addIceCandidate(
 }
 
 // Subscribe to call state
-export function subscribeToCall(
-  callId: string,
-  callback: (call: CallData | null) => void
-): () => void {
+export function subscribeToCall(callId: string, callback: (call: CallData | null) => void): () => void {
   const callRef = doc(db, 'calls', callId);
-  return onSnapshot(callRef, (snapshot) => {
+  return onSnapshot(callRef, snapshot => {
     if (snapshot.exists()) {
       callback({ id: snapshot.id, ...snapshot.data() } as CallData);
     } else {
@@ -1423,9 +1442,9 @@ export function subscribeToIceCandidates(
 ): () => void {
   const candidatesRef = collection(db, 'calls', callId, 'iceCandidates');
   const q = query(candidatesRef, orderBy('timestamp'));
-  
-  return onSnapshot(q, (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
+
+  return onSnapshot(q, snapshot => {
+    snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
         const data = change.doc.data();
         if (data.fromUserId !== excludeUserId) {
@@ -1440,10 +1459,7 @@ export function subscribeToIceCandidates(
 }
 
 // Subscribe to incoming calls for a user
-export function subscribeToIncomingCalls(
-  userId: string,
-  callback: (call: CallData | null) => void
-): () => void {
+export function subscribeToIncomingCalls(userId: string, callback: (call: CallData | null) => void): () => void {
   const callsRef = collection(db, 'calls');
   const q = query(
     callsRef,
@@ -1452,8 +1468,8 @@ export function subscribeToIncomingCalls(
     orderBy('createdAt', 'desc'),
     limit(1)
   );
-  
-  return onSnapshot(q, (snapshot) => {
+
+  return onSnapshot(q, snapshot => {
     if (!snapshot.empty) {
       const doc = snapshot.docs[0];
       callback({ id: doc.id, ...doc.data() } as CallData);
@@ -1503,17 +1519,19 @@ export async function sendGroupMessage(
     // Sanitize message text
     const sanitizedText = sanitizeMessage(text);
     const sanitizedSenderName = sanitizeDisplayName(senderName);
-    
+
     if (!sanitizedText && !imageUrl) {
       throw new Error('Message cannot be empty');
     }
 
     // Sanitize reply text if present
-    const sanitizedReplyTo = replyTo ? {
-      ...replyTo,
-      text: sanitizeMessage(replyTo.text),
-      senderName: sanitizeDisplayName(replyTo.senderName)
-    } : undefined;
+    const sanitizedReplyTo = replyTo
+      ? {
+          ...replyTo,
+          text: sanitizeMessage(replyTo.text),
+          senderName: sanitizeDisplayName(replyTo.senderName)
+        }
+      : undefined;
 
     const messagesRef = collection(db, 'groups', groupId, 'messages');
     const messageDoc = doc(messagesRef);
@@ -1561,10 +1579,7 @@ export async function sendGroupMessage(
 }
 
 // Subscribe to group messages in real-time
-export function subscribeToGroupMessages(
-  groupId: string,
-  callback: (messages: GroupMessage[]) => void
-): () => void {
+export function subscribeToGroupMessages(groupId: string, callback: (messages: GroupMessage[]) => void): () => void {
   const messagesRef = collection(db, 'groups', groupId, 'messages');
   const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
 
@@ -1584,9 +1599,12 @@ export function subscribeToGroupMessages(
 export async function initializeUserCredits(userId: string): Promise<UserCredits> {
   const creditsRef = doc(db, 'userCredits', userId);
   const creditsDoc = await getDoc(creditsRef);
-  
+
   if (!creditsDoc.exists()) {
-    const initialCredits: Omit<UserCredits, 'lastFreeSuperLike' | 'lastSwipeCountReset'> & { lastFreeSuperLike: null; lastSwipeCountReset: null } = {
+    const initialCredits: Omit<UserCredits, 'lastFreeSuperLike' | 'lastSwipeCountReset'> & {
+      lastFreeSuperLike: null;
+      lastSwipeCountReset: null;
+    } = {
       superLikes: 1, // Start with 1 free super like
       lastFreeSuperLike: null,
       totalSuperLikesPurchased: 0,
@@ -1596,7 +1614,7 @@ export async function initializeUserCredits(userId: string): Promise<UserCredits
     await setDoc(creditsRef, initialCredits);
     return initialCredits as UserCredits;
   }
-  
+
   return creditsDoc.data() as UserCredits;
 }
 
@@ -1604,7 +1622,7 @@ export async function initializeUserCredits(userId: string): Promise<UserCredits
 export async function initializeUserSubscription(userId: string): Promise<UserSubscription> {
   const subRef = doc(db, 'userSubscriptions', userId);
   const subDoc = await getDoc(subRef);
-  
+
   if (!subDoc.exists()) {
     const initialSub: UserSubscription = {
       isPremium: false,
@@ -1620,7 +1638,7 @@ export async function initializeUserSubscription(userId: string): Promise<UserSu
     await setDoc(subRef, initialSub);
     return initialSub;
   }
-  
+
   return subDoc.data() as UserSubscription;
 }
 
@@ -1628,11 +1646,11 @@ export async function initializeUserSubscription(userId: string): Promise<UserSu
 export async function getUserCredits(userId: string): Promise<UserCredits> {
   const creditsRef = doc(db, 'userCredits', userId);
   const creditsDoc = await getDoc(creditsRef);
-  
+
   if (!creditsDoc.exists()) {
     return initializeUserCredits(userId);
   }
-  
+
   return creditsDoc.data() as UserCredits;
 }
 
@@ -1640,17 +1658,17 @@ export async function getUserCredits(userId: string): Promise<UserCredits> {
 export async function getUserSubscription(userId: string): Promise<UserSubscription> {
   const subRef = doc(db, 'userSubscriptions', userId);
   const subDoc = await getDoc(subRef);
-  
+
   if (!subDoc.exists()) {
     return initializeUserSubscription(userId);
   }
-  
+
   // Check if subscriptions have expired
   const sub = subDoc.data() as UserSubscription;
   const now = new Date();
   let needsUpdate = false;
   const updates: Partial<UserSubscription> = {};
-  
+
   if (sub.premiumExpiresAt && sub.premiumExpiresAt.toDate() < now) {
     updates.isPremium = false;
     updates.unlimitedSuperLikes = false;
@@ -1660,28 +1678,25 @@ export async function getUserSubscription(userId: string): Promise<UserSubscript
     updates.advancedFilters = false;
     needsUpdate = true;
   }
-  
+
   if (sub.adFreeExpiresAt && sub.adFreeExpiresAt.toDate() < now) {
     updates.isAdFree = false;
     needsUpdate = true;
   }
-  
+
   if (needsUpdate) {
     await updateDoc(subRef, updates);
     return { ...sub, ...updates };
   }
-  
+
   return sub;
 }
 
 // Subscribe to user credits in real-time
-export function subscribeToUserCredits(
-  userId: string,
-  callback: (credits: UserCredits) => void
-): () => void {
+export function subscribeToUserCredits(userId: string, callback: (credits: UserCredits) => void): () => void {
   const creditsRef = doc(db, 'userCredits', userId);
-  
-  return onSnapshot(creditsRef, async (snapshot) => {
+
+  return onSnapshot(creditsRef, async snapshot => {
     if (!snapshot.exists()) {
       const credits = await initializeUserCredits(userId);
       callback(credits);
@@ -1697,8 +1712,8 @@ export function subscribeToUserSubscription(
   callback: (subscription: UserSubscription) => void
 ): () => void {
   const subRef = doc(db, 'userSubscriptions', userId);
-  
-  return onSnapshot(subRef, async (snapshot) => {
+
+  return onSnapshot(subRef, async snapshot => {
     if (!snapshot.exists()) {
       const sub = await initializeUserSubscription(userId);
       callback(sub);
@@ -1710,36 +1725,33 @@ export function subscribeToUserSubscription(
 
 // Check if user can use a super like (has credits or premium)
 export async function canUseSuperLike(userId: string): Promise<{ canUse: boolean; reason?: string }> {
-  const [credits, subscription] = await Promise.all([
-    getUserCredits(userId),
-    getUserSubscription(userId)
-  ]);
-  
+  const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
+
   // Premium users have unlimited super likes
   if (subscription.isPremium && subscription.unlimitedSuperLikes) {
     return { canUse: true };
   }
-  
+
   // Check if user has super likes available
   if (credits.superLikes > 0) {
     return { canUse: true };
   }
-  
+
   // Check if user can claim their daily free super like
   const now = new Date();
   const lastFree = credits.lastFreeSuperLike?.toDate();
-  
-  if (!lastFree || (now.getTime() - lastFree.getTime()) >= 24 * 60 * 60 * 1000) {
+
+  if (!lastFree || now.getTime() - lastFree.getTime() >= 24 * 60 * 60 * 1000) {
     // Can claim daily free super like
     return { canUse: true };
   }
-  
+
   // Calculate time until next free super like
   const nextFreeTime = new Date(lastFree.getTime() + 24 * 60 * 60 * 1000);
   const hoursLeft = Math.ceil((nextFreeTime.getTime() - now.getTime()) / (60 * 60 * 1000));
-  
-  return { 
-    canUse: false, 
+
+  return {
+    canUse: false,
     reason: `No super likes available. Next free super like in ${hoursLeft} hours. Buy more or upgrade to Premium!`
   };
 }
@@ -1747,16 +1759,13 @@ export async function canUseSuperLike(userId: string): Promise<{ canUse: boolean
 // Use a super like
 export async function useSuperLike(userId: string): Promise<boolean> {
   const creditsRef = doc(db, 'userCredits', userId);
-  const [credits, subscription] = await Promise.all([
-    getUserCredits(userId),
-    getUserSubscription(userId)
-  ]);
-  
+  const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
+
   // Premium users don't consume super likes
   if (subscription.isPremium && subscription.unlimitedSuperLikes) {
     return true;
   }
-  
+
   // Check if user has super likes
   if (credits.superLikes > 0) {
     await updateDoc(creditsRef, {
@@ -1764,19 +1773,19 @@ export async function useSuperLike(userId: string): Promise<boolean> {
     });
     return true;
   }
-  
+
   // Check if can claim daily free
   const now = new Date();
   const lastFree = credits.lastFreeSuperLike?.toDate();
-  
-  if (!lastFree || (now.getTime() - lastFree.getTime()) >= 24 * 60 * 60 * 1000) {
+
+  if (!lastFree || now.getTime() - lastFree.getTime() >= 24 * 60 * 60 * 1000) {
     // Claim and use daily free super like (don't add to count, just mark as used)
     await updateDoc(creditsRef, {
       lastFreeSuperLike: serverTimestamp()
     });
     return true;
   }
-  
+
   return false;
 }
 
@@ -1784,7 +1793,7 @@ export async function useSuperLike(userId: string): Promise<boolean> {
 export async function addSuperLikes(userId: string, amount: number): Promise<void> {
   const creditsRef = doc(db, 'userCredits', userId);
   await getUserCredits(userId); // Ensure initialized
-  
+
   await updateDoc(creditsRef, {
     superLikes: increment(amount),
     totalSuperLikesPurchased: increment(amount)
@@ -1794,23 +1803,20 @@ export async function addSuperLikes(userId: string, amount: number): Promise<voi
 // Increment swipe count and check if ad should be shown
 export async function incrementSwipeCount(userId: string): Promise<{ showAd: boolean; swipeCount: number }> {
   const creditsRef = doc(db, 'userCredits', userId);
-  const [credits, subscription] = await Promise.all([
-    getUserCredits(userId),
-    getUserSubscription(userId)
-  ]);
-  
+  const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
+
   // Premium or ad-free users don't see ads
   if (subscription.isPremium || subscription.isAdFree) {
     return { showAd: false, swipeCount: credits.swipeCount };
   }
-  
+
   const newCount = credits.swipeCount + 1;
   const showAd = newCount % 10 === 0;
-  
+
   await updateDoc(creditsRef, {
     swipeCount: newCount
   });
-  
+
   return { showAd, swipeCount: newCount };
 }
 
@@ -1818,10 +1824,10 @@ export async function incrementSwipeCount(userId: string): Promise<{ showAd: boo
 export async function purchasePremium(userId: string): Promise<void> {
   const subRef = doc(db, 'userSubscriptions', userId);
   await getUserSubscription(userId); // Ensure initialized
-  
+
   const expiresAt = new Date();
   expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 month
-  
+
   await updateDoc(subRef, {
     isPremium: true,
     premiumExpiresAt: Timestamp.fromDate(expiresAt),
@@ -1841,10 +1847,10 @@ export async function purchasePremium(userId: string): Promise<void> {
 export async function purchaseAdFree(userId: string): Promise<void> {
   const subRef = doc(db, 'userSubscriptions', userId);
   await getUserSubscription(userId); // Ensure initialized
-  
+
   const expiresAt = new Date();
   expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 month
-  
+
   await updateDoc(subRef, {
     isAdFree: true,
     adFreeExpiresAt: Timestamp.fromDate(expiresAt)
@@ -1867,6 +1873,3 @@ export async function recordPurchase(
     createdAt: serverTimestamp()
   });
 }
-
-
-

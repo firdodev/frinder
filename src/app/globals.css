@@ -373,7 +373,11 @@
 
 /* Mobile touch improvements */
 @media (hover: none) and (pointer: coarse) {
-  button, a, input, textarea, select {
+  button,
+  a,
+  input,
+  textarea,
+  select {
     min-height: 44px;
   }
 }

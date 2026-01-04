@@ -135,7 +135,7 @@ const rtcConfig: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
   ]
 };
 
@@ -155,7 +155,7 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(false);
-  
+
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -186,14 +186,14 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       // Handle ICE candidates
-      pc.onicecandidate = (event) => {
+      pc.onicecandidate = event => {
         if (event.candidate && callId) {
           addIceCandidate(callId, event.candidate.toJSON(), currentUserId);
         }
       };
 
       // Handle remote stream
-      pc.ontrack = (event) => {
+      pc.ontrack = event => {
         if (remoteAudioRef.current && event.streams[0]) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
@@ -217,7 +217,7 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
       // Create and set local offer
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      
+
       setCallStatus('connecting');
     } catch (error) {
       console.error('Error initializing call:', error);
@@ -243,14 +243,14 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       // Handle ICE candidates
-      pc.onicecandidate = (event) => {
+      pc.onicecandidate = event => {
         if (event.candidate && callId) {
           addIceCandidate(callId, event.candidate.toJSON(), currentUserId);
         }
       };
 
       // Handle remote stream
-      pc.ontrack = (event) => {
+      pc.ontrack = event => {
         if (remoteAudioRef.current && event.streams[0]) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
@@ -275,7 +275,7 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
       await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      
+
       // Send answer to Firebase
       await answerCall(callId, answer);
       setCallStatus('connecting');
@@ -288,8 +288,12 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
 
   // Handle incoming answer (for caller)
   useEffect(() => {
-    if (!isIncoming && callData?.answer && peerConnectionRef.current && 
-        peerConnectionRef.current.signalingState === 'have-local-offer') {
+    if (
+      !isIncoming &&
+      callData?.answer &&
+      peerConnectionRef.current &&
+      peerConnectionRef.current.signalingState === 'have-local-offer'
+    ) {
       peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(callData.answer));
     }
   }, [callData?.answer, isIncoming]);
@@ -298,7 +302,7 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
   useEffect(() => {
     if (!callId) return;
 
-    const unsubscribe = subscribeToIceCandidates(callId, currentUserId, (iceCandidate) => {
+    const unsubscribe = subscribeToIceCandidates(callId, currentUserId, iceCandidate => {
       if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
         peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(iceCandidate.candidate));
       }
@@ -382,10 +386,13 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
 
       {/* Background pattern */}
       <div className='absolute inset-0 opacity-10'>
-        <div className='absolute inset-0' style={{
-          backgroundImage: 'radial-gradient(circle at 2px 2px, #ed8c00 1px, transparent 0)',
-          backgroundSize: '32px 32px'
-        }} />
+        <div
+          className='absolute inset-0'
+          style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, #ed8c00 1px, transparent 0)',
+            backgroundSize: '32px 32px'
+          }}
+        />
       </div>
 
       {/* Call UI */}
@@ -393,9 +400,13 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
         {/* Avatar with pulse animation during ringing/connecting */}
         <motion.div
           className='relative mb-6'
-          animate={callStatus === 'ringing' || callStatus === 'connecting' ? {
-            scale: [1, 1.05, 1],
-          } : {}}
+          animate={
+            callStatus === 'ringing' || callStatus === 'connecting'
+              ? {
+                  scale: [1, 1.05, 1]
+                }
+              : {}
+          }
           transition={{ duration: 1.5, repeat: Infinity }}
         >
           {(callStatus === 'ringing' || callStatus === 'connecting') && (
@@ -500,13 +511,9 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {isMuted ? (
-                  <MicOff className='w-6 h-6 text-white' />
-                ) : (
-                  <Mic className='w-6 h-6 text-white' />
-                )}
+                {isMuted ? <MicOff className='w-6 h-6 text-white' /> : <Mic className='w-6 h-6 text-white' />}
               </motion.button>
-              
+
               <motion.button
                 onClick={handleEndCall}
                 className='w-16 h-16 rounded-full bg-red-500 flex items-center justify-center'
@@ -524,11 +531,7 @@ function VoiceCall({ callId, callData, isIncoming, currentUserId, matchName, mat
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {isSpeaker ? (
-                  <Volume2 className='w-6 h-6 text-white' />
-                ) : (
-                  <VolumeX className='w-6 h-6 text-white' />
-                )}
+                {isSpeaker ? <Volume2 className='w-6 h-6 text-white' /> : <VolumeX className='w-6 h-6 text-white' />}
               </motion.button>
             </>
           )}
@@ -549,26 +552,30 @@ interface MessageBubbleProps {
   onScrollToMessage?: (messageId: string) => void;
 }
 
-function MessageBubble({ message, isOwn, matchName, onReply, onViewImage, swipeDirection, onScrollToMessage }: MessageBubbleProps) {
+function MessageBubble({
+  message,
+  isOwn,
+  matchName,
+  onReply,
+  onViewImage,
+  swipeDirection,
+  onScrollToMessage
+}: MessageBubbleProps) {
   const x = useMotionValue(0);
   const [showReplyIndicator, setShowReplyIndicator] = useState(false);
-  
+
   // Calculate opacity for reply indicator based on swipe distance
-  const replyIndicatorOpacity = useTransform(
-    x,
-    isOwn ? [-60, -30, 0] : [0, 30, 60],
-    isOwn ? [1, 0.5, 0] : [0, 0.5, 1]
-  );
+  const replyIndicatorOpacity = useTransform(x, isOwn ? [-60, -30, 0] : [0, 30, 60], isOwn ? [1, 0.5, 0] : [0, 0.5, 1]);
 
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 50;
     const offset = info.offset.x;
-    
+
     // Trigger reply if swiped past threshold
     if ((isOwn && offset < -threshold) || (!isOwn && offset > threshold)) {
       onReply();
     }
-    
+
     // Reset indicator
     setShowReplyIndicator(false);
   };
@@ -594,7 +601,7 @@ function MessageBubble({ message, isOwn, matchName, onReply, onViewImage, swipeD
           <Reply className='w-5 h-5 text-frinder-orange' />
         </motion.div>
       )}
-      
+
       {/* Desktop reply button - appears on hover */}
       <button
         onClick={onReply}
@@ -618,11 +625,11 @@ function MessageBubble({ message, isOwn, matchName, onReply, onViewImage, swipeD
       >
         {/* Reply preview if this message is replying to another - clickable to scroll */}
         {message.replyTo && (
-          <div 
+          <div
             onClick={() => message.replyTo?.id && onScrollToMessage?.(message.replyTo.id)}
             className={`mb-1 px-2 py-1 rounded-lg text-xs overflow-hidden cursor-pointer transition-opacity hover:opacity-80 active:opacity-60 ${
-              isOwn 
-                ? 'bg-frinder-burnt/30 border-l-2 border-white/50' 
+              isOwn
+                ? 'bg-frinder-burnt/30 border-l-2 border-white/50'
                 : 'bg-muted/50 dark:bg-gray-800/50 border-l-2 border-frinder-orange'
             }`}
           >
@@ -632,7 +639,7 @@ function MessageBubble({ message, isOwn, matchName, onReply, onViewImage, swipeD
             <span className='opacity-70 line-clamp-1 break-all'>{message.replyTo.text}</span>
           </div>
         )}
-        
+
         <div
           className={`rounded-2xl overflow-hidden ${
             isOwn
@@ -642,43 +649,29 @@ function MessageBubble({ message, isOwn, matchName, onReply, onViewImage, swipeD
         >
           {/* Image message */}
           {message.type === 'image' && message.imageUrl && (
-            <div 
-              className='cursor-pointer relative group/image'
-              onClick={onViewImage}
-            >
-              <img 
-                src={message.imageUrl} 
-                alt='Shared image' 
-                className='rounded-xl max-w-full max-h-64 object-cover'
-              />
+            <div className='cursor-pointer relative group/image' onClick={onViewImage}>
+              <img src={message.imageUrl} alt='Shared image' className='rounded-xl max-w-full max-h-64 object-cover' />
               <div className='absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors rounded-xl flex items-center justify-center opacity-0 group-hover/image:opacity-100'>
                 <ZoomIn className='w-8 h-8 text-white drop-shadow-lg' />
               </div>
             </div>
           )}
-          
+
           {/* Text message */}
-          {message.type === 'text' && message.text && (
-            <p className='text-sm sm:text-base'>{message.text}</p>
-          )}
-          
+          {message.type === 'text' && message.text && <p className='text-sm sm:text-base'>{message.text}</p>}
+
           <div
-            className={`flex items-center gap-1 justify-end mt-1 ${
-              message.type === 'image' ? 'px-2 pb-1' : ''
-            } ${
+            className={`flex items-center gap-1 justify-end mt-1 ${message.type === 'image' ? 'px-2 pb-1' : ''} ${
               isOwn ? 'text-white/70' : 'text-muted-foreground'
             }`}
           >
-            <span className='text-[10px] sm:text-xs'>
-              {formatTime(message.timestamp)}
-            </span>
-            {isOwn && (
-              message.isRead ? (
+            <span className='text-[10px] sm:text-xs'>{formatTime(message.timestamp)}</span>
+            {isOwn &&
+              (message.isRead ? (
                 <CheckCheck className='w-3.5 h-3.5 text-blue-300' />
               ) : (
                 <Check className='w-3.5 h-3.5' />
-              )
-            )}
+              ))}
           </div>
         </div>
       </motion.div>
@@ -706,7 +699,14 @@ interface DateRequestBubbleProps {
   isResponding: boolean;
 }
 
-function DateRequestBubble({ dateRequest, isOwn, matchName, onAccept, onDecline, isResponding }: DateRequestBubbleProps) {
+function DateRequestBubble({
+  dateRequest,
+  isOwn,
+  matchName,
+  onAccept,
+  onDecline,
+  isResponding
+}: DateRequestBubbleProps) {
   const formatDate = (timestamp: any) => {
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -756,22 +756,16 @@ function DateRequestBubble({ dateRequest, isOwn, matchName, onAccept, onDecline,
             <div className='flex items-center gap-2'>
               <CalendarHeart className='w-5 h-5 text-white' />
               <span className='text-white font-semibold text-sm'>Date Request</span>
-              {isPending && (
-                <Badge className='ml-auto bg-white/20 text-white text-[10px]'>Pending</Badge>
-              )}
-              {isAccepted && (
-                <Badge className='ml-auto bg-green-400/30 text-white text-[10px]'>Accepted! 🎉</Badge>
-              )}
-              {isDeclined && (
-                <Badge className='ml-auto bg-red-400/30 text-white text-[10px]'>Declined</Badge>
-              )}
+              {isPending && <Badge className='ml-auto bg-white/20 text-white text-[10px]'>Pending</Badge>}
+              {isAccepted && <Badge className='ml-auto bg-green-400/30 text-white text-[10px]'>Accepted! 🎉</Badge>}
+              {isDeclined && <Badge className='ml-auto bg-red-400/30 text-white text-[10px]'>Declined</Badge>}
             </div>
           </div>
 
           {/* Content */}
           <div className='px-4 py-3 space-y-3'>
             <h3 className='text-white font-bold text-lg'>{dateRequest.title}</h3>
-            
+
             <div className='space-y-2'>
               <div className='flex items-center gap-2 text-white/90'>
                 <Calendar className='w-4 h-4' />
@@ -822,9 +816,7 @@ function DateRequestBubble({ dateRequest, isOwn, matchName, onAccept, onDecline,
 
           {/* Timestamp */}
           <div className='px-4 pb-2 flex justify-end'>
-            <span className='text-white/60 text-[10px]'>
-              {formatDate(dateRequest.createdAt)}
-            </span>
+            <span className='text-white/60 text-[10px]'>{formatDate(dateRequest.createdAt)}</span>
           </div>
         </div>
       </div>
@@ -842,7 +834,14 @@ interface DateAcceptedCelebrationProps {
   isOwn: boolean;
 }
 
-function DateAcceptedCelebration({ show, onClose, dateRequest, matchName, matchPhoto, isOwn }: DateAcceptedCelebrationProps) {
+function DateAcceptedCelebration({
+  show,
+  onClose,
+  dateRequest,
+  matchName,
+  matchPhoto,
+  isOwn
+}: DateAcceptedCelebrationProps) {
   const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -871,23 +870,25 @@ function DateAcceptedCelebration({ show, onClose, dateRequest, matchName, matchP
         {[...Array(50)].map((_, i) => (
           <motion.div
             key={i}
-            initial={{ 
-              x: Math.random() * window.innerWidth, 
+            initial={{
+              x: Math.random() * window.innerWidth,
               y: -20,
               rotate: 0,
               scale: Math.random() * 0.5 + 0.5
             }}
-            animate={{ 
+            animate={{
               y: window.innerHeight + 20,
-              rotate: Math.random() * 720 - 360,
+              rotate: Math.random() * 720 - 360
             }}
-            transition={{ 
+            transition={{
               duration: Math.random() * 2 + 2,
               delay: Math.random() * 0.5,
               ease: 'linear'
             }}
             className={`absolute w-3 h-3 rounded-sm ${
-              ['bg-pink-500', 'bg-rose-500', 'bg-frinder-orange', 'bg-yellow-400', 'bg-red-500', 'bg-purple-500'][Math.floor(Math.random() * 6)]
+              ['bg-pink-500', 'bg-rose-500', 'bg-frinder-orange', 'bg-yellow-400', 'bg-red-500', 'bg-purple-500'][
+                Math.floor(Math.random() * 6)
+              ]
             }`}
           />
         ))}
@@ -898,17 +899,17 @@ function DateAcceptedCelebration({ show, onClose, dateRequest, matchName, matchP
         {[...Array(20)].map((_, i) => (
           <motion.div
             key={`heart-${i}`}
-            initial={{ 
-              x: Math.random() * window.innerWidth, 
+            initial={{
+              x: Math.random() * window.innerWidth,
               y: window.innerHeight + 50,
               scale: Math.random() * 0.5 + 0.5,
               opacity: 0.8
             }}
-            animate={{ 
+            animate={{
               y: -50,
               opacity: 0
             }}
-            transition={{ 
+            transition={{
               duration: Math.random() * 3 + 3,
               delay: Math.random() * 2,
               ease: 'easeOut'
@@ -1080,7 +1081,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   useEffect(() => {
     if (!match.id || match.isUnmatched) return;
 
-    const unsubscribe = subscribeToDateRequests(match.id, (requests) => {
+    const unsubscribe = subscribeToDateRequests(match.id, requests => {
       // Check for newly accepted date requests to trigger celebration
       requests.forEach(req => {
         if (req.status === 'accepted' && lastAcceptedDateRef.current !== req.id) {
@@ -1102,8 +1103,8 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   // Subscribe to other user's typing status
   useEffect(() => {
     if (!match.id || !match.odMatchId || match.isUnmatched) return;
-    
-    const unsubscribe = subscribeToTypingStatus(match.id, match.odMatchId, (isTyping) => {
+
+    const unsubscribe = subscribeToTypingStatus(match.id, match.odMatchId, isTyping => {
       setIsOtherUserTyping(isTyping);
     });
 
@@ -1113,15 +1114,15 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   // Handle typing indicator - update when user types
   const handleTyping = useCallback(() => {
     if (match.isUnmatched) return;
-    
+
     // Update typing status
     updateTypingStatus(match.id, currentUserId, true);
-    
+
     // Clear previous timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    
+
     // Set timeout to clear typing status after 3 seconds of inactivity
     typingTimeoutRef.current = setTimeout(() => {
       updateTypingStatus(match.id, currentUserId, false);
@@ -1143,8 +1144,8 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   // Subscribe to active call state
   useEffect(() => {
     if (!activeCallId) return;
-    
-    const unsubscribe = subscribeToCall(activeCallId, (callData) => {
+
+    const unsubscribe = subscribeToCall(activeCallId, callData => {
       setActiveCallData(callData);
       if (callData?.status === 'ended' || callData?.status === 'declined' || callData?.status === 'missed') {
         setShowVoiceCall(false);
@@ -1161,13 +1162,13 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
     try {
       // Get audio stream first to ensure permissions
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      
+
       // Create peer connection and offer
       const pc = new RTCPeerConnection(rtcConfig);
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      
+
       // Stop stream temporarily (will be recreated in VoiceCall component)
       stream.getTracks().forEach(track => track.stop());
       pc.close();
@@ -1207,7 +1208,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   // Subscribe to other user's online status
   useEffect(() => {
     if (!match.odMatchId) return;
-    
+
     const unsubscribe = subscribeToUserPresence(match.odMatchId, (online, seen) => {
       setIsOnline(online);
       setLastSeen(seen);
@@ -1254,14 +1255,16 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
     try {
       setSending(true);
-      
+
       // Prepare reply data if replying
-      const replyData = replyingTo ? {
-        id: replyingTo.id,
-        text: replyingTo.type === 'image' ? '📷 Photo' : replyingTo.text,
-        senderId: replyingTo.senderId
-      } : undefined;
-      
+      const replyData = replyingTo
+        ? {
+            id: replyingTo.id,
+            text: replyingTo.type === 'image' ? '📷 Photo' : replyingTo.text,
+            senderId: replyingTo.senderId
+          }
+        : undefined;
+
       if (selectedImage) {
         // Send image message
         setUploadingImage(true);
@@ -1274,7 +1277,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         await sendMessage(match.id, currentUserId, newMessage.trim(), undefined, replyData);
         setNewMessage('');
       }
-      
+
       // Clear reply state
       setReplyingTo(null);
     } catch (error) {
@@ -1313,7 +1316,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
     setSelectedImage(file);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       setImagePreview(e.target?.result as string);
     };
     reader.readAsDataURL(file);
@@ -1355,7 +1358,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         location: dateRequestData.location,
         description: dateRequestData.description
       });
-      
+
       toast.success(`Date request sent to ${match.name}! 💕`);
       setShowDateRequestDialog(false);
       setDateRequestData({ title: '', date: '', time: '', location: '', description: '' });
@@ -1466,11 +1469,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
             >
               {/* Profile Header */}
               <div className='relative h-72 lg:h-64'>
-                <img
-                  src={match.photo}
-                  alt={match.name}
-                  className='w-full h-full object-cover'
-                />
+                <img src={match.photo} alt={match.name} className='w-full h-full object-cover' />
                 <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
                 <button
                   onClick={() => setShowProfileDialog(false)}
@@ -1480,7 +1479,8 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 </button>
                 <div className='absolute bottom-4 left-4 right-4'>
                   <h2 className='text-2xl font-bold text-white'>
-                    {match.name}{match.age ? `, ${match.age}` : ''}
+                    {match.name}
+                    {match.age ? `, ${match.age}` : ''}
                   </h2>
                   {match.location && (
                     <div className='flex items-center gap-1 text-white/80 mt-1'>
@@ -1555,19 +1555,18 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         <button onClick={onBack} className='p-1 hover:bg-muted dark:hover:bg-gray-800 rounded-full'>
           <ChevronLeft className='w-5 h-5 sm:w-6 sm:h-6 dark:text-white' />
         </button>
-        <button 
-          onClick={() => setShowProfileDialog(true)}
-          className='relative hover:opacity-80 transition-opacity'
-        >
+        <button onClick={() => setShowProfileDialog(true)} className='relative hover:opacity-80 transition-opacity'>
           <Avatar className={`w-9 h-9 sm:w-10 sm:h-10 ${match.isUnmatched ? 'grayscale' : ''}`}>
             <AvatarImage src={match.photo} alt={match.name} />
-            <AvatarFallback className={match.isUnmatched ? 'bg-gray-400 text-white' : 'bg-frinder-orange text-white'}>{match.name[0]}</AvatarFallback>
+            <AvatarFallback className={match.isUnmatched ? 'bg-gray-400 text-white' : 'bg-frinder-orange text-white'}>
+              {match.name[0]}
+            </AvatarFallback>
           </Avatar>
           {isOnline && !match.isUnmatched && (
             <span className='absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-black' />
           )}
         </button>
-        <button 
+        <button
           onClick={() => setShowProfileDialog(true)}
           className='flex-1 text-left hover:opacity-80 transition-opacity'
         >
@@ -1579,41 +1578,45 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               </Badge>
             )}
           </div>
-          <p className={`text-[10px] sm:text-xs ${match.isUnmatched ? 'text-gray-400' : isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
+          <p
+            className={`text-[10px] sm:text-xs ${
+              match.isUnmatched ? 'text-gray-400' : isOnline ? 'text-green-500' : 'text-muted-foreground'
+            }`}
+          >
             {match.isUnmatched ? 'Chat disabled' : getStatusText()}
           </p>
         </button>
         {!match.isUnmatched && (
-        <div className='flex items-center gap-1 sm:gap-2'>
-          <button 
-            onClick={initiateCall}
-            className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-800 rounded-full hover:text-frinder-orange transition-colors'
-          >
-            <Phone className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
-          </button>
-          <div className='relative'>
-            <button 
-              onClick={() => setShowMenu(!showMenu)}
-              className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-800 rounded-full'
+          <div className='flex items-center gap-1 sm:gap-2'>
+            <button
+              onClick={initiateCall}
+              className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-800 rounded-full hover:text-frinder-orange transition-colors'
             >
-              <MoreVertical className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
+              <Phone className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-            {showMenu && (
-              <div className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[150px] z-50'>
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowUnmatchDialog(true);
-                  }}
-                  className='w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2'
-                >
-                  <UserX className='w-4 h-4' />
-                  Unmatch
-                </button>
-              </div>
-            )}
+            <div className='relative'>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-800 rounded-full'
+              >
+                <MoreVertical className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
+              </button>
+              {showMenu && (
+                <div className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[150px] z-50'>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowUnmatchDialog(true);
+                    }}
+                    className='w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2'
+                  >
+                    <UserX className='w-4 h-4' />
+                    Unmatch
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         )}
       </div>
 
@@ -1630,7 +1633,9 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               <div className='relative mb-3 sm:mb-4'>
                 <Avatar className='w-20 h-20 sm:w-24 sm:h-24 border-4 border-[#ed8c00]'>
                   <AvatarImage src={match.photo} alt={match.name} />
-                  <AvatarFallback className='bg-[#ed8c00] text-white text-xl sm:text-2xl'>{match.name[0]}</AvatarFallback>
+                  <AvatarFallback className='bg-[#ed8c00] text-white text-xl sm:text-2xl'>
+                    {match.name[0]}
+                  </AvatarFallback>
                 </Avatar>
                 <div className='absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#ed8c00] px-2.5 sm:px-3 py-1 rounded-full'>
                   <Heart className='w-3 h-3 sm:w-4 sm:h-4 text-white' fill='white' />
@@ -1643,7 +1648,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
             {/* Combined Messages and Date Requests Timeline */}
             {(() => {
               // Create timeline items from both messages and date requests
-              type TimelineItem = 
+              type TimelineItem =
                 | { type: 'message'; data: Message; timestamp: Date }
                 | { type: 'dateRequest'; data: DateRequest; timestamp: Date };
 
@@ -1663,17 +1668,21 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               // Sort by timestamp
               timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-              return timeline.map((item) => {
+              return timeline.map(item => {
                 if (item.type === 'message') {
                   const message = item.data;
                   const isOwn = message.senderId === currentUserId;
                   const swipeDirection = isOwn ? -1 : 1;
-                  
+
                   return (
-                    <div 
-                      key={`msg-${message.id}`} 
-                      ref={(el) => { messageRefs.current[message.id] = el; }}
-                      className={`transition-all duration-300 ${highlightedMessageId === message.id ? 'bg-frinder-orange/20 rounded-xl -mx-2 px-2 py-1' : ''}`}
+                    <div
+                      key={`msg-${message.id}`}
+                      ref={el => {
+                        messageRefs.current[message.id] = el;
+                      }}
+                      className={`transition-all duration-300 ${
+                        highlightedMessageId === message.id ? 'bg-frinder-orange/20 rounded-xl -mx-2 px-2 py-1' : ''
+                      }`}
                     >
                       <MessageBubble
                         message={message}
@@ -1689,7 +1698,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 } else {
                   const dateRequest = item.data;
                   const isOwn = dateRequest.senderId === currentUserId;
-                  
+
                   return (
                     <DateRequestBubble
                       key={`dr-${dateRequest.id}`}
@@ -1704,7 +1713,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 }
               });
             })()}
-            
+
             {/* Typing Indicator */}
             <AnimatePresence>
               {isOtherUserTyping && (
@@ -1716,46 +1725,44 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 >
                   <Avatar className='w-6 h-6'>
                     <AvatarImage src={match.photo} alt={match.name} />
-                    <AvatarFallback className='bg-frinder-orange text-white text-xs'>
-                      {match.name[0]}
-                    </AvatarFallback>
+                    <AvatarFallback className='bg-frinder-orange text-white text-xs'>{match.name[0]}</AvatarFallback>
                   </Avatar>
                   <div className='bg-muted dark:bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5'>
                     <div className='flex items-center gap-1'>
                       <motion.span
                         className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
-                        animate={{ 
+                        animate={{
                           y: [0, -4, 0],
                           opacity: [0.5, 1, 0.5]
                         }}
-                        transition={{ 
-                          duration: 0.8, 
+                        transition={{
+                          duration: 0.8,
                           repeat: Infinity,
-                          delay: 0 
+                          delay: 0
                         }}
                       />
                       <motion.span
                         className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
-                        animate={{ 
+                        animate={{
                           y: [0, -4, 0],
                           opacity: [0.5, 1, 0.5]
                         }}
-                        transition={{ 
-                          duration: 0.8, 
+                        transition={{
+                          duration: 0.8,
                           repeat: Infinity,
-                          delay: 0.2 
+                          delay: 0.2
                         }}
                       />
                       <motion.span
                         className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
-                        animate={{ 
+                        animate={{
                           y: [0, -4, 0],
                           opacity: [0.5, 1, 0.5]
                         }}
-                        transition={{ 
-                          duration: 0.8, 
+                        transition={{
+                          duration: 0.8,
                           repeat: Infinity,
-                          delay: 0.4 
+                          delay: 0.4
                         }}
                       />
                     </div>
@@ -1763,7 +1770,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 </motion.div>
               )}
             </AnimatePresence>
-            
+
             <div ref={messagesEndRef} />
           </>
         )}
@@ -1806,118 +1813,114 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           </div>
         </div>
       ) : (
-      <div className='p-3 sm:p-4 border-t bg-white dark:bg-black dark:border-gray-800 safe-bottom'>
-        {/* Reply Preview */}
-        <AnimatePresence>
-          {replyingTo && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className='mb-3'
-            >
-              <div className='flex items-center gap-2 px-3 py-2 bg-muted dark:bg-gray-900 rounded-lg border-l-4 border-frinder-orange'>
-                <CornerDownLeft className='w-4 h-4 text-frinder-orange shrink-0' />
-                <div className='flex-1 min-w-0'>
-                  <span className='text-xs font-medium text-frinder-orange block'>
-                    Replying to {replyingTo.senderId === currentUserId ? 'yourself' : match.name}
-                  </span>
-                  <span className='text-sm text-muted-foreground line-clamp-1'>
-                    {replyingTo.type === 'image' ? '📷 Photo' : replyingTo.text}
-                  </span>
+        <div className='p-3 sm:p-4 border-t bg-white dark:bg-black dark:border-gray-800 safe-bottom'>
+          {/* Reply Preview */}
+          <AnimatePresence>
+            {replyingTo && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className='mb-3'
+              >
+                <div className='flex items-center gap-2 px-3 py-2 bg-muted dark:bg-gray-900 rounded-lg border-l-4 border-frinder-orange'>
+                  <CornerDownLeft className='w-4 h-4 text-frinder-orange shrink-0' />
+                  <div className='flex-1 min-w-0'>
+                    <span className='text-xs font-medium text-frinder-orange block'>
+                      Replying to {replyingTo.senderId === currentUserId ? 'yourself' : match.name}
+                    </span>
+                    <span className='text-sm text-muted-foreground line-clamp-1'>
+                      {replyingTo.type === 'image' ? '📷 Photo' : replyingTo.text}
+                    </span>
+                  </div>
+                  <button
+                    onClick={cancelReply}
+                    className='w-6 h-6 rounded-full hover:bg-muted-foreground/20 flex items-center justify-center transition-colors'
+                  >
+                    <X className='w-4 h-4 text-muted-foreground' />
+                  </button>
                 </div>
-                <button
-                  onClick={cancelReply}
-                  className='w-6 h-6 rounded-full hover:bg-muted-foreground/20 flex items-center justify-center transition-colors'
-                >
-                  <X className='w-4 h-4 text-muted-foreground' />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Image Preview */}
-        <AnimatePresence>
-          {imagePreview && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className='mb-3 relative'
+          {/* Image Preview */}
+          <AnimatePresence>
+            {imagePreview && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className='mb-3 relative'
+              >
+                <div className='relative inline-block'>
+                  <img src={imagePreview} alt='Preview' className='h-24 rounded-lg object-cover' />
+                  <button
+                    onClick={clearSelectedImage}
+                    className='absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors'
+                  >
+                    <X className='w-4 h-4' />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Hidden file input */}
+          <input ref={imageInputRef} type='file' accept='image/*' onChange={handleImageSelect} className='hidden' />
+
+          <div className='flex items-center gap-1 sm:gap-2'>
+            <button
+              onClick={() => imageInputRef.current?.click()}
+              disabled={uploadingImage}
+              className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-900 rounded-full transition-colors'
             >
-              <div className='relative inline-block'>
-                <img 
-                  src={imagePreview} 
-                  alt='Preview' 
-                  className='h-24 rounded-lg object-cover'
-                />
-                <button
-                  onClick={clearSelectedImage}
-                  className='absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors'
-                >
-                  <X className='w-4 h-4' />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Hidden file input */}
-        <input
-          ref={imageInputRef}
-          type='file'
-          accept='image/*'
-          onChange={handleImageSelect}
-          className='hidden'
-        />
-
-        <div className='flex items-center gap-1 sm:gap-2'>
-          <button 
-            onClick={() => imageInputRef.current?.click()}
-            disabled={uploadingImage}
-            className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-900 rounded-full transition-colors'
-          >
-            {uploadingImage ? (
-              <Loader2 className='w-5 h-5 sm:w-6 sm:h-6 text-frinder-orange animate-spin' />
-            ) : (
-              <ImageIcon className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground hover:text-frinder-orange transition-colors' />
-            )}
-          </button>
-          <button 
-            onClick={() => setShowDateRequestDialog(true)}
-            className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-900 rounded-full transition-colors group'
-            title='Request a Date'
-          >
-            <CalendarHeart className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground group-hover:text-pink-500 transition-colors' />
-          </button>
-          <Input
-            ref={inputRef}
-            value={newMessage}
-            onChange={e => {
-              setNewMessage(e.target.value);
-              handleTyping();
-            }}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder={replyingTo ? `Reply to ${replyingTo.senderId === currentUserId ? 'yourself' : match.name}...` : selectedImage ? 'Add a caption...' : 'Type a message...'}
-            className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
-            disabled={sending || uploadingImage}
-          />
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleSend}
-            disabled={(!newMessage.trim() && !selectedImage) || sending || uploadingImage}
-            className='w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-frinder-orange flex items-center justify-center disabled:opacity-50'
-          >
-            {sending || uploadingImage ? (
-              <Loader2 className='w-4 h-4 sm:w-5 sm:h-5 text-white animate-spin' />
-            ) : (
-              <Send className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
-            )}
-          </motion.button>
+              {uploadingImage ? (
+                <Loader2 className='w-5 h-5 sm:w-6 sm:h-6 text-frinder-orange animate-spin' />
+              ) : (
+                <ImageIcon className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground hover:text-frinder-orange transition-colors' />
+              )}
+            </button>
+            <button
+              onClick={() => setShowDateRequestDialog(true)}
+              className='p-1.5 sm:p-2 hover:bg-muted dark:hover:bg-gray-900 rounded-full transition-colors group'
+              title='Request a Date'
+            >
+              <CalendarHeart className='w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground group-hover:text-pink-500 transition-colors' />
+            </button>
+            <Input
+              ref={inputRef}
+              value={newMessage}
+              onChange={e => {
+                setNewMessage(e.target.value);
+                handleTyping();
+              }}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder={
+                replyingTo
+                  ? `Reply to ${replyingTo.senderId === currentUserId ? 'yourself' : match.name}...`
+                  : selectedImage
+                  ? 'Add a caption...'
+                  : 'Type a message...'
+              }
+              className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+              disabled={sending || uploadingImage}
+            />
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleSend}
+              disabled={(!newMessage.trim() && !selectedImage) || sending || uploadingImage}
+              className='w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-frinder-orange flex items-center justify-center disabled:opacity-50'
+            >
+              {sending || uploadingImage ? (
+                <Loader2 className='w-4 h-4 sm:w-5 sm:h-5 text-white animate-spin' />
+              ) : (
+                <Send className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
+              )}
+            </motion.button>
+          </div>
         </div>
-      </div>
       )}
 
       {/* Date Request Dialog */}
@@ -1990,16 +1993,18 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               />
             </div>
             <div className='flex gap-3 pt-2'>
-              <Button
-                variant='outline'
-                onClick={() => setShowDateRequestDialog(false)}
-                className='flex-1'
-              >
+              <Button variant='outline' onClick={() => setShowDateRequestDialog(false)} className='flex-1'>
                 Cancel
               </Button>
               <Button
                 onClick={handleSendDateRequest}
-                disabled={sendingDateRequest || !dateRequestData.title || !dateRequestData.date || !dateRequestData.time || !dateRequestData.location}
+                disabled={
+                  sendingDateRequest ||
+                  !dateRequestData.title ||
+                  !dateRequestData.date ||
+                  !dateRequestData.time ||
+                  !dateRequestData.location
+                }
                 className='flex-1 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white'
               >
                 {sendingDateRequest ? (
@@ -2040,7 +2045,14 @@ interface GroupChatViewProps {
 }
 
 // Group Chat View Component - Similar to ChatView but with member avatars like WhatsApp groups
-function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto, onBack, onGroupDeleted }: GroupChatViewProps) {
+function GroupChatView({
+  group,
+  currentUserId,
+  currentUserName,
+  currentUserPhoto,
+  onBack,
+  onGroupDeleted
+}: GroupChatViewProps) {
   const [messages, setMessages] = useState<FirebaseGroupMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -2057,12 +2069,12 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
   const [deleting, setDeleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const isAdmin = group.creatorId === currentUserId;
 
   // Subscribe to group messages
   useEffect(() => {
-    const unsubscribe = subscribeToGroupMessages(group.id, (msgs) => {
+    const unsubscribe = subscribeToGroupMessages(group.id, msgs => {
       setMessages(msgs);
     });
 
@@ -2073,7 +2085,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  
+
   // Load members when dialog opens
   const handleViewMembers = async () => {
     setShowMembersDialog(true);
@@ -2087,7 +2099,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
       setLoadingMembers(false);
     }
   };
-  
+
   // Remove a member (admin only)
   const handleRemoveMember = async (memberId: string) => {
     if (!isAdmin) return;
@@ -2103,7 +2115,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
       setRemovingMember(null);
     }
   };
-  
+
   // Delete entire group (admin only)
   const handleDeleteGroup = async () => {
     if (!isAdmin) return;
@@ -2144,12 +2156,14 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
         currentUserPhoto,
         newMessage.trim() || (imageUrl ? '📷 Photo' : ''),
         imageUrl,
-        replyingTo ? {
-          id: replyingTo.id,
-          text: replyingTo.text,
-          senderId: replyingTo.senderId,
-          senderName: replyingTo.senderName
-        } : undefined
+        replyingTo
+          ? {
+              id: replyingTo.id,
+              text: replyingTo.text,
+              senderId: replyingTo.senderId,
+              senderName: replyingTo.senderName
+            }
+          : undefined
       );
 
       setNewMessage('');
@@ -2196,9 +2210,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
 
         <div className='flex-1 min-w-0'>
           <h2 className='font-semibold text-sm sm:text-base dark:text-white truncate'>{group.name}</h2>
-          <p className='text-xs text-muted-foreground truncate'>
-            {group.members?.length || 1} members
-          </p>
+          <p className='text-xs text-muted-foreground truncate'>{group.members?.length || 1} members</p>
         </div>
 
         <div className='relative'>
@@ -2220,7 +2232,10 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
                 className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[180px] z-50'
               >
                 <button
-                  onClick={() => { handleViewMembers(); setShowMenu(false); }}
+                  onClick={() => {
+                    handleViewMembers();
+                    setShowMenu(false);
+                  }}
                   className='w-full px-4 py-2 text-left text-sm hover:bg-muted dark:hover:bg-gray-800 dark:text-white flex items-center gap-2'
                 >
                   <Users className='w-4 h-4' />
@@ -2228,7 +2243,10 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
                 </button>
                 {isAdmin && (
                   <button
-                    onClick={() => { setShowDeleteDialog(true); setShowMenu(false); }}
+                    onClick={() => {
+                      setShowDeleteDialog(true);
+                      setShowMenu(false);
+                    }}
                     className='w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-950 text-red-500 flex items-center gap-2'
                   >
                     <Trash2 className='w-4 h-4' />
@@ -2250,7 +2268,9 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
               {group.name} - Members
             </DialogTitle>
             <DialogDescription>
-              {isAdmin ? 'Manage group members. You can remove members from the group.' : 'View all members of this group.'}
+              {isAdmin
+                ? 'Manage group members. You can remove members from the group.'
+                : 'View all members of this group.'}
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-2 max-h-96 overflow-y-auto'>
@@ -2260,7 +2280,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
               </div>
             ) : groupMembers.length > 0 ? (
               groupMembers.map(member => (
-                <div 
+                <div
                   key={member.uid}
                   className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
                 >
@@ -2280,9 +2300,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
                         </Badge>
                       )}
                     </div>
-                    {member.city && (
-                      <span className='text-xs text-muted-foreground'>{member.city}</span>
-                    )}
+                    {member.city && <span className='text-xs text-muted-foreground'>{member.city}</span>}
                   </div>
                   {isAdmin && member.uid !== group.creatorId && member.uid !== currentUserId && (
                     <button
@@ -2319,7 +2337,8 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
               Delete Group
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{group.name}</strong>? This will permanently delete all messages, images, and data associated with this group. This action cannot be undone.
+              Are you sure you want to delete <strong>{group.name}</strong>? This will permanently delete all messages,
+              images, and data associated with this group. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <div className='flex gap-3 mt-4'>
@@ -2331,12 +2350,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
             >
               Cancel
             </Button>
-            <Button
-              variant='destructive'
-              className='flex-1'
-              onClick={handleDeleteGroup}
-              disabled={deleting}
-            >
+            <Button variant='destructive' className='flex-1' onClick={handleDeleteGroup} disabled={deleting}>
               {deleting ? (
                 <>
                   <Loader2 className='w-4 h-4 mr-2 animate-spin' />
@@ -2366,7 +2380,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
                 showAvatar={showAvatar}
                 showName={showName}
                 onSwipeReply={() => handleSwipeToReply(message)}
-                onImageClick={(url) => setPreviewImage(url)}
+                onImageClick={url => setPreviewImage(url)}
               />
             );
           })}
@@ -2398,7 +2412,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
               src={previewImage}
               alt='Preview'
               className='max-w-full max-h-full object-contain rounded-lg'
-              onClick={(e) => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
             />
           </motion.div>
         )}
@@ -2431,11 +2445,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
       {selectedImage && (
         <div className='px-3 sm:px-4 py-2 border-t dark:border-gray-800'>
           <div className='relative inline-block'>
-            <img
-              src={URL.createObjectURL(selectedImage)}
-              alt='Selected'
-              className='h-20 rounded-lg object-cover'
-            />
+            <img src={URL.createObjectURL(selectedImage)} alt='Selected' className='h-20 rounded-lg object-cover' />
             <button
               onClick={() => setSelectedImage(null)}
               className='absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center'
@@ -2449,13 +2459,7 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
       {/* Input Area */}
       <div className='p-3 sm:p-4 border-t dark:border-gray-800'>
         <div className='flex items-center gap-2'>
-          <input
-            type='file'
-            ref={fileInputRef}
-            onChange={handleImageSelect}
-            accept='image/*'
-            className='hidden'
-          />
+          <input type='file' ref={fileInputRef} onChange={handleImageSelect} accept='image/*' className='hidden' />
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -2467,8 +2471,8 @@ function GroupChatView({ group, currentUserId, currentUserName, currentUserPhoto
           </motion.button>
           <Input
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            onChange={e => setNewMessage(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder='Message group...'
             className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
             disabled={sending || uploadingImage}
@@ -2502,7 +2506,14 @@ interface GroupMessageBubbleProps {
   onImageClick: (url: string) => void;
 }
 
-function GroupMessageBubble({ message, isOwn, showAvatar, showName, onSwipeReply, onImageClick }: GroupMessageBubbleProps) {
+function GroupMessageBubble({
+  message,
+  isOwn,
+  showAvatar,
+  showName,
+  onSwipeReply,
+  onImageClick
+}: GroupMessageBubbleProps) {
   const x = useMotionValue(0);
   const replyOpacity = useTransform(x, [0, 50], [0, 1]);
 
@@ -2550,32 +2561,20 @@ function GroupMessageBubble({ message, isOwn, showAvatar, showName, onSwipeReply
         className={`max-w-[75%] ${isOwn ? 'order-1' : ''}`}
       >
         {/* Sender name for group messages */}
-        {showName && (
-          <p className='text-xs font-medium text-frinder-orange mb-1 ml-1'>
-            {message.senderName}
-          </p>
-        )}
+        {showName && <p className='text-xs font-medium text-frinder-orange mb-1 ml-1'>{message.senderName}</p>}
 
         <div
           className={`rounded-2xl px-3 py-2 ${
-            isOwn
-              ? 'bg-frinder-orange text-white rounded-br-md'
-              : 'bg-muted dark:bg-gray-800 rounded-bl-md'
+            isOwn ? 'bg-frinder-orange text-white rounded-br-md' : 'bg-muted dark:bg-gray-800 rounded-bl-md'
           }`}
         >
           {/* Reply preview */}
           {message.replyTo && (
-            <div
-              className={`mb-2 p-2 rounded-lg text-xs ${
-                isOwn ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'
-              }`}
-            >
+            <div className={`mb-2 p-2 rounded-lg text-xs ${isOwn ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}>
               <p className={`font-medium ${isOwn ? 'text-white/80' : 'text-frinder-orange'}`}>
                 {message.replyTo.senderName}
               </p>
-              <p className={isOwn ? 'text-white/70' : 'text-muted-foreground'}>
-                {message.replyTo.text}
-              </p>
+              <p className={isOwn ? 'text-white/70' : 'text-muted-foreground'}>{message.replyTo.text}</p>
             </div>
           )}
 
@@ -2593,17 +2592,11 @@ function GroupMessageBubble({ message, isOwn, showAvatar, showName, onSwipeReply
 
           {/* Text */}
           {message.text && message.text !== '📷 Photo' && (
-            <p className={`text-sm ${isOwn ? 'text-white' : 'dark:text-white'}`}>
-              {message.text}
-            </p>
+            <p className={`text-sm ${isOwn ? 'text-white' : 'dark:text-white'}`}>{message.text}</p>
           )}
 
           {/* Timestamp */}
-          <p
-            className={`text-[10px] mt-1 ${
-              isOwn ? 'text-white/70' : 'text-muted-foreground'
-            }`}
-          >
+          <p className={`text-[10px] mt-1 ${isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>
             {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
@@ -2655,7 +2648,7 @@ export default function Messages() {
     matches.forEach(match => {
       if (match.isUnmatched) return;
 
-      const unsubscribe = subscribeToDateRequests(match.id, (dateRequests) => {
+      const unsubscribe = subscribeToDateRequests(match.id, dateRequests => {
         // Check if we're currently viewing this match's conversation
         const isViewingThisConversation = selectedMatch?.id === match.id;
 
@@ -2674,14 +2667,14 @@ export default function Messages() {
           const dateB = b.dateRequest.date instanceof Date ? b.dateRequest.date : b.dateRequest.date.toDate();
           const aIsPast = dateA < now;
           const bIsPast = dateB < now;
-          
+
           // Upcoming dates come before past dates
           if (!aIsPast && bIsPast) return -1;
           if (aIsPast && !bIsPast) return 1;
-          
+
           // Within upcoming: sort by nearest date first
           if (!aIsPast && !bIsPast) return dateA.getTime() - dateB.getTime();
-          
+
           // Within past: sort by most recent first
           return dateB.getTime() - dateA.getTime();
         });
@@ -2689,7 +2682,7 @@ export default function Messages() {
 
         dateRequests.forEach(req => {
           const notificationKey = `${match.id}-${req.id}-${req.status}`;
-          
+
           // Get previous state for this date request
           if (!dateRequestStatesRef.current.has(match.id)) {
             dateRequestStatesRef.current.set(match.id, new Map());
@@ -2705,14 +2698,14 @@ export default function Messages() {
                 if (req.senderId === user.uid) {
                   // User sent the request and it was accepted
                   toast.success(`🎉 ${match.name} accepted your date request!`, {
-                    duration: 5000,
+                    duration: 5000
                   });
                 }
               } else if (req.status === 'declined') {
                 if (req.senderId === user.uid) {
                   // User sent the request and it was declined
                   toast.error(`${match.name} declined your date request`, {
-                    duration: 4000,
+                    duration: 4000
                   });
                 }
               }
@@ -2737,7 +2730,7 @@ export default function Messages() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const unsubscribe = subscribeToUserGroups(user.uid, (groups) => {
+    const unsubscribe = subscribeToUserGroups(user.uid, groups => {
       setUserGroups(groups);
     });
 
@@ -2793,7 +2786,7 @@ export default function Messages() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const unsubscribe = subscribeToIncomingCalls(user.uid, (call) => {
+    const unsubscribe = subscribeToIncomingCalls(user.uid, call => {
       if (call && call.status === 'ringing') {
         setIncomingCall(call);
         setShowIncomingCall(true);
@@ -2887,7 +2880,7 @@ export default function Messages() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const unsubscribe = subscribeToUnmatchedConversations(user.uid, (unmatchedMatches) => {
+    const unsubscribe = subscribeToUnmatchedConversations(user.uid, unmatchedMatches => {
       const mappedUnmatched: Match[] = unmatchedMatches.map(m => {
         const otherUserIndex = m.users[0] === user.uid ? 1 : 0;
         const otherUserId = m.users[otherUserIndex];
@@ -2941,12 +2934,12 @@ export default function Messages() {
 
   if (selectedMatch) {
     return (
-      <ChatView 
-        match={selectedMatch} 
+      <ChatView
+        match={selectedMatch}
         currentUserId={user.uid}
         currentUserName={userProfile?.displayName || user.displayName || 'You'}
         currentUserPhoto={userProfile?.photos?.[0] || user.photoURL || '/placeholder-avatar.png'}
-        onBack={() => setSelectedMatch(null)} 
+        onBack={() => setSelectedMatch(null)}
         onUnmatch={handleUnmatch}
       />
     );
@@ -3005,13 +2998,12 @@ export default function Messages() {
             />
 
             {/* Caller avatar */}
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
+            <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
               <Avatar className='w-32 h-32 border-4 border-frinder-orange mb-6'>
                 <AvatarImage src={incomingCall.callerPhoto} alt={incomingCall.callerName} />
-                <AvatarFallback className='bg-frinder-orange text-white text-4xl'>{incomingCall.callerName[0]}</AvatarFallback>
+                <AvatarFallback className='bg-frinder-orange text-white text-4xl'>
+                  {incomingCall.callerName[0]}
+                </AvatarFallback>
               </Avatar>
             </motion.div>
 
@@ -3071,7 +3063,9 @@ export default function Messages() {
                   <div className='relative'>
                     <Avatar className='w-14 h-14 sm:w-16 sm:h-16 ring-2 ring-frinder-orange ring-offset-2 ring-offset-white dark:ring-offset-gray-900 shadow-md'>
                       <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
-                      <AvatarFallback className='bg-frinder-orange text-white font-medium'>{match.name[0]}</AvatarFallback>
+                      <AvatarFallback className='bg-frinder-orange text-white font-medium'>
+                        {match.name[0]}
+                      </AvatarFallback>
                     </Avatar>
                     {match.isOnline && (
                       <span className='absolute bottom-1 right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
@@ -3102,9 +3096,17 @@ export default function Messages() {
                     }`}
                   >
                     <div className='relative'>
-                      <Avatar className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${match.unreadCount > 0 ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : 'border border-gray-200 dark:border-gray-700'}`}>
+                      <Avatar
+                        className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${
+                          match.unreadCount > 0
+                            ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900'
+                            : 'border border-gray-200 dark:border-gray-700'
+                        }`}
+                      >
                         <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
-                        <AvatarFallback className='bg-frinder-orange text-white font-medium'>{match.name[0]}</AvatarFallback>
+                        <AvatarFallback className='bg-frinder-orange text-white font-medium'>
+                          {match.name[0]}
+                        </AvatarFallback>
                       </Avatar>
                       {match.isOnline && !match.unreadCount && (
                         <span className='absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
@@ -3117,14 +3119,26 @@ export default function Messages() {
                     </div>
                     <div className='flex-1 text-left min-w-0'>
                       <div className='flex items-center justify-between mb-0.5 sm:mb-1'>
-                        <h3 className={`font-semibold text-sm sm:text-base dark:text-white ${match.unreadCount > 0 ? 'text-frinder-orange' : ''}`}>{match.name}</h3>
-                        <span className={`text-[10px] sm:text-xs ${match.unreadCount > 0 ? 'text-frinder-orange font-medium' : 'text-muted-foreground'}`}>
+                        <h3
+                          className={`font-semibold text-sm sm:text-base dark:text-white ${
+                            match.unreadCount > 0 ? 'text-frinder-orange' : ''
+                          }`}
+                        >
+                          {match.name}
+                        </h3>
+                        <span
+                          className={`text-[10px] sm:text-xs ${
+                            match.unreadCount > 0 ? 'text-frinder-orange font-medium' : 'text-muted-foreground'
+                          }`}
+                        >
                           {match.lastMessageTime && formatTime(match.lastMessageTime)}
                         </span>
                       </div>
                       <p
                         className={`text-xs sm:text-sm truncate ${
-                          match.unreadCount > 0 ? 'text-foreground dark:text-white font-semibold' : 'text-muted-foreground'
+                          match.unreadCount > 0
+                            ? 'text-foreground dark:text-white font-semibold'
+                            : 'text-muted-foreground'
                         }`}
                       >
                         {match.lastMessage || 'Start a conversation!'}
@@ -3171,13 +3185,14 @@ export default function Messages() {
                     <div className='flex-1 text-left min-w-0'>
                       <div className='flex items-center justify-between mb-0.5 sm:mb-1'>
                         <h3 className='font-semibold text-sm sm:text-base dark:text-white'>{match.name}</h3>
-                        <Badge variant='outline' className='text-[10px] border-gray-300 dark:border-gray-700 text-gray-500'>
+                        <Badge
+                          variant='outline'
+                          className='text-[10px] border-gray-300 dark:border-gray-700 text-gray-500'
+                        >
                           Unmatched
                         </Badge>
                       </div>
-                      <p className='text-xs sm:text-sm truncate text-muted-foreground'>
-                        {match.lastMessage}
-                      </p>
+                      <p className='text-xs sm:text-sm truncate text-muted-foreground'>{match.lastMessage}</p>
                     </div>
                   </motion.button>
                 ))}
@@ -3228,11 +3243,14 @@ export default function Messages() {
                         {group.activity || group.description}
                       </p>
                     </div>
-                    <div className='flex items-center gap-1' onClick={(e) => e.stopPropagation()}>
+                    <div className='flex items-center gap-1' onClick={e => e.stopPropagation()}>
                       {/* Admin can view/manage members */}
                       {group.creatorId === user?.uid && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleViewGroupMembers(group); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleViewGroupMembers(group);
+                          }}
                           className='p-2 rounded-full hover:bg-muted dark:hover:bg-gray-700 transition-colors'
                           title='Manage members'
                         >
@@ -3242,7 +3260,10 @@ export default function Messages() {
                       {/* Non-admin can leave */}
                       {group.creatorId !== user?.uid && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleLeaveGroup(group.id); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleLeaveGroup(group.id);
+                          }}
                           className='p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors'
                           title='Leave group'
                         >
@@ -3267,12 +3288,10 @@ export default function Messages() {
             <div className='space-y-1.5 sm:space-y-2'>
               <AnimatePresence>
                 {acceptedDates.map(({ dateRequest, match }) => {
-                  const dateObj = dateRequest.date instanceof Date 
-                    ? dateRequest.date 
-                    : dateRequest.date.toDate();
+                  const dateObj = dateRequest.date instanceof Date ? dateRequest.date : dateRequest.date.toDate();
                   const isPast = dateObj < new Date();
                   const isToday = dateObj.toDateString() === new Date().toDateString();
-                  
+
                   return (
                     <motion.button
                       key={dateRequest.id}
@@ -3281,15 +3300,21 @@ export default function Messages() {
                       exit={{ opacity: 0, y: -10 }}
                       onClick={() => setSelectedMatch(match)}
                       className={`w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-colors text-left ${
-                        isPast 
-                          ? 'bg-muted/30 dark:bg-gray-800/30' 
+                        isPast
+                          ? 'bg-muted/30 dark:bg-gray-800/30'
                           : isToday
-                            ? 'bg-frinder-orange/10 dark:bg-frinder-orange/20 border border-frinder-orange/30'
-                            : 'bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50'
+                          ? 'bg-frinder-orange/10 dark:bg-frinder-orange/20 border border-frinder-orange/30'
+                          : 'bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50'
                       }`}
                     >
                       <div className='relative'>
-                        <Avatar className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${isToday ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : 'border border-gray-200 dark:border-gray-700'}`}>
+                        <Avatar
+                          className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${
+                            isToday
+                              ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900'
+                              : 'border border-gray-200 dark:border-gray-700'
+                          }`}
+                        >
                           <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
                           <AvatarFallback className='bg-frinder-orange text-white font-medium'>
                             {match.name[0]}
@@ -3303,13 +3328,15 @@ export default function Messages() {
                       </div>
                       <div className='flex-1 text-left min-w-0'>
                         <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
-                          <h3 className={`font-semibold text-sm sm:text-base truncate ${isPast ? 'text-muted-foreground' : 'dark:text-white'}`}>
+                          <h3
+                            className={`font-semibold text-sm sm:text-base truncate ${
+                              isPast ? 'text-muted-foreground' : 'dark:text-white'
+                            }`}
+                          >
                             {dateRequest.title}
                           </h3>
                           {isToday && (
-                            <Badge className='bg-frinder-orange text-white text-[10px] shrink-0'>
-                              Today!
-                            </Badge>
+                            <Badge className='bg-frinder-orange text-white text-[10px] shrink-0'>Today!</Badge>
                           )}
                           {isPast && (
                             <Badge variant='outline' className='text-[10px] shrink-0 opacity-60'>
@@ -3358,7 +3385,7 @@ export default function Messages() {
             </DialogHeader>
             <div className='space-y-2 max-h-[400px] overflow-y-auto'>
               {groupMembers.map(member => (
-                <div 
+                <div
                   key={member.uid}
                   className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
                 >
@@ -3378,9 +3405,7 @@ export default function Messages() {
                         </Badge>
                       )}
                     </div>
-                    {member.city && (
-                      <span className='text-xs text-muted-foreground'>{member.city}</span>
-                    )}
+                    {member.city && <span className='text-xs text-muted-foreground'>{member.city}</span>}
                   </div>
                   {member.uid !== selectedGroup?.creatorId && member.uid !== user?.uid && (
                     <button

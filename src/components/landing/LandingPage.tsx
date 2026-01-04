@@ -3,19 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { 
-  Heart, 
-  Users, 
-  MessageCircle, 
-  Shield, 
-  Sparkles, 
-  ArrowRight, 
-  Check,
-  Star,
-  Zap,
-  Globe,
-  Lock
-} from 'lucide-react';
+import { Heart, Users, MessageCircle, Shield, Sparkles, ArrowRight, Check, Star, Zap, Globe, Lock } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -78,7 +66,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
+      setCurrentTestimonial(prev => (prev + 1) % testimonials.length);
     }, 5000);
     return () => clearInterval(interval);
   }, [testimonials.length]);
@@ -94,7 +82,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
   return (
     <div className='min-h-screen bg-white overflow-x-hidden'>
       {/* Animated background gradient */}
-      <div 
+      <div
         className='fixed inset-0 pointer-events-none opacity-30'
         style={{
           background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(237, 140, 0, 0.15), transparent 40%)`
@@ -105,26 +93,23 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       <nav className='fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 py-4'>
           <div className='flex items-center justify-between'>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className='flex items-center gap-2'
             >
-              <img 
-                src='/frinder-logo.png' 
-                alt='Frinder - Find Friends & Meaningful Connections' 
+              <img
+                src='/frinder-logo.png'
+                alt='Frinder - Find Friends & Meaningful Connections'
                 className='w-9 h-9 rounded-lg shadow-md shadow-orange-200/50'
               />
               <span className='text-2xl font-bold bg-gradient-to-r from-[#ed8c00] to-[#e8763d] bg-clip-text text-transparent'>
                 Frinder
               </span>
             </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-            >
-              <Button 
-                onClick={onGetStarted} 
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+              <Button
+                onClick={onGetStarted}
                 className='bg-[#ed8c00] hover:bg-[#cc5d00] text-white shadow-lg shadow-orange-200 transition-all hover:shadow-xl hover:scale-105'
               >
                 Get Started
@@ -139,7 +124,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className='max-w-7xl mx-auto'>
           <div className='grid lg:grid-cols-2 gap-12 lg:gap-20 items-center'>
             {/* Hero Text */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
@@ -154,7 +139,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 <Sparkles className='w-4 h-4' />
                 <span>Join thousands of people connecting daily</span>
               </motion.div>
-              
+
               <h1 className='text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6'>
                 Find Your
                 <span className='relative'>
@@ -167,22 +152,18 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     viewBox='0 0 200 12'
                     fill='none'
                   >
-                    <path
-                      d='M2 8C50 2 150 2 198 8'
-                      stroke='#ffbe42'
-                      strokeWidth='4'
-                      strokeLinecap='round'
-                    />
+                    <path d='M2 8C50 2 150 2 198 8' stroke='#ffbe42' strokeWidth='4' strokeLinecap='round' />
                   </motion.svg>
                 </span>
                 <br />
                 Based on Interests
               </h1>
-              
+
               <p className='text-lg sm:text-xl text-gray-600 mb-8 max-w-lg mx-auto lg:mx-0'>
-                Connect with people who share your passions. Swipe, match, and build meaningful relationships in your city.
+                Connect with people who share your passions. Swipe, match, and build meaningful relationships in your
+                city.
               </p>
-              
+
               <div className='flex flex-col sm:flex-row gap-4 justify-center lg:justify-start'>
                 <Button
                   onClick={onGetStarted}
@@ -240,10 +221,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                       <div className='h-full bg-white rounded-2xl shadow-lg overflow-hidden relative'>
                         <div className='h-2/3 bg-gradient-to-br from-[#ed8c00] to-[#e8763d] relative'>
                           <div className='absolute inset-0 flex items-center justify-center'>
-                            <motion.div
-                              animate={{ scale: [1, 1.1, 1] }}
-                              transition={{ duration: 2, repeat: Infinity }}
-                            >
+                            <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
                               <Heart className='w-20 h-20 text-white/30' />
                             </motion.div>
                           </div>
@@ -313,9 +291,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             viewport={{ once: true }}
             className='text-center mb-16'
           >
-            <h2 className='text-3xl sm:text-4xl font-bold text-gray-900 mb-4'>
-              Everything You Need to Connect
-            </h2>
+            <h2 className='text-3xl sm:text-4xl font-bold text-gray-900 mb-4'>Everything You Need to Connect</h2>
             <p className='text-lg text-gray-600 max-w-2xl mx-auto'>
               Frinder makes it easy to find people with similar interests and build meaningful connections
             </p>
@@ -355,12 +331,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             viewport={{ once: true }}
             className='text-center mb-16'
           >
-            <h2 className='text-3xl sm:text-4xl font-bold text-gray-900 mb-4'>
-              How Frinder Works
-            </h2>
-            <p className='text-lg text-gray-600'>
-              Getting started is easy – just three simple steps
-            </p>
+            <h2 className='text-3xl sm:text-4xl font-bold text-gray-900 mb-4'>How Frinder Works</h2>
+            <p className='text-lg text-gray-600'>Getting started is easy – just three simple steps</p>
           </motion.div>
 
           <div className='grid md:grid-cols-3 gap-8'>
@@ -396,9 +368,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             viewport={{ once: true }}
             className='text-center mb-12'
           >
-            <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>
-              What People Are Saying
-            </h2>
+            <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>What People Are Saying</h2>
           </motion.div>
 
           <div className='relative h-48'>
@@ -448,11 +418,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <div className='absolute top-0 left-0 w-40 h-40 bg-[#ed8c00] rounded-full blur-3xl' />
               <div className='absolute bottom-0 right-0 w-60 h-60 bg-[#ffbe42] rounded-full blur-3xl' />
             </div>
-            
+
             <div className='relative z-10'>
-              <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>
-                Ready to Find Your Match?
-              </h2>
+              <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>Ready to Find Your Match?</h2>
               <p className='text-lg text-gray-400 mb-8 max-w-xl mx-auto'>
                 Join thousands of people already making meaningful connections on Frinder.
               </p>
@@ -482,9 +450,15 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </div>
             <p className='text-gray-500 text-sm'>© 2026 Frinder. All rights reserved.</p>
             <div className='flex gap-6'>
-              <a href='#' className='text-gray-500 hover:text-[#ed8c00] text-sm transition-colors'>Privacy</a>
-              <a href='#' className='text-gray-500 hover:text-[#ed8c00] text-sm transition-colors'>Terms</a>
-              <a href='#' className='text-gray-500 hover:text-[#ed8c00] text-sm transition-colors'>Contact</a>
+              <a href='#' className='text-gray-500 hover:text-[#ed8c00] text-sm transition-colors'>
+                Privacy
+              </a>
+              <a href='#' className='text-gray-500 hover:text-[#ed8c00] text-sm transition-colors'>
+                Terms
+              </a>
+              <a href='#' className='text-gray-500 hover:text-[#ed8c00] text-sm transition-colors'>
+                Contact
+              </a>
             </div>
           </div>
         </div>

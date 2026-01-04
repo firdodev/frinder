@@ -12,15 +12,22 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription
+} from '@/components/ui/dialog';
 import { SettingsSheet } from './SettingsSheet';
 import { PrivacySheet } from './PrivacySheet';
 import { NotificationsSheet } from './NotificationsSheet';
 import { HelpSheet } from './HelpSheet';
 import { uploadProfilePhoto, deleteProfilePhoto, compressImage } from '@/lib/storageService';
-import { 
-  getUserProfileStats, 
-  subscribeToUserCredits, 
+import {
+  getUserProfileStats,
+  subscribeToUserCredits,
   subscribeToUserSubscription,
   type UserCredits,
   type UserSubscription
@@ -52,13 +59,7 @@ import {
   Gift,
   Users
 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function Profile() {
   const router = useRouter();
@@ -73,11 +74,11 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Stats state
   const [profileStats, setProfileStats] = useState({ matches: 0, likesReceived: 0, superLikesReceived: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
-  
+
   // Credits and subscription state
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
@@ -86,10 +87,10 @@ export default function Profile() {
     displayName: userProfile?.displayName || 'John Doe',
     bio: userProfile?.bio || 'Coffee lover | Adventure seeker | Looking for meaningful connections',
     age: userProfile?.age || 22,
-    gender: userProfile?.gender || 'other' as 'male' | 'female' | 'other',
+    gender: userProfile?.gender || ('other' as 'male' | 'female' | 'other'),
     city: userProfile?.city || '',
     country: userProfile?.country || '',
-    relationshipGoal: userProfile?.relationshipGoal || 'relationship' as 'relationship' | 'casual' | 'friends'
+    relationshipGoal: userProfile?.relationshipGoal || ('relationship' as 'relationship' | 'casual' | 'friends')
   });
 
   // Fetch profile stats from Firebase
@@ -155,7 +156,7 @@ export default function Profile() {
     if (!files || files.length === 0 || !user) return;
 
     const file = files[0];
-    
+
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
@@ -221,14 +222,8 @@ export default function Profile() {
 
   return (
     <div className='h-full overflow-y-auto bg-[#fff7ed] dark:bg-black'>
-      <input
-        ref={fileInputRef}
-        type='file'
-        accept='image/*'
-        onChange={handlePhotoUpload}
-        className='hidden'
-      />
-      
+      <input ref={fileInputRef} type='file' accept='image/*' onChange={handlePhotoUpload} className='hidden' />
+
       <div className='relative h-56 sm:h-64'>
         <div className='absolute inset-0 bg-frinder-orange' />
         <div className='absolute inset-0 flex flex-col items-center justify-center text-white'>
@@ -246,18 +241,20 @@ export default function Profile() {
               <Settings className='w-5 h-5 text-white' />
             </button>
           </div>
-          
+
           <div className='relative'>
             <Avatar className='w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-xl'>
               <AvatarImage src={profile.photos[0]} alt={profile.displayName} />
-              <AvatarFallback className='text-2xl sm:text-3xl bg-frinder-burnt text-white'>{profile.displayName[0]}</AvatarFallback>
+              <AvatarFallback className='text-2xl sm:text-3xl bg-frinder-burnt text-white'>
+                {profile.displayName[0]}
+              </AvatarFallback>
             </Avatar>
             {profile.verified && (
               <div className='absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500 flex items-center justify-center border-2 border-white'>
                 <Verified className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
               </div>
             )}
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className='absolute bottom-0 left-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform'
             >
@@ -327,13 +324,11 @@ export default function Profile() {
                     {userSubscription?.isPremium ? 'Frinder Pro' : 'Upgrade Your Experience'}
                   </h2>
                   <p className='text-white/80 text-xs'>
-                    {userSubscription?.isPremium 
-                      ? 'Enjoying Pro features!' 
-                      : 'Get more matches with Pro'}
+                    {userSubscription?.isPremium ? 'Enjoying Pro features!' : 'Get more matches with Pro'}
                   </p>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={() => router.push('/shop')}
                 variant='secondary'
                 size='sm'
@@ -356,15 +351,11 @@ export default function Profile() {
                 </div>
               </div>
               <div className='text-right'>
-                <div className='text-xl font-bold text-blue-500'>
-                  {userCredits?.superLikes ?? 0}
-                </div>
-                {userSubscription?.isPremium && (
-                  <Badge className='bg-frinder-orange text-white text-[10px]'>Pro</Badge>
-                )}
+                <div className='text-xl font-bold text-blue-500'>{userCredits?.superLikes ?? 0}</div>
+                {userSubscription?.isPremium && <Badge className='bg-frinder-orange text-white text-[10px]'>Pro</Badge>}
               </div>
             </div>
-            
+
             {/* Quick benefits preview */}
             {!userSubscription?.isPremium && (
               <div className='mt-3 pt-3 border-t dark:border-gray-800'>
@@ -417,7 +408,7 @@ export default function Profile() {
                       <Label className='dark:text-white'>What are you looking for?</Label>
                       <Select
                         value={editData.relationshipGoal}
-                        onValueChange={(value: 'relationship' | 'casual' | 'friends') => 
+                        onValueChange={(value: 'relationship' | 'casual' | 'friends') =>
                           setEditData(prev => ({ ...prev, relationshipGoal: value }))
                         }
                       >
@@ -433,7 +424,9 @@ export default function Profile() {
                     </div>
 
                     <div className='space-y-1.5 sm:space-y-2'>
-                      <Label htmlFor='name' className='dark:text-white'>Display Name</Label>
+                      <Label htmlFor='name' className='dark:text-white'>
+                        Display Name
+                      </Label>
                       <Input
                         id='name'
                         value={editData.displayName}
@@ -444,7 +437,9 @@ export default function Profile() {
 
                     <div className='grid grid-cols-2 gap-3'>
                       <div className='space-y-1.5 sm:space-y-2'>
-                        <Label htmlFor='age' className='dark:text-white'>Age</Label>
+                        <Label htmlFor='age' className='dark:text-white'>
+                          Age
+                        </Label>
                         <Input
                           id='age'
                           type='number'
@@ -457,7 +452,7 @@ export default function Profile() {
                         <Label className='dark:text-white'>Gender</Label>
                         <Select
                           value={editData.gender}
-                          onValueChange={(value: 'male' | 'female' | 'other') => 
+                          onValueChange={(value: 'male' | 'female' | 'other') =>
                             setEditData(prev => ({ ...prev, gender: value }))
                           }
                         >
@@ -475,7 +470,9 @@ export default function Profile() {
 
                     <div className='grid grid-cols-2 gap-3'>
                       <div className='space-y-1.5 sm:space-y-2'>
-                        <Label htmlFor='city' className='dark:text-white'>City</Label>
+                        <Label htmlFor='city' className='dark:text-white'>
+                          City
+                        </Label>
                         <Input
                           id='city'
                           value={editData.city}
@@ -485,7 +482,9 @@ export default function Profile() {
                         />
                       </div>
                       <div className='space-y-1.5 sm:space-y-2'>
-                        <Label htmlFor='country' className='dark:text-white'>Country</Label>
+                        <Label htmlFor='country' className='dark:text-white'>
+                          Country
+                        </Label>
                         <Input
                           id='country'
                           value={editData.country}
@@ -497,7 +496,9 @@ export default function Profile() {
                     </div>
 
                     <div className='space-y-1.5 sm:space-y-2'>
-                      <Label htmlFor='bio' className='dark:text-white'>Bio</Label>
+                      <Label htmlFor='bio' className='dark:text-white'>
+                        Bio
+                      </Label>
                       <Textarea
                         id='bio'
                         value={editData.bio}
@@ -518,10 +519,7 @@ export default function Profile() {
             {/* Relationship Goal Badge */}
             {profile.relationshipGoal && (
               <div className='mb-3'>
-                <Badge 
-                  variant='outline' 
-                  className='text-xs sm:text-sm border-frinder-orange/30 text-frinder-orange'
-                >
+                <Badge variant='outline' className='text-xs sm:text-sm border-frinder-orange/30 text-frinder-orange'>
                   {profile.relationshipGoal === 'relationship' && '💕 Looking for a relationship'}
                   {profile.relationshipGoal === 'casual' && '😎 Something casual'}
                   {profile.relationshipGoal === 'friends' && '🤝 Just making friends'}
@@ -533,15 +531,17 @@ export default function Profile() {
 
             <h3 className='font-semibold mb-1.5 sm:mb-2 text-sm sm:text-base dark:text-white'>Interests</h3>
             <div className='flex flex-wrap gap-1.5 sm:gap-2'>
-              {profile.interests.filter(interest => interest).map((interest, index) => (
-                <Badge
-                  key={`${interest}-${index}`}
-                  variant='secondary'
-                  className='bg-frinder-orange/10 text-frinder-orange hover:bg-frinder-orange/20 text-xs sm:text-sm'
-                >
-                  {interest}
-                </Badge>
-              ))}
+              {profile.interests
+                .filter(interest => interest)
+                .map((interest, index) => (
+                  <Badge
+                    key={`${interest}-${index}`}
+                    variant='secondary'
+                    className='bg-frinder-orange/10 text-frinder-orange hover:bg-frinder-orange/20 text-xs sm:text-sm'
+                  >
+                    {interest}
+                  </Badge>
+                ))}
             </div>
           </CardContent>
         </Card>
@@ -552,7 +552,7 @@ export default function Profile() {
           <CardContent className='p-3 sm:p-4'>
             <div className='flex items-center justify-between mb-2 sm:mb-3'>
               <h2 className='font-semibold text-sm sm:text-base dark:text-white'>My Photos</h2>
-              <button 
+              <button
                 onClick={() => setIsEditingPhotos(!isEditingPhotos)}
                 className='text-xs sm:text-sm text-frinder-orange font-medium'
               >
@@ -598,7 +598,7 @@ export default function Profile() {
                   )}
                 </motion.div>
               ))}
-              
+
               {profile.photos.length < 6 && (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -621,7 +621,7 @@ export default function Profile() {
       <div className='px-3 sm:px-4 mt-3 sm:mt-4 pb-6'>
         <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
           <CardContent className='p-0 divide-y dark:divide-gray-800'>
-            <button 
+            <button
               onClick={() => setSettingsOpen(true)}
               className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
@@ -633,8 +633,8 @@ export default function Profile() {
               </div>
               <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setPrivacyOpen(true)}
               className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
@@ -646,8 +646,8 @@ export default function Profile() {
               </div>
               <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setNotificationsOpen(true)}
               className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
@@ -659,8 +659,8 @@ export default function Profile() {
               </div>
               <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setHelpOpen(true)}
               className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 dark:hover:bg-gray-800/50 transition-colors'
             >
@@ -672,8 +672,8 @@ export default function Profile() {
               </div>
               <ChevronRight className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
             </button>
-            
-            <button 
+
+            <button
               onClick={signOut}
               className='w-full flex items-center justify-between p-3 sm:p-4 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors'
             >

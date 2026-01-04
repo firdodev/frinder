@@ -148,11 +148,13 @@ function SwipeGroupCard({ group, onSwipe, isTop }: SwipeGroupCardProps) {
             {/* Interests */}
             {group.interests.length > 0 && (
               <div className='flex flex-wrap gap-2'>
-                {group.interests.filter(i => i).map((interest, index) => (
-                  <Badge key={`${interest}-${index}`} variant='secondary' className='bg-white/20 text-white border-0'>
-                    {interest}
-                  </Badge>
-                ))}
+                {group.interests
+                  .filter(i => i)
+                  .map((interest, index) => (
+                    <Badge key={`${interest}-${index}`} variant='secondary' className='bg-white/20 text-white border-0'>
+                      {interest}
+                    </Badge>
+                  ))}
               </div>
             )}
           </div>
@@ -180,11 +182,40 @@ export default function SwipeGroups() {
 
   // Predefined interest tags for better algorithm matching
   const availableTags = [
-    'Sports', 'Fitness', 'Music', 'Art', 'Photography', 'Gaming', 'Travel',
-    'Food', 'Cooking', 'Reading', 'Movies', 'Tech', 'Coding', 'Fashion',
-    'Dance', 'Yoga', 'Hiking', 'Camping', 'Beach', 'Nature', 'Nightlife',
-    'Coffee', 'Wine', 'Pets', 'Dogs', 'Cats', 'Volunteering', 'Languages',
-    'Business', 'Startups', 'Networking', 'Study', 'Research', 'Writing'
+    'Sports',
+    'Fitness',
+    'Music',
+    'Art',
+    'Photography',
+    'Gaming',
+    'Travel',
+    'Food',
+    'Cooking',
+    'Reading',
+    'Movies',
+    'Tech',
+    'Coding',
+    'Fashion',
+    'Dance',
+    'Yoga',
+    'Hiking',
+    'Camping',
+    'Beach',
+    'Nature',
+    'Nightlife',
+    'Coffee',
+    'Wine',
+    'Pets',
+    'Dogs',
+    'Cats',
+    'Volunteering',
+    'Languages',
+    'Business',
+    'Startups',
+    'Networking',
+    'Study',
+    'Research',
+    'Writing'
   ];
 
   const toggleInterest = (interest: string) => {
@@ -326,7 +357,9 @@ export default function SwipeGroups() {
           </DialogHeader>
           <div className='space-y-4'>
             <div>
-              <Label htmlFor='name' className='dark:text-white'>Group Name</Label>
+              <Label htmlFor='name' className='dark:text-white'>
+                Group Name
+              </Label>
               <Input
                 id='name'
                 value={newGroup.name}
@@ -336,7 +369,9 @@ export default function SwipeGroups() {
               />
             </div>
             <div>
-              <Label htmlFor='description' className='dark:text-white'>Description</Label>
+              <Label htmlFor='description' className='dark:text-white'>
+                Description
+              </Label>
               <Textarea
                 id='description'
                 value={newGroup.description}
@@ -345,12 +380,14 @@ export default function SwipeGroups() {
                 className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
               />
             </div>
-            
+
             {/* Interest Tags Section */}
             <div>
               <Label className='dark:text-white'>Interests</Label>
-              <p className='text-xs text-muted-foreground mb-3'>Select tags that describe your group for better matching</p>
-              
+              <p className='text-xs text-muted-foreground mb-3'>
+                Select tags that describe your group for better matching
+              </p>
+
               {/* Selected Tags */}
               {newGroup.interests.length > 0 && (
                 <div className='flex flex-wrap gap-2 mb-3 p-3 rounded-lg bg-frinder-orange/5 dark:bg-gray-900 border border-frinder-orange/20 dark:border-gray-800'>
@@ -366,7 +403,7 @@ export default function SwipeGroups() {
                   ))}
                 </div>
               )}
-              
+
               {/* Available Tags Grid */}
               <div className='max-h-32 overflow-y-auto border rounded-lg p-3 dark:border-gray-800'>
                 <div className='flex flex-wrap gap-2'>
@@ -384,7 +421,7 @@ export default function SwipeGroups() {
                     ))}
                 </div>
               </div>
-              
+
               {/* Custom Interest Input */}
               <div className='flex gap-2 mt-3'>
                 <Input
@@ -408,7 +445,9 @@ export default function SwipeGroups() {
             </div>
 
             <div>
-              <Label htmlFor='activity' className='dark:text-white'>Activity Schedule</Label>
+              <Label htmlFor='activity' className='dark:text-white'>
+                Activity Schedule
+              </Label>
               <Input
                 id='activity'
                 value={newGroup.activity}
@@ -418,7 +457,9 @@ export default function SwipeGroups() {
               />
             </div>
             <div>
-              <Label htmlFor='location' className='dark:text-white'>Location</Label>
+              <Label htmlFor='location' className='dark:text-white'>
+                Location
+              </Label>
               <Input
                 id='location'
                 value={newGroup.location}

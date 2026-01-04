@@ -3,7 +3,19 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { Heart, Users, MessageCircle, User, Flame, Settings, LogOut, Sparkles, Search, Star, Crown } from 'lucide-react';
+import {
+  Heart,
+  Users,
+  MessageCircle,
+  User,
+  Flame,
+  Settings,
+  LogOut,
+  Sparkles,
+  Search,
+  Star,
+  Crown
+} from 'lucide-react';
 import SwipePeople from '@/components/swipe/SwipePeople';
 import SwipeGroups from '@/components/swipe/SwipeGroups';
 import Messages from '@/components/messages/Messages';
@@ -12,7 +24,13 @@ import Matches from '@/components/matches/Matches';
 import SearchComponent from '@/components/search/Search';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { subscribeToUnreadCount, subscribeToUserCredits, subscribeToUserSubscription, type UserCredits, type UserSubscription } from '@/lib/firebaseServices';
+import {
+  subscribeToUnreadCount,
+  subscribeToUserCredits,
+  subscribeToUserSubscription,
+  type UserCredits,
+  type UserSubscription
+} from '@/lib/firebaseServices';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SettingsSheet } from '@/components/profile/SettingsSheet';
 
@@ -37,7 +55,7 @@ export default function MainApp() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const unsubscribe = subscribeToUnreadCount(user.uid, (count) => {
+    const unsubscribe = subscribeToUnreadCount(user.uid, count => {
       setUnreadCount(count);
     });
 
@@ -96,20 +114,13 @@ export default function MainApp() {
       <aside className='hidden lg:flex flex-col w-72 border-r bg-white dark:bg-black dark:border-gray-800'>
         {/* Logo */}
         <div className='p-6 border-b dark:border-gray-800'>
-          <motion.button 
-            initial={{ opacity: 0, x: -20 }} 
-            animate={{ opacity: 1, x: 0 }} 
+          <motion.button
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             onClick={() => setActiveTab('swipe')}
             className='flex items-center gap-3 hover:opacity-80 transition-opacity'
           >
-            <Image 
-              src='/frinder-logo.png' 
-              alt='Frinder' 
-              width={36} 
-              height={36} 
-              className='rounded-lg'
-              priority
-            />
+            <Image src='/frinder-logo.png' alt='Frinder' width={36} height={36} className='rounded-lg' priority />
             <div className='text-left'>
               <span className='text-2xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
                 Frinder
@@ -132,9 +143,7 @@ export default function MainApp() {
                 </Avatar>
               </button>
               <div className='flex-1 min-w-0'>
-                <h3 className='font-semibold text-sm truncate dark:text-white'>
-                  {userProfile?.displayName || 'User'}
-                </h3>
+                <h3 className='font-semibold text-sm truncate dark:text-white'>{userProfile?.displayName || 'User'}</h3>
                 <p className='text-xs text-muted-foreground truncate'>
                   {userProfile?.city}, {userProfile?.country}
                 </p>
@@ -178,14 +187,14 @@ export default function MainApp() {
 
         {/* Bottom Actions */}
         <div className='p-4 border-t dark:border-gray-800 space-y-2'>
-          <button 
+          <button
             onClick={() => setSettingsOpen(true)}
             className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted dark:hover:bg-gray-900 text-muted-foreground hover:text-foreground dark:hover:text-white transition-all'
           >
             <Settings className='w-5 h-5' />
             <span className='font-medium'>Settings</span>
           </button>
-          <button 
+          <button
             onClick={() => signOut()}
             className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-all'
           >
@@ -199,28 +208,24 @@ export default function MainApp() {
       <div className='flex-1 flex flex-col min-w-0'>
         {/* Mobile Header - hidden on desktop */}
         <div className='lg:hidden px-4 py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
-          <motion.button 
-            initial={{ opacity: 0, x: -20 }} 
-            animate={{ opacity: 1, x: 0 }} 
+          <motion.button
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             onClick={() => setActiveTab('swipe')}
             className='flex items-center gap-2 hover:opacity-80 transition-opacity'
           >
-            <img 
-              src='/frinder-logo.png' 
-              alt='Frinder' 
-              className='w-8 h-8 rounded-lg'
-            />
+            <img src='/frinder-logo.png' alt='Frinder' className='w-8 h-8 rounded-lg' />
             <span className='text-xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
               Frinder
             </span>
           </motion.button>
-          
+
           {/* Credits Display - Mobile */}
           <div className='flex items-center gap-2'>
             <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 dark:bg-blue-500/20'>
               <Star className='w-3.5 h-3.5 text-blue-500' fill='currentColor' />
               <span className='text-xs font-semibold text-blue-600 dark:text-blue-400'>
-                {userSubscription?.unlimitedSuperLikes ? '∞' : (userCredits?.superLikes ?? 0)}
+                {userSubscription?.unlimitedSuperLikes ? '∞' : userCredits?.superLikes ?? 0}
               </span>
             </div>
             {userSubscription?.isPremium && (
@@ -234,9 +239,7 @@ export default function MainApp() {
         {/* Desktop Header */}
         <div className='hidden lg:flex px-6 py-4 items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
           <div>
-            <h1 className='text-2xl font-bold dark:text-white'>
-              {tabs.find(t => t.id === activeTab)?.label}
-            </h1>
+            <h1 className='text-2xl font-bold dark:text-white'>{tabs.find(t => t.id === activeTab)?.label}</h1>
             <p className='text-sm text-muted-foreground'>
               {activeTab === 'swipe' && 'Find your perfect match'}
               {activeTab === 'groups' && 'Join groups with similar interests'}
@@ -303,7 +306,10 @@ export default function MainApp() {
                   {tab.label}
                 </span>
                 {activeTab === tab.id && (
-                  <motion.div layoutId='activeTab' className='absolute -bottom-2 w-1 h-1 rounded-full bg-frinder-orange' />
+                  <motion.div
+                    layoutId='activeTab'
+                    className='absolute -bottom-2 w-1 h-1 rounded-full bg-frinder-orange'
+                  />
                 )}
               </motion.button>
             ))}

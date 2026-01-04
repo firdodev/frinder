@@ -26,10 +26,10 @@ const acidGrotesk = localFont({
     { path: '../../public/fonts/FFF-AcidGrotesk-ExtraBold.otf', weight: '800', style: 'normal' },
     { path: '../../public/fonts/FFF-AcidGrotesk-ExtraBoldItalic.otf', weight: '800', style: 'italic' },
     { path: '../../public/fonts/FFF-AcidGrotesk-Black.otf', weight: '900', style: 'normal' },
-    { path: '../../public/fonts/FFF-AcidGrotesk-BlackItalic.otf', weight: '900', style: 'italic' },
+    { path: '../../public/fonts/FFF-AcidGrotesk-BlackItalic.otf', weight: '900', style: 'italic' }
   ],
   variable: '--font-acid-grotesk',
-  display: 'swap',
+  display: 'swap'
 });
 
 const geistMono = Geist_Mono({
@@ -44,7 +44,8 @@ export const metadata: Metadata = {
     default: 'Frinder - Find Friends & Meaningful Connections',
     template: '%s | Frinder'
   },
-  description: 'Frinder is the #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests. Join millions discovering friendships today!',
+  description:
+    'Frinder is the #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests. Join millions discovering friendships today!',
   keywords: [
     'dating app',
     'find friends',
@@ -68,16 +69,16 @@ export const metadata: Metadata = {
   authors: [{ name: 'Frinder', url: 'https://frinder.co' }],
   creator: 'Frinder',
   publisher: 'Frinder',
-  
+
   // Canonical URL
   metadataBase: new URL('https://frinder.co'),
   alternates: {
     canonical: '/',
     languages: {
-      'en-US': '/en-US',
-    },
+      'en-US': '/en-US'
+    }
   },
-  
+
   // Open Graph (Facebook, LinkedIn, etc.)
   openGraph: {
     type: 'website',
@@ -85,52 +86,54 @@ export const metadata: Metadata = {
     url: 'https://frinder.co',
     siteName: 'Frinder',
     title: 'Frinder - Find Friends & Meaningful Connections',
-    description: 'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
+    description:
+      'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
     images: [
       {
         url: '/frinder-logo.png',
         width: 1200,
         height: 630,
         alt: 'Frinder - Find Friends & Meaningful Connections',
-        type: 'image/png',
+        type: 'image/png'
       },
       {
         url: '/frinder-logo.png',
         width: 600,
         height: 600,
         alt: 'Frinder Logo',
-        type: 'image/png',
+        type: 'image/png'
       }
-    ],
+    ]
   },
-  
+
   // Twitter Card
   twitter: {
     card: 'summary_large_image',
     site: '@frinder',
     creator: '@frinder',
     title: 'Frinder - Find Friends & Meaningful Connections',
-    description: 'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
-    images: ['/frinder-logo.png'],
+    description:
+      'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
+    images: ['/frinder-logo.png']
   },
-  
+
   // App Links
   appLinks: {
     ios: {
       url: 'https://frinder.co',
       app_store_id: 'frinder-app',
-      app_name: 'Frinder',
+      app_name: 'Frinder'
     },
     android: {
       package: 'co.frinder.app',
-      app_name: 'Frinder',
+      app_name: 'Frinder'
     },
     web: {
       url: 'https://frinder.co',
-      should_fallback: true,
-    },
+      should_fallback: true
+    }
   },
-  
+
   // Robots
   robots: {
     index: true,
@@ -142,45 +145,41 @@ export const metadata: Metadata = {
       noimageindex: false,
       'max-video-preview': -1,
       'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
+      'max-snippet': -1
+    }
   },
-  
+
   // Icons
   icons: {
     icon: [
       { url: '/frinder-logo.png', sizes: '32x32', type: 'image/png' },
-      { url: '/frinder-logo.png', sizes: '16x16', type: 'image/png' },
+      { url: '/frinder-logo.png', sizes: '16x16', type: 'image/png' }
     ],
-    apple: [
-      { url: '/frinder-logo.png', sizes: '180x180', type: 'image/png' },
-    ],
-    shortcut: '/frinder-logo.png',
+    apple: [{ url: '/frinder-logo.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: '/frinder-logo.png'
   },
-  
+
   // Manifest
   manifest: '/manifest.json',
-  
+
   // Apple Web App
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'Frinder',
-    startupImage: [
-      '/frinder-logo.png',
-    ],
+    startupImage: ['/frinder-logo.png']
   },
-  
+
   // Verification (add your actual verification codes)
   verification: {
     google: 'your-google-verification-code',
-    yandex: 'your-yandex-verification-code',
+    yandex: 'your-yandex-verification-code'
     // yahoo: 'your-yahoo-verification-code',
   },
-  
+
   // Category
   category: 'social networking',
-  
+
   // Other
   other: {
     'mobile-web-app-capable': 'yes',
@@ -189,8 +188,8 @@ export const metadata: Metadata = {
     'msapplication-TileColor': '#ed8c00',
     'msapplication-TileImage': '/frinder-logo.png',
     'msapplication-config': '/browserconfig.xml',
-    'format-detection': 'telephone=no',
-  },
+    'format-detection': 'telephone=no'
+  }
 };
 
 export const viewport: Viewport = {
@@ -200,9 +199,9 @@ export const viewport: Viewport = {
   userScalable: false,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ed8c00' },
-    { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' },
+    { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' }
   ],
-  colorScheme: 'light dark',
+  colorScheme: 'light dark'
 };
 
 // JSON-LD Structured Data for rich snippets
@@ -214,25 +213,26 @@ const jsonLd = {
       '@id': 'https://frinder.co/#app',
       name: 'Frinder',
       url: 'https://frinder.co',
-      description: 'Frinder is the #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests.',
+      description:
+        'Frinder is the #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests.',
       applicationCategory: 'SocialNetworkingApplication',
       operatingSystem: 'Any',
       offers: {
         '@type': 'Offer',
         price: '0',
-        priceCurrency: 'USD',
+        priceCurrency: 'USD'
       },
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: '4.8',
         ratingCount: '125000',
         bestRating: '5',
-        worstRating: '1',
+        worstRating: '1'
       },
       author: {
         '@type': 'Organization',
-        name: 'Frinder',
-      },
+        name: 'Frinder'
+      }
     },
     {
       '@type': 'Organization',
@@ -243,21 +243,21 @@ const jsonLd = {
         '@type': 'ImageObject',
         url: 'https://frinder.co/frinder-logo.png',
         width: 512,
-        height: 512,
+        height: 512
       },
       sameAs: [
         'https://twitter.com/frinder',
         'https://facebook.com/frinder',
         'https://instagram.com/frinder',
         'https://linkedin.com/company/frinder',
-        'https://tiktok.com/@frinder',
+        'https://tiktok.com/@frinder'
       ],
       contactPoint: {
         '@type': 'ContactPoint',
         contactType: 'customer support',
         email: 'support@frinder.co',
-        availableLanguage: ['English'],
-      },
+        availableLanguage: ['English']
+      }
     },
     {
       '@type': 'WebSite',
@@ -266,16 +266,16 @@ const jsonLd = {
       name: 'Frinder',
       description: 'Find Friends & Meaningful Connections',
       publisher: {
-        '@id': 'https://frinder.co/#organization',
+        '@id': 'https://frinder.co/#organization'
       },
       potentialAction: {
         '@type': 'SearchAction',
         target: {
           '@type': 'EntryPoint',
-          urlTemplate: 'https://frinder.co/search?q={search_term_string}',
+          urlTemplate: 'https://frinder.co/search?q={search_term_string}'
         },
-        'query-input': 'required name=search_term_string',
-      },
+        'query-input': 'required name=search_term_string'
+      }
     },
     {
       '@type': 'MobileApplication',
@@ -286,13 +286,13 @@ const jsonLd = {
       offers: {
         '@type': 'Offer',
         price: '0',
-        priceCurrency: 'USD',
+        priceCurrency: 'USD'
       },
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: '4.8',
-        ratingCount: '125000',
-      },
+        ratingCount: '125000'
+      }
     },
     {
       '@type': 'FAQPage',
@@ -303,28 +303,28 @@ const jsonLd = {
           name: 'What is Frinder?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Frinder is a social networking app that helps you find friends and meaningful connections. Swipe through profiles, match with people who share your interests, and start conversations.',
-          },
+            text: 'Frinder is a social networking app that helps you find friends and meaningful connections. Swipe through profiles, match with people who share your interests, and start conversations.'
+          }
         },
         {
           '@type': 'Question',
           name: 'Is Frinder free to use?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Yes! Frinder is free to download and use. We also offer optional premium features like Frinder Pro for enhanced experiences.',
-          },
+            text: 'Yes! Frinder is free to download and use. We also offer optional premium features like Frinder Pro for enhanced experiences.'
+          }
         },
         {
           '@type': 'Question',
           name: 'How does Frinder work?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Create your profile, set your preferences, and start swiping! When you and another person both like each other, it\'s a match. Then you can chat and plan to meet up.',
-          },
-        },
-      ],
-    },
-  ],
+            text: "Create your profile, set your preferences, and start swiping! When you and another person both like each other, it's a match. Then you can chat and plan to meet up."
+          }
+        }
+      ]
+    }
+  ]
 };
 
 export default function RootLayout({
@@ -339,16 +339,13 @@ export default function RootLayout({
         <link rel='preconnect' href='https://fonts.googleapis.com' />
         <link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />
         <link rel='preconnect' href='https://firebasestorage.googleapis.com' />
-        
+
         {/* DNS Prefetch */}
         <link rel='dns-prefetch' href='https://www.google-analytics.com' />
         <link rel='dns-prefetch' href='https://www.googletagmanager.com' />
-        
+
         {/* JSON-LD Structured Data */}
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body className={`${acidGrotesk.variable} ${geistMono.variable} font-sans antialiased`}>
         <AuthProvider>

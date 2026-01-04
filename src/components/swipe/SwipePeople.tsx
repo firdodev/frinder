@@ -2,16 +2,30 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo, useAnimation } from 'framer-motion';
-import { Heart, X, Star, RotateCcw, Info, MapPin, Briefcase, Loader2, Sparkles, MessageCircle, Crown, Zap, ShieldCheck } from 'lucide-react';
+import {
+  Heart,
+  X,
+  Star,
+  RotateCcw,
+  Info,
+  MapPin,
+  Briefcase,
+  Loader2,
+  Sparkles,
+  MessageCircle,
+  Crown,
+  Zap,
+  ShieldCheck
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { 
-  getUsersToSwipe, 
-  recordSwipe, 
+import {
+  getUsersToSwipe,
+  recordSwipe,
   canUseSuperLike,
   incrementSwipeCount,
   addSuperLikes,
@@ -41,7 +55,7 @@ interface Profile {
 function Firework({ delay, x, color }: { delay: number; x: number; color: string }) {
   const particles = Array.from({ length: 12 }, (_, i) => ({
     id: i,
-    angle: (i * 30) * (Math.PI / 180),
+    angle: i * 30 * (Math.PI / 180)
   }));
 
   return (
@@ -61,7 +75,7 @@ function Firework({ delay, x, color }: { delay: number; x: number; color: string
         transition={{ delay, duration: 0.4 }}
       />
       {/* Explosion particles */}
-      {particles.map((particle) => (
+      {particles.map(particle => (
         <motion.div
           key={particle.id}
           className='absolute w-3 h-3 rounded-full'
@@ -71,7 +85,7 @@ function Firework({ delay, x, color }: { delay: number; x: number; color: string
             x: Math.cos(particle.angle) * 100,
             y: Math.sin(particle.angle) * 100,
             opacity: [0, 1, 1, 0],
-            scale: [0, 1.5, 1, 0],
+            scale: [0, 1.5, 1, 0]
           }}
           transition={{ delay: delay + 0.4, duration: 1, ease: 'easeOut' }}
         />
@@ -87,21 +101,31 @@ function FireworksDisplay() {
     id: i,
     x: 10 + Math.random() * 80,
     delay: Math.random() * 2,
-    color: colors[Math.floor(Math.random() * colors.length)],
+    color: colors[Math.floor(Math.random() * colors.length)]
   }));
 
   return (
     <div className='absolute inset-0 pointer-events-none overflow-hidden'>
-      {fireworks.map((fw) => (
+      {fireworks.map(fw => (
         <Firework key={fw.id} delay={fw.delay} x={fw.x} color={fw.color} />
       ))}
       {/* Second wave of fireworks */}
-      {fireworks.map((fw) => (
-        <Firework key={`wave2-${fw.id}`} delay={fw.delay + 2.5} x={(fw.x + 40) % 100} color={colors[(fw.id + 2) % colors.length]} />
+      {fireworks.map(fw => (
+        <Firework
+          key={`wave2-${fw.id}`}
+          delay={fw.delay + 2.5}
+          x={(fw.x + 40) % 100}
+          color={colors[(fw.id + 2) % colors.length]}
+        />
       ))}
       {/* Third wave */}
-      {fireworks.map((fw) => (
-        <Firework key={`wave3-${fw.id}`} delay={fw.delay + 5} x={(fw.x + 20) % 100} color={colors[(fw.id + 4) % colors.length]} />
+      {fireworks.map(fw => (
+        <Firework
+          key={`wave3-${fw.id}`}
+          delay={fw.delay + 5}
+          x={(fw.x + 20) % 100}
+          color={colors[(fw.id + 4) % colors.length]}
+        />
       ))}
     </div>
   );
@@ -114,28 +138,28 @@ function FloatingHearts() {
     x: Math.random() * 100,
     delay: Math.random() * 2,
     duration: 2 + Math.random() * 2,
-    size: 16 + Math.random() * 24,
+    size: 16 + Math.random() * 24
   }));
 
   return (
     <div className='absolute inset-0 pointer-events-none overflow-hidden'>
-      {hearts.map((heart) => (
+      {hearts.map(heart => (
         <motion.div
           key={heart.id}
           className='absolute text-pink-500'
-          initial={{ 
-            x: `${heart.x}vw`, 
+          initial={{
+            x: `${heart.x}vw`,
             y: '100vh',
             opacity: 0,
-            scale: 0 
+            scale: 0
           }}
-          animate={{ 
+          animate={{
             y: '-20vh',
             opacity: [0, 1, 1, 0],
             scale: [0, 1, 1, 0.5],
             rotate: [0, 10, -10, 0]
           }}
-          transition={{ 
+          transition={{
             duration: heart.duration,
             delay: heart.delay,
             repeat: Infinity,
@@ -232,7 +256,7 @@ function MatchCelebration({
               className='absolute'
               animate={{
                 scale: [1, 1.2, 1],
-                rotate: [0, 180, 360],
+                rotate: [0, 180, 360]
               }}
               transition={{ duration: 3, repeat: Infinity }}
             >
@@ -246,9 +270,7 @@ function MatchCelebration({
               transition={{ type: 'spring', duration: 0.8, bounce: 0.5 }}
               className='mb-8'
             >
-              <h1 className='text-5xl sm:text-7xl font-black text-white text-center drop-shadow-2xl'>
-                IT'S A
-              </h1>
+              <h1 className='text-5xl sm:text-7xl font-black text-white text-center drop-shadow-2xl'>IT'S A</h1>
               <motion.h1
                 className='text-6xl sm:text-8xl font-black text-white text-center drop-shadow-2xl'
                 animate={{ scale: [1, 1.05, 1] }}
@@ -265,10 +287,7 @@ function MatchCelebration({
               animate={{ scale: 1 }}
               transition={{ delay: 0.3, type: 'spring', bounce: 0.6 }}
             >
-              <motion.div
-                animate={{ x: [0, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
+              <motion.div animate={{ x: [0, -10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
                 <Avatar className='w-28 h-28 sm:w-36 sm:h-36 border-4 border-white shadow-2xl'>
                   <AvatarImage src={userPhoto} />
                   <AvatarFallback className='text-3xl bg-white text-frinder-orange font-bold'>
@@ -277,17 +296,11 @@ function MatchCelebration({
                 </Avatar>
               </motion.div>
 
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 1, repeat: Infinity }}
-              >
+              <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
                 <Heart className='w-12 h-12 sm:w-16 sm:h-16 text-white drop-shadow-xl' fill='currentColor' />
               </motion.div>
 
-              <motion.div
-                animate={{ x: [0, 10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
+              <motion.div animate={{ x: [0, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
                 <Avatar className='w-28 h-28 sm:w-36 sm:h-36 border-4 border-white shadow-2xl'>
                   <AvatarImage src={matchPhoto} />
                   <AvatarFallback className='text-3xl bg-white text-frinder-orange font-bold'>
@@ -354,21 +367,17 @@ function SwipeCard({
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  
+
   // More dramatic rotation
   const rotate = useTransform(x, [-300, 0, 300], [-30, 0, 30]);
-  
+
   // Full card overlay opacities with earlier trigger
   const likeOpacity = useTransform(x, [0, 50, 150], [0, 0.3, 1]);
   const nopeOpacity = useTransform(x, [-150, -50, 0], [1, 0.3, 0]);
   const superLikeOpacity = useTransform(y, [-150, -50, 0], [1, 0.3, 0]);
-  
+
   // Card scale during drag
-  const scale = useTransform(
-    x,
-    [-200, 0, 200],
-    [0.95, 1, 0.95]
-  );
+  const scale = useTransform(x, [-200, 0, 200], [0.95, 1, 0.95]);
 
   const handleDragEnd = useCallback(
     (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -377,28 +386,34 @@ function SwipeCard({
 
       if (info.offset.x > threshold || info.velocity.x > velocityThreshold) {
         setExitDirection('right');
-        controls.start({
-          x: 500,
-          rotate: 30,
-          opacity: 0,
-          transition: { duration: 0.3, ease: 'easeOut' }
-        }).then(() => onSwipe('right'));
+        controls
+          .start({
+            x: 500,
+            rotate: 30,
+            opacity: 0,
+            transition: { duration: 0.3, ease: 'easeOut' }
+          })
+          .then(() => onSwipe('right'));
       } else if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) {
         setExitDirection('left');
-        controls.start({
-          x: -500,
-          rotate: -30,
-          opacity: 0,
-          transition: { duration: 0.3, ease: 'easeOut' }
-        }).then(() => onSwipe('left'));
+        controls
+          .start({
+            x: -500,
+            rotate: -30,
+            opacity: 0,
+            transition: { duration: 0.3, ease: 'easeOut' }
+          })
+          .then(() => onSwipe('left'));
       } else if (info.offset.y < -threshold || info.velocity.y < -velocityThreshold) {
         setExitDirection('up');
-        controls.start({
-          y: -600,
-          scale: 0.8,
-          opacity: 0,
-          transition: { duration: 0.4, ease: 'easeOut' }
-        }).then(() => onSwipe('up'));
+        controls
+          .start({
+            y: -600,
+            scale: 0.8,
+            opacity: 0,
+            transition: { duration: 0.4, ease: 'easeOut' }
+          })
+          .then(() => onSwipe('up'));
       } else {
         // Spring back
         controls.start({
@@ -414,31 +429,40 @@ function SwipeCard({
   );
 
   // Button swipe animations
-  const triggerButtonSwipe = useCallback((direction: 'left' | 'right' | 'up') => {
-    setExitDirection(direction);
-    if (direction === 'right') {
-      controls.start({
-        x: 500,
-        rotate: 30,
-        opacity: 0,
-        transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
-      }).then(() => onSwipe('right'));
-    } else if (direction === 'left') {
-      controls.start({
-        x: -500,
-        rotate: -30,
-        opacity: 0,
-        transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
-      }).then(() => onSwipe('left'));
-    } else {
-      controls.start({
-        y: -600,
-        scale: 1.2,
-        opacity: 0,
-        transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1] }
-      }).then(() => onSwipe('up'));
-    }
-  }, [onSwipe, controls]);
+  const triggerButtonSwipe = useCallback(
+    (direction: 'left' | 'right' | 'up') => {
+      setExitDirection(direction);
+      if (direction === 'right') {
+        controls
+          .start({
+            x: 500,
+            rotate: 30,
+            opacity: 0,
+            transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
+          })
+          .then(() => onSwipe('right'));
+      } else if (direction === 'left') {
+        controls
+          .start({
+            x: -500,
+            rotate: -30,
+            opacity: 0,
+            transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
+          })
+          .then(() => onSwipe('left'));
+      } else {
+        controls
+          .start({
+            y: -600,
+            scale: 1.2,
+            opacity: 0,
+            transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1] }
+          })
+          .then(() => onSwipe('up'));
+      }
+    },
+    [onSwipe, controls]
+  );
 
   // Expose button swipe to parent
   useEffect(() => {
@@ -521,9 +545,7 @@ function SwipeCard({
               className='absolute inset-0 bg-green-500 flex items-center justify-center pointer-events-none z-30'
               style={{ opacity: likeOpacity }}
             >
-              <motion.div 
-                className='flex flex-col items-center'
-              >
+              <motion.div className='flex flex-col items-center'>
                 <motion.div
                   className='w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4'
                   animate={{ scale: [1, 1.1, 1] }}
@@ -531,9 +553,7 @@ function SwipeCard({
                 >
                   <Heart className='w-12 h-12 sm:w-16 sm:h-16 text-white' fill='currentColor' />
                 </motion.div>
-                <span className='text-white text-4xl sm:text-6xl font-black tracking-wider drop-shadow-lg'>
-                  LIKE
-                </span>
+                <span className='text-white text-4xl sm:text-6xl font-black tracking-wider drop-shadow-lg'>LIKE</span>
               </motion.div>
             </motion.div>
           )}
@@ -544,9 +564,7 @@ function SwipeCard({
               className='absolute inset-0 bg-red-500 flex items-center justify-center pointer-events-none z-30'
               style={{ opacity: nopeOpacity }}
             >
-              <motion.div 
-                className='flex flex-col items-center'
-              >
+              <motion.div className='flex flex-col items-center'>
                 <motion.div
                   className='w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4'
                   animate={{ rotate: [0, -10, 10, 0] }}
@@ -554,9 +572,7 @@ function SwipeCard({
                 >
                   <X className='w-12 h-12 sm:w-16 sm:h-16 text-white' strokeWidth={3} />
                 </motion.div>
-                <span className='text-white text-4xl sm:text-6xl font-black tracking-wider drop-shadow-lg'>
-                  NOPE
-                </span>
+                <span className='text-white text-4xl sm:text-6xl font-black tracking-wider drop-shadow-lg'>NOPE</span>
               </motion.div>
             </motion.div>
           )}
@@ -567,9 +583,7 @@ function SwipeCard({
               className='absolute inset-0 bg-blue-500 flex items-center justify-center pointer-events-none z-30'
               style={{ opacity: superLikeOpacity }}
             >
-              <motion.div 
-                className='flex flex-col items-center'
-              >
+              <motion.div className='flex flex-col items-center'>
                 <motion.div
                   className='w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4'
                   animate={{ y: [0, -10, 0], scale: [1, 1.1, 1] }}
@@ -623,7 +637,10 @@ function SwipeCard({
                 )}
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); setShowInfo(!showInfo); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  setShowInfo(!showInfo);
+                }}
                 className='w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors'
               >
                 <Info className='w-4 h-4 sm:w-5 sm:h-5' />
@@ -641,11 +658,17 @@ function SwipeCard({
                 >
                   <p className='text-white/90 mb-2 sm:mb-3 text-sm sm:text-base'>{profile.bio}</p>
                   <div className='flex flex-wrap gap-1.5 sm:gap-2'>
-                    {profile.interests.filter(i => i).map((interest, index) => (
-                      <Badge key={`${interest}-${index}`} variant='secondary' className='bg-white/20 text-white border-0 text-xs sm:text-sm backdrop-blur-sm'>
-                        {interest}
-                      </Badge>
-                    ))}
+                    {profile.interests
+                      .filter(i => i)
+                      .map((interest, index) => (
+                        <Badge
+                          key={`${interest}-${index}`}
+                          variant='secondary'
+                          className='bg-white/20 text-white border-0 text-xs sm:text-sm backdrop-blur-sm'
+                        >
+                          {interest}
+                        </Badge>
+                      ))}
                   </div>
                 </motion.div>
               )}
@@ -666,11 +689,11 @@ export default function SwipePeople() {
   const [matchedProfile, setMatchedProfile] = useState<Profile | null>(null);
   const [showMatchCelebration, setShowMatchCelebration] = useState(false);
   const [useFullScreenMatch, setUseFullScreenMatch] = useState(true);
-  
+
   // Credits & Subscription state
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
-  
+
   // Dialog states
   const [showAdDialog, setShowAdDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
@@ -689,10 +712,10 @@ export default function SwipePeople() {
   // Subscribe to user credits and subscription
   useEffect(() => {
     if (!user?.uid) return;
-    
+
     const unsubCredits = subscribeToUserCredits(user.uid, setUserCredits);
     const unsubSub = subscribeToUserSubscription(user.uid, setUserSubscription);
-    
+
     return () => {
       unsubCredits();
       unsubSub();
@@ -745,7 +768,7 @@ export default function SwipePeople() {
       if (profiles.length === 0) return;
 
       const currentProfile = profiles[0];
-      
+
       // Check if super like and if user can use it
       if (direction === 'up' && user?.uid) {
         const canUse = await canUseSuperLike(user.uid);
@@ -754,7 +777,7 @@ export default function SwipePeople() {
           return;
         }
       }
-      
+
       setLastAction({ profile: currentProfile, direction });
 
       // Remove the swiped profile from UI immediately
@@ -769,7 +792,7 @@ export default function SwipePeople() {
           setAdCountdown(5);
           setShowAdDialog(true);
         }
-        
+
         // Record swipe to Firebase
         const swipeDirection = direction === 'up' ? 'superlike' : direction;
 
@@ -779,9 +802,9 @@ export default function SwipePeople() {
           // It's a match!
           setMatchedProfile(currentProfile);
           setShowMatchCelebration(true);
-          
+
           if (result.isSuperLike) {
-            toast.success('⭐ Super Like Match! They\'ll know you really like them!');
+            toast.success("⭐ Super Like Match! They'll know you really like them!");
           }
         }
       } catch (error) {
@@ -799,7 +822,7 @@ export default function SwipePeople() {
       // In a real app, this would go through a payment provider
       // For now, we'll simulate the purchase
       await addSuperLikes(user.uid, 10);
-      await recordPurchase(user.uid, 'super_likes', 1.00);
+      await recordPurchase(user.uid, 'super_likes', 1.0);
       toast.success('🎉 10 Super Likes added to your account!');
       setShowNoSuperLikesDialog(false);
       setShowUpgradeDialog(false);
@@ -816,7 +839,7 @@ export default function SwipePeople() {
     setPurchasing(true);
     try {
       await purchasePremium(user.uid);
-      await recordPurchase(user.uid, 'premium', 5.00);
+      await recordPurchase(user.uid, 'premium', 5.0);
       toast.success('👑 Welcome to Frinder Premium!');
       setShowUpgradeDialog(false);
       setShowNoSuperLikesDialog(false);
@@ -833,7 +856,7 @@ export default function SwipePeople() {
     setPurchasing(true);
     try {
       await purchaseAdFree(user.uid);
-      await recordPurchase(user.uid, 'ad_free', 1.00);
+      await recordPurchase(user.uid, 'ad_free', 1.0);
       toast.success('✨ Ads removed! Enjoy uninterrupted swiping!');
       setShowAdDialog(false);
       setShowUpgradeDialog(false);
@@ -898,10 +921,10 @@ export default function SwipePeople() {
           <div className='relative w-full h-full max-w-md mx-auto'>
             <AnimatePresence>
               {profiles.slice(0, 2).map((profile, index) => (
-                <SwipeCard 
-                  key={profile.id} 
-                  profile={profile} 
-                  onSwipe={handleSwipe} 
+                <SwipeCard
+                  key={profile.id}
+                  profile={profile}
+                  onSwipe={handleSwipe}
                   isTop={index === 0}
                   onButtonSwipe={index === 0 ? handleButtonSwipe : undefined}
                 />
@@ -985,7 +1008,7 @@ export default function SwipePeople() {
           <div className='flex justify-center mt-2'>
             <div className='flex items-center gap-1 text-xs text-muted-foreground'>
               <Star className='w-3 h-3 text-blue-500' fill='currentColor' />
-              <span>{userSubscription?.unlimitedSuperLikes ? '∞' : (userCredits?.superLikes ?? 0)} Super Likes</span>
+              <span>{userSubscription?.unlimitedSuperLikes ? '∞' : userCredits?.superLikes ?? 0} Super Likes</span>
               {userSubscription?.isPremium && (
                 <Badge className='ml-1 bg-frinder-orange text-white text-[10px] px-1 py-0'>Premium</Badge>
               )}
@@ -1026,18 +1049,10 @@ export default function SwipePeople() {
               disabled={purchasing}
               className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
             >
-              {purchasing ? (
-                <Loader2 className='w-4 h-4 animate-spin mr-2' />
-              ) : (
-                <Crown className='w-4 h-4 mr-2' />
-              )}
+              {purchasing ? <Loader2 className='w-4 h-4 animate-spin mr-2' /> : <Crown className='w-4 h-4 mr-2' />}
               Go Premium - $5/month
             </Button>
-            <Button
-              variant='outline'
-              onClick={() => setShowNoSuperLikesDialog(false)}
-              className='w-full'
-            >
+            <Button variant='outline' onClick={() => setShowNoSuperLikesDialog(false)} className='w-full'>
               Maybe Later
             </Button>
           </div>
@@ -1068,15 +1083,8 @@ export default function SwipePeople() {
             >
               Continue Swiping
             </Button>
-            <Button
-              onClick={handlePurchaseAdFree}
-              disabled={purchasing}
-              variant='outline'
-              className='w-full'
-            >
-              {purchasing ? (
-                <Loader2 className='w-4 h-4 animate-spin mr-2' />
-              ) : null}
+            <Button onClick={handlePurchaseAdFree} disabled={purchasing} variant='outline' className='w-full'>
+              {purchasing ? <Loader2 className='w-4 h-4 animate-spin mr-2' /> : null}
               Remove Ads - $1/month
             </Button>
           </div>
@@ -1135,7 +1143,13 @@ export default function SwipePeople() {
                 variant={userSubscription?.isAdFree ? 'outline' : 'default'}
                 className={userSubscription?.isAdFree ? '' : 'bg-green-500 hover:bg-green-600 text-white'}
               >
-                {userSubscription?.isAdFree ? 'Active' : purchasing ? <Loader2 className='w-4 h-4 animate-spin' /> : '$1/mo'}
+                {userSubscription?.isAdFree ? (
+                  'Active'
+                ) : purchasing ? (
+                  <Loader2 className='w-4 h-4 animate-spin' />
+                ) : (
+                  '$1/mo'
+                )}
               </Button>
             </div>
 
@@ -1166,7 +1180,13 @@ export default function SwipePeople() {
                   variant={userSubscription?.isPremium ? 'outline' : 'default'}
                   className={userSubscription?.isPremium ? '' : 'bg-frinder-orange hover:bg-frinder-burnt text-white'}
                 >
-                  {userSubscription?.isPremium ? 'Active' : purchasing ? <Loader2 className='w-4 h-4 animate-spin' /> : '$5/mo'}
+                  {userSubscription?.isPremium ? (
+                    'Active'
+                  ) : purchasing ? (
+                    <Loader2 className='w-4 h-4 animate-spin' />
+                  ) : (
+                    '$5/mo'
+                  )}
                 </Button>
               </div>
             </div>

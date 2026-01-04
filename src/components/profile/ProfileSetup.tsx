@@ -10,39 +10,83 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, ChevronRight, ChevronLeft, Plus, X, Sparkles, User, Heart, Users, MapPin, Loader2 } from 'lucide-react';
+import {
+  Camera,
+  ChevronRight,
+  ChevronLeft,
+  Plus,
+  X,
+  Sparkles,
+  User,
+  Heart,
+  Users,
+  MapPin,
+  Loader2
+} from 'lucide-react';
 import { uploadProfilePhoto, compressImage } from '@/lib/storageService';
 import { toast } from 'sonner';
 
 const INTERESTS = [
-  'Music', 'Sports', 'Travel', 'Gaming', 'Movies', 'Reading',
-  'Art', 'Photography', 'Cooking', 'Fitness', 'Technology', 'Fashion',
-  'Dancing', 'Hiking', 'Coffee', 'Wine', 'Dogs', 'Cats',
-  'Beach', 'Mountains', 'Nightlife', 'Food', 'Netflix', 'Anime'
+  'Music',
+  'Sports',
+  'Travel',
+  'Gaming',
+  'Movies',
+  'Reading',
+  'Art',
+  'Photography',
+  'Cooking',
+  'Fitness',
+  'Technology',
+  'Fashion',
+  'Dancing',
+  'Hiking',
+  'Coffee',
+  'Wine',
+  'Dogs',
+  'Cats',
+  'Beach',
+  'Mountains',
+  'Nightlife',
+  'Food',
+  'Netflix',
+  'Anime'
 ];
 
 const COUNTRIES = [
-  'Albania', 'Kosovo', 'North Macedonia', 'Montenegro', 'Serbia',
-  'Greece', 'Italy', 'Germany', 'United Kingdom', 'United States',
-  'France', 'Spain', 'Switzerland', 'Austria', 'Netherlands'
+  'Albania',
+  'Kosovo',
+  'North Macedonia',
+  'Montenegro',
+  'Serbia',
+  'Greece',
+  'Italy',
+  'Germany',
+  'United Kingdom',
+  'United States',
+  'France',
+  'Spain',
+  'Switzerland',
+  'Austria',
+  'Netherlands'
 ];
 
 const CITIES: Record<string, string[]> = {
-  'Albania': ['Tirana', 'Durrës', 'Vlorë', 'Shkodër', 'Elbasan', 'Korçë', 'Fier', 'Berat'],
-  'Kosovo': ['Pristina', 'Prizren', 'Ferizaj', 'Peja', 'Gjakova', 'Mitrovica'],
+  Albania: ['Tirana', 'Durrës', 'Vlorë', 'Shkodër', 'Elbasan', 'Korçë', 'Fier', 'Berat'],
+  Kosovo: ['Pristina', 'Prizren', 'Ferizaj', 'Peja', 'Gjakova', 'Mitrovica'],
   'North Macedonia': ['Skopje', 'Bitola', 'Kumanovo', 'Prilep', 'Tetovo', 'Ohrid'],
-  'Montenegro': ['Podgorica', 'Nikšić', 'Herceg Novi', 'Bar', 'Budva', 'Kotor'],
-  'Serbia': ['Belgrade', 'Novi Sad', 'Niš', 'Kragujevac', 'Subotica'],
-  'Greece': ['Athens', 'Thessaloniki', 'Patras', 'Heraklion', 'Larissa'],
-  'Italy': ['Rome', 'Milan', 'Naples', 'Turin', 'Florence', 'Venice'],
-  'Germany': ['Berlin', 'Munich', 'Frankfurt', 'Hamburg', 'Cologne'],
+  Montenegro: ['Podgorica', 'Nikšić', 'Herceg Novi', 'Bar', 'Budva', 'Kotor'],
+  Serbia: ['Belgrade', 'Novi Sad', 'Niš', 'Kragujevac', 'Subotica'],
+  Greece: ['Athens', 'Thessaloniki', 'Patras', 'Heraklion', 'Larissa'],
+  Italy: ['Rome', 'Milan', 'Naples', 'Turin', 'Florence', 'Venice'],
+  Germany: ['Berlin', 'Munich', 'Frankfurt', 'Hamburg', 'Cologne'],
   'United Kingdom': ['London', 'Manchester', 'Birmingham', 'Edinburgh', 'Glasgow'],
   'United States': ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Miami'],
-  'France': ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice'],
-  'Spain': ['Madrid', 'Barcelona', 'Valencia', 'Seville', 'Bilbao'],
-  'Switzerland': ['Zurich', 'Geneva', 'Basel', 'Bern', 'Lausanne'],
-  'Austria': ['Vienna', 'Salzburg', 'Innsbruck', 'Graz', 'Linz'],
-  'Netherlands': ['Amsterdam', 'Rotterdam', 'The Hague', 'Utrecht', 'Eindhoven']
+  France: ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice'],
+  Spain: ['Madrid', 'Barcelona', 'Valencia', 'Seville', 'Bilbao'],
+  Switzerland: ['Zurich', 'Geneva', 'Basel', 'Bern', 'Lausanne'],
+  Austria: ['Vienna', 'Salzburg', 'Innsbruck', 'Graz', 'Linz'],
+  Netherlands: ['Amsterdam', 'Rotterdam', 'The Hague', 'Utrecht', 'Eindhoven']
 };
 
 export default function ProfileSetup() {
@@ -61,7 +105,7 @@ export default function ProfileSetup() {
     city: userProfile?.city || '',
     interests: userProfile?.interests || [],
     lookingFor: userProfile?.lookingFor || ('both' as 'people' | 'groups' | 'both'),
-    photos: userProfile?.photos || [] as string[]
+    photos: userProfile?.photos || ([] as string[])
   });
 
   const totalSteps = 5;
@@ -82,7 +126,7 @@ export default function ProfileSetup() {
     if (!files || files.length === 0 || !user) return;
 
     const file = files[0];
-    
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
@@ -97,16 +141,12 @@ export default function ProfileSetup() {
 
     try {
       setUploadingPhoto(true);
-      
+
       // Compress the image
       const compressedFile = await compressImage(file, 1024, 0.8);
-      
+
       // Upload to Firebase Storage
-      const photoUrl = await uploadProfilePhoto(
-        user.uid,
-        compressedFile,
-        formData.photos.length
-      );
+      const photoUrl = await uploadProfilePhoto(user.uid, compressedFile, formData.photos.length);
 
       setFormData(prev => ({
         ...prev,
@@ -181,13 +221,7 @@ export default function ProfileSetup() {
   return (
     <div className='min-h-screen bg-[#fff7ed] flex flex-col'>
       {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type='file'
-        accept='image/*'
-        onChange={handlePhotoUpload}
-        className='hidden'
-      />
+      <input ref={fileInputRef} type='file' accept='image/*' onChange={handlePhotoUpload} className='hidden' />
 
       {/* Progress bar */}
       <div className='fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm'>
@@ -306,14 +340,16 @@ export default function ProfileSetup() {
                     <Label>Country</Label>
                     <Select
                       value={formData.country}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, country: value, city: '' }))}
+                      onValueChange={value => setFormData(prev => ({ ...prev, country: value, city: '' }))}
                     >
                       <SelectTrigger className='h-12'>
                         <SelectValue placeholder='Select your country' />
                       </SelectTrigger>
                       <SelectContent>
                         {COUNTRIES.map(country => (
-                          <SelectItem key={country} value={country}>{country}</SelectItem>
+                          <SelectItem key={country} value={country}>
+                            {country}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -322,16 +358,19 @@ export default function ProfileSetup() {
                     <Label>City</Label>
                     <Select
                       value={formData.city}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, city: value }))}
+                      onValueChange={value => setFormData(prev => ({ ...prev, city: value }))}
                       disabled={!formData.country}
                     >
                       <SelectTrigger className='h-12'>
                         <SelectValue placeholder={formData.country ? 'Select your city' : 'Select country first'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {formData.country && CITIES[formData.country]?.map(city => (
-                          <SelectItem key={city} value={city}>{city}</SelectItem>
-                        ))}
+                        {formData.country &&
+                          CITIES[formData.country]?.map(city => (
+                            <SelectItem key={city} value={city}>
+                              {city}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
