@@ -79,7 +79,7 @@ export const metadata: Metadata = {
     }
   },
 
-  // Open Graph (Facebook, LinkedIn, etc.)
+  // Open Graph (Facebook, LinkedIn, WhatsApp, etc.)
   openGraph: {
     type: 'website',
     locale: 'en_US',
@@ -90,17 +90,10 @@ export const metadata: Metadata = {
       'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
     images: [
       {
-        url: '/frinder-logo.png',
+        url: 'https://frinder.co/og-image.png',
         width: 1200,
         height: 630,
         alt: 'Frinder - Find Friends & Meaningful Connections',
-        type: 'image/png'
-      },
-      {
-        url: '/frinder-logo.png',
-        width: 600,
-        height: 600,
-        alt: 'Frinder Logo',
         type: 'image/png'
       }
     ]
@@ -114,7 +107,7 @@ export const metadata: Metadata = {
     title: 'Frinder - Find Friends & Meaningful Connections',
     description:
       'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
-    images: ['/frinder-logo.png']
+    images: ['https://frinder.co/og-image.png']
   },
 
   // App Links
@@ -149,14 +142,19 @@ export const metadata: Metadata = {
     }
   },
 
-  // Icons
+  // Icons - Favicon and Apple Touch Icons
   icons: {
     icon: [
-      { url: '/frinder-logo.png', sizes: '32x32', type: 'image/png' },
-      { url: '/frinder-logo.png', sizes: '16x16', type: 'image/png' }
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' }
     ],
-    apple: [{ url: '/frinder-logo.png', sizes: '180x180', type: 'image/png' }],
-    shortcut: '/frinder-logo.png'
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+    ],
+    shortcut: '/favicon.ico'
   },
 
   // Manifest
