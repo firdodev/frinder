@@ -10,20 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Camera,
-  ChevronRight,
-  ChevronLeft,
-  Plus,
-  X,
-  Sparkles,
-  User,
-  Heart,
-  Users,
-  MapPin,
-  Loader2
-} from 'lucide-react';
+import { Camera, ChevronRight, ChevronLeft, Plus, X, Sparkles, User, Heart, Users, MapPin, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { uploadProfilePhoto, compressImage } from '@/lib/storageService';
+import { isDisplayNameTaken } from '@/lib/firebaseServices';
 import { toast } from 'sonner';
 
 const INTERESTS = [
@@ -95,6 +84,10 @@ export default function ProfileSetup() {
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [checkingDisplayName, setCheckingDisplayName] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const [displayNameValid, setDisplayNameValid] = useState(false);
+  const displayNameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     displayName: userProfile?.displayName || '',
@@ -109,6 +102,48 @@ export default function ProfileSetup() {
   });
 
   const totalSteps = 5;
+
+  // Check display name availability with debounce
+  const checkDisplayName = async (name: string) => {
+    if (displayNameCheckTimeout.current) {
+      clearTimeout(displayNameCheckTimeout.current);
+    }
+
+    const trimmedName = name.trim();
+    
+    if (trimmedName.length < 2) {
+      setDisplayNameError(null);
+      setDisplayNameValid(false);
+      setCheckingDisplayName(false);
+      return;
+    }
+
+    setCheckingDisplayName(true);
+    setDisplayNameError(null);
+    setDisplayNameValid(false);
+
+    displayNameCheckTimeout.current = setTimeout(async () => {
+      try {
+        const isTaken = await isDisplayNameTaken(trimmedName, user?.uid);
+        if (isTaken) {
+          setDisplayNameError('This display name is already taken');
+          setDisplayNameValid(false);
+        } else {
+          setDisplayNameError(null);
+          setDisplayNameValid(true);
+        }
+      } catch (error) {
+        console.error('Error checking display name:', error);
+      } finally {
+        setCheckingDisplayName(false);
+      }
+    }, 500); // 500ms debounce
+  };
+
+  const handleDisplayNameChange = (value: string) => {
+    setFormData(prev => ({ ...prev, displayName: value }));
+    checkDisplayName(value);
+  };
 
   const handleInterestToggle = (interest: string) => {
     setFormData(prev => ({
@@ -204,7 +239,7 @@ export default function ProfileSetup() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return formData.displayName.trim().length >= 2 && formData.age >= 18 && formData.gender !== 'other';
+        return formData.displayName.trim().length >= 2 && formData.age >= 18 && formData.gender !== 'other' && !displayNameError && displayNameValid && !checkingDisplayName;
       case 2:
         return formData.country && formData.city;
       case 3:
@@ -271,13 +306,41 @@ export default function ProfileSetup() {
                 <CardContent className='pt-6 space-y-6'>
                   <div className='space-y-2'>
                     <Label htmlFor='name'>Display Name</Label>
-                    <Input
-                      id='name'
-                      placeholder='Your name'
-                      value={formData.displayName}
-                      onChange={e => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
-                      className='text-lg h-12'
-                    />
+                    <div className='relative'>
+                      <Input
+                        id='name'
+                        placeholder='Your name'
+                        value={formData.displayName}
+                        onChange={e => handleDisplayNameChange(e.target.value)}
+                        className={`text-lg h-12 pr-10 ${
+                          displayNameError ? 'border-red-500 focus-visible:ring-red-500' : 
+                          displayNameValid ? 'border-green-500 focus-visible:ring-green-500' : ''
+                        }`}
+                      />
+                      <div className='absolute right-3 top-1/2 -translate-y-1/2'>
+                        {checkingDisplayName && (
+                          <Loader2 className='w-5 h-5 text-muted-foreground animate-spin' />
+                        )}
+                        {!checkingDisplayName && displayNameError && (
+                          <AlertCircle className='w-5 h-5 text-red-500' />
+                        )}
+                        {!checkingDisplayName && displayNameValid && (
+                          <CheckCircle className='w-5 h-5 text-green-500' />
+                        )}
+                      </div>
+                    </div>
+                    {displayNameError && (
+                      <p className='text-sm text-red-500 flex items-center gap-1'>
+                        <AlertCircle className='w-3 h-3' />
+                        {displayNameError}
+                      </p>
+                    )}
+                    {displayNameValid && !checkingDisplayName && (
+                      <p className='text-sm text-green-500 flex items-center gap-1'>
+                        <CheckCircle className='w-3 h-3' />
+                        This display name is available
+                      </p>
+                    )}
                   </div>
                   <div className='grid grid-cols-2 gap-4'>
                     <div className='space-y-2'>

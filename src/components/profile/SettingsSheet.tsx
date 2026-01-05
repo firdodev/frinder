@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog';
-import { Moon, Sun, Globe, Trash2, LogOut, ChevronRight, AlertTriangle, Loader2, Sparkles, Bell } from 'lucide-react';
+import { Moon, Sun, Globe, Trash2, LogOut, ChevronRight, AlertTriangle, Loader2, Sparkles, Key, Eye, EyeOff, UserX, Ban, Shield } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -27,11 +27,20 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
   const { darkMode, toggleDarkMode } = useSettings();
-  const { signOut, deleteAccount } = useAuth();
+  const { signOut, deleteAccount, changePassword } = useAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [fullScreenMatch, setFullScreenMatch] = useState(true);
+  
+  // Password change state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Load full screen match preference
   useEffect(() => {
@@ -45,6 +54,51 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
     const newValue = !fullScreenMatch;
     setFullScreenMatch(newValue);
     localStorage.setItem('frinder_fullScreenMatch', JSON.stringify(newValue));
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      toast.success('Password changed successfully');
+      handleClosePasswordDialog();
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('wrong-password') || error.message.includes('invalid-credential')) {
+          toast.error('Current password is incorrect');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.error('Failed to change password');
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleClosePasswordDialog = () => {
+    setShowPasswordDialog(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
   };
 
   const handleLogout = async () => {
@@ -166,6 +220,48 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
           <Separator className='dark:bg-gray-800' />
 
+          {/* Safety */}
+          <div className='space-y-4'>
+            <h3 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>Safety</h3>
+
+            <button
+              onClick={() => setShowPasswordDialog(true)}
+              className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'
+            >
+              <Key className='w-5 h-5 text-frinder-orange' />
+              <div>
+                <p className='text-sm font-medium dark:text-white'>Change Password</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>Update your account password</p>
+              </div>
+            </button>
+
+            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
+              <UserX className='w-5 h-5 text-frinder-orange' />
+              <div>
+                <p className='text-sm font-medium dark:text-white'>Blocked Users</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>Manage your blocked list</p>
+              </div>
+            </button>
+
+            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
+              <Ban className='w-5 h-5 text-frinder-orange' />
+              <div>
+                <p className='text-sm font-medium dark:text-white'>Hidden Profiles</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>Profiles you&apos;ve hidden from discovery</p>
+              </div>
+            </button>
+
+            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
+              <Shield className='w-5 h-5 text-frinder-orange' />
+              <div>
+                <p className='text-sm font-medium dark:text-white'>Safety Tips</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>Learn how to stay safe while dating</p>
+              </div>
+            </button>
+          </div>
+
+          <Separator className='dark:bg-gray-800' />
+
           {/* Account Actions */}
           <div className='space-y-4'>
             <h3 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>Account</h3>
@@ -248,6 +344,98 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
                 </>
               ) : (
                 'Delete Account'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={handleClosePasswordDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and a new password to update your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-4 py-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='currentPassword'>Current Password</Label>
+              <div className='relative'>
+                <Input
+                  id='currentPassword'
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder='Enter current password'
+                  className='dark:bg-gray-900 dark:border-gray-800 pr-10'
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                >
+                  {showCurrentPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+                </button>
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='newPassword'>New Password</Label>
+              <div className='relative'>
+                <Input
+                  id='newPassword'
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder='Enter new password'
+                  className='dark:bg-gray-900 dark:border-gray-800 pr-10'
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                >
+                  {showNewPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+                </button>
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='confirmPassword'>Confirm New Password</Label>
+              <Input
+                id='confirmPassword'
+                type={showNewPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder='Confirm new password'
+                className='dark:bg-gray-900 dark:border-gray-800'
+              />
+            </div>
+          </div>
+
+          <DialogFooter className='gap-2 sm:gap-0'>
+            <Button
+              variant='outline'
+              onClick={handleClosePasswordDialog}
+              disabled={isChangingPassword}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword}
+              className='bg-frinder-orange hover:bg-frinder-orange/90 text-white'
+            >
+              {isChangingPassword ? (
+                <>
+                  <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                  Changing...
+                </>
+              ) : (
+                'Change Password'
               )}
             </Button>
           </DialogFooter>

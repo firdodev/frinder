@@ -1,12 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Eye, EyeOff, Clock, CheckCheck, Mail, Shield, UserX, Ban } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Eye, EyeOff, Clock, CheckCheck, Mail, Shield, UserX, Ban, Key, Loader2 } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface PrivacySheetProps {
   open: boolean;
@@ -15,6 +26,63 @@ interface PrivacySheetProps {
 
 export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
   const { privacy, updatePrivacy } = useSettings();
+  const { changePassword } = useAuth();
+  
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      toast.success('Password changed successfully');
+      setPasswordDialogOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('wrong-password') || error.message.includes('invalid-credential')) {
+          toast.error('Current password is incorrect');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.error('Failed to change password');
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleClosePasswordDialog = () => {
+    setPasswordDialogOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -114,6 +182,17 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
           <div className='space-y-4'>
             <h3 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>Safety</h3>
 
+            <button
+              onClick={() => setPasswordDialogOpen(true)}
+              className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'
+            >
+              <Key className='w-5 h-5 text-[#ed8c00]' />
+              <div>
+                <p className='text-sm font-medium dark:text-white'>Change Password</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>Update your account password</p>
+              </div>
+            </button>
+
             <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
               <UserX className='w-5 h-5 text-[#ed8c00]' />
               <div>
@@ -140,6 +219,98 @@ export function PrivacySheet({ open, onOpenChange }: PrivacySheetProps) {
           </div>
         </div>
       </SheetContent>
+
+      {/* Change Password Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={handleClosePasswordDialog}>
+        <DialogContent className='dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Change Password</DialogTitle>
+            <DialogDescription className='dark:text-gray-400'>
+              Enter your current password and a new password to update your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-4 mt-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='currentPassword' className='dark:text-white'>Current Password</Label>
+              <div className='relative'>
+                <Input
+                  id='currentPassword'
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder='Enter current password'
+                  className='dark:bg-gray-800 dark:border-gray-700 dark:text-white pr-10'
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                >
+                  {showCurrentPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+                </button>
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='newPassword' className='dark:text-white'>New Password</Label>
+              <div className='relative'>
+                <Input
+                  id='newPassword'
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder='Enter new password'
+                  className='dark:bg-gray-800 dark:border-gray-700 dark:text-white pr-10'
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                >
+                  {showNewPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+                </button>
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='confirmPassword' className='dark:text-white'>Confirm New Password</Label>
+              <Input
+                id='confirmPassword'
+                type={showNewPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder='Confirm new password'
+                className='dark:bg-gray-800 dark:border-gray-700 dark:text-white'
+              />
+            </div>
+
+            <div className='flex gap-3 pt-4'>
+              <Button
+                variant='outline'
+                onClick={handleClosePasswordDialog}
+                className='flex-1 dark:border-gray-700 dark:text-white dark:hover:bg-gray-800'
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleChangePassword}
+                disabled={isChangingPassword}
+                className='flex-1 bg-[#ed8c00] hover:bg-[#d17d00] text-white'
+              >
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                    Changing...
+                  </>
+                ) : (
+                  'Change Password'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

@@ -94,9 +94,11 @@ export interface DateRequest {
   time: string;
   location: string;
   description?: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
   createdAt: Timestamp;
   respondedAt?: Timestamp;
+  cancelledAt?: Timestamp;
+  cancelledBy?: string;
 }
 
 export interface Group {
@@ -110,7 +112,40 @@ export interface Group {
   interests: string[];
   activity: string;
   location?: string;
+  isPrivate: boolean;
+  pendingMembers?: string[];
+  pendingMemberProfiles?: { [key: string]: UserProfile };
   createdAt: Timestamp;
+  lastMessage?: string;
+  lastMessageTime?: Timestamp;
+  lastMessageSender?: string;
+}
+
+// Check if a display name is already taken by another user
+export async function isDisplayNameTaken(displayName: string, currentUserId?: string): Promise<boolean> {
+  try {
+    const normalizedName = displayName.trim().toLowerCase();
+    if (!normalizedName) return false;
+
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+    
+    for (const doc of usersSnapshot.docs) {
+      const userData = doc.data();
+      // Skip the current user's own profile
+      if (currentUserId && doc.id === currentUserId) continue;
+      
+      // Check if display name matches (case-insensitive)
+      if (userData.displayName && userData.displayName.trim().toLowerCase() === normalizedName) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking display name:', error);
+    return false; // In case of error, allow the name (backend validation should also check)
+  }
 }
 
 // Get users to swipe on (filtered by opposite gender, same city, and shared interests)
@@ -563,6 +598,32 @@ export async function respondToDateRequest(
   }
 }
 
+// Cancel a date request (can be cancelled by either party)
+export async function cancelDateRequest(
+  matchId: string,
+  dateRequestId: string,
+  cancelledByUserId: string
+): Promise<void> {
+  try {
+    const dateRequestRef = doc(db, 'matches', matchId, 'dateRequests', dateRequestId);
+
+    await updateDoc(dateRequestRef, {
+      status: 'cancelled',
+      cancelledAt: serverTimestamp(),
+      cancelledBy: cancelledByUserId
+    });
+
+    // Update match with cancellation notice
+    await updateDoc(doc(db, 'matches', matchId), {
+      lastMessage: '🚫 Date cancelled',
+      lastMessageTime: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error cancelling date request:', error);
+    throw error;
+  }
+}
+
 // Subscribe to date requests for a match
 export function subscribeToDateRequests(matchId: string, callback: (dateRequests: DateRequest[]) => void): () => void {
   const dateRequestsRef = collection(db, 'matches', matchId, 'dateRequests');
@@ -598,7 +659,8 @@ export async function getGroupsToSwipe(currentUserId: string, limitCount: number
       .filter(
         group =>
           !group.members?.includes(currentUserId) && // Not a member
-          group.creatorId !== currentUserId // Not the creator
+          group.creatorId !== currentUserId && // Not the creator
+          !group.pendingMembers?.includes(currentUserId) // Not already pending
       )
       .slice(0, limitCount);
   } catch (error) {
@@ -607,26 +669,201 @@ export async function getGroupsToSwipe(currentUserId: string, limitCount: number
   }
 }
 
-// Join a group
-export async function joinGroup(groupId: string, userId: string): Promise<void> {
+// Join a group (public) or request to join (private)
+export async function joinGroup(groupId: string, userId: string): Promise<'joined' | 'requested'> {
   try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
     const userDoc = await getDoc(doc(db, 'users', userId));
     const userData = userDoc.data();
 
-    await updateDoc(doc(db, 'groups', groupId), {
-      members: arrayUnion(userId),
-      [`memberProfiles.${userId}`]: userData
-    });
+    // Check if group is private
+    if (groupData.isPrivate) {
+      // Add to pending members
+      await updateDoc(doc(db, 'groups', groupId), {
+        pendingMembers: arrayUnion(userId),
+        [`pendingMemberProfiles.${userId}`]: userData
+      });
+      return 'requested';
+    } else {
+      // Public group - join directly
+      await updateDoc(doc(db, 'groups', groupId), {
+        members: arrayUnion(userId),
+        [`memberProfiles.${userId}`]: userData
+      });
+      return 'joined';
+    }
   } catch (error) {
     console.error('Error joining group:', error);
     throw error;
   }
 }
 
+// Approve join request (creator only)
+export async function approveJoinRequest(groupId: string, requesterId: string, approverId: string): Promise<void> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
+    
+    // Check if user is creator
+    if (groupData.creatorId !== approverId) {
+      throw new Error('Only the group creator can approve join requests');
+    }
+    
+    // Check if requester is in pending list
+    if (!groupData.pendingMembers?.includes(requesterId)) {
+      throw new Error('User has not requested to join this group');
+    }
+    
+    const requesterProfile = groupData.pendingMemberProfiles?.[requesterId];
+    
+    // Remove from pending and add to members
+    const updatedPendingMembers = (groupData.pendingMembers || []).filter((id: string) => id !== requesterId);
+    const updatedPendingProfiles = { ...groupData.pendingMemberProfiles };
+    delete updatedPendingProfiles[requesterId];
+    
+    await updateDoc(doc(db, 'groups', groupId), {
+      pendingMembers: updatedPendingMembers,
+      pendingMemberProfiles: updatedPendingProfiles,
+      members: arrayUnion(requesterId),
+      [`memberProfiles.${requesterId}`]: requesterProfile
+    });
+  } catch (error) {
+    console.error('Error approving join request:', error);
+    throw error;
+  }
+}
+
+// Decline join request (creator only)
+export async function declineJoinRequest(groupId: string, requesterId: string, declinerId: string): Promise<void> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
+    
+    // Check if user is creator
+    if (groupData.creatorId !== declinerId) {
+      throw new Error('Only the group creator can decline join requests');
+    }
+    
+    // Remove from pending
+    const updatedPendingMembers = (groupData.pendingMembers || []).filter((id: string) => id !== requesterId);
+    const updatedPendingProfiles = { ...groupData.pendingMemberProfiles };
+    delete updatedPendingProfiles[requesterId];
+    
+    await updateDoc(doc(db, 'groups', groupId), {
+      pendingMembers: updatedPendingMembers,
+      pendingMemberProfiles: updatedPendingProfiles
+    });
+  } catch (error) {
+    console.error('Error declining join request:', error);
+    throw error;
+  }
+}
+
+// Update group (creator only)
+export async function updateGroup(
+  groupId: string,
+  creatorId: string,
+  updates: {
+    name?: string;
+    description?: string;
+    photo?: string;
+    interests?: string[];
+    activity?: string;
+    location?: string;
+    isPrivate?: boolean;
+  }
+): Promise<void> {
+  try {
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) throw new Error('Group not found');
+    
+    const groupData = groupDoc.data();
+    
+    // Check if user is creator
+    if (groupData.creatorId !== creatorId) {
+      throw new Error('Only the group creator can update the group');
+    }
+    
+    // Sanitize updates
+    const sanitizedUpdates: Record<string, any> = {};
+    
+    if (updates.name !== undefined) {
+      sanitizedUpdates.name = sanitizeInput(updates.name, { maxLength: 100, allowNewlines: false });
+    }
+    if (updates.description !== undefined) {
+      sanitizedUpdates.description = sanitizeBio(updates.description);
+    }
+    if (updates.photo !== undefined) {
+      sanitizedUpdates.photo = updates.photo;
+    }
+    if (updates.interests !== undefined) {
+      sanitizedUpdates.interests = sanitizeInterests(updates.interests);
+    }
+    if (updates.activity !== undefined) {
+      sanitizedUpdates.activity = sanitizeInput(updates.activity, { maxLength: 100, allowNewlines: false });
+    }
+    if (updates.location !== undefined) {
+      sanitizedUpdates.location = sanitizeInput(updates.location, { maxLength: 100, allowNewlines: false });
+    }
+    if (updates.isPrivate !== undefined) {
+      sanitizedUpdates.isPrivate = updates.isPrivate;
+    }
+    
+    await updateDoc(doc(db, 'groups', groupId), sanitizedUpdates);
+  } catch (error) {
+    console.error('Error updating group:', error);
+    throw error;
+  }
+}
+
+// Get groups created by user
+export async function getMyCreatedGroups(userId: string): Promise<Group[]> {
+  try {
+    const groupsRef = collection(db, 'groups');
+    const groupsQuery = query(groupsRef, where('creatorId', '==', userId));
+    const groupsSnapshot = await getDocs(groupsQuery);
+
+    return groupsSnapshot.docs.map(
+      doc =>
+        ({
+          id: doc.id,
+          ...doc.data()
+        } as Group)
+    );
+  } catch (error) {
+    console.error('Error getting created groups:', error);
+    return [];
+  }
+}
+
+// Subscribe to groups created by user (for real-time updates)
+export function subscribeToMyCreatedGroups(userId: string, callback: (groups: Group[]) => void): () => void {
+  const groupsRef = collection(db, 'groups');
+  const groupsQuery = query(groupsRef, where('creatorId', '==', userId));
+
+  return onSnapshot(groupsQuery, snapshot => {
+    const groups = snapshot.docs.map(
+      doc =>
+        ({
+          id: doc.id,
+          ...doc.data()
+        } as Group)
+    );
+    callback(groups);
+  });
+}
+
 // Create a group
 export async function createGroup(
   creatorId: string,
-  groupData: Omit<Group, 'id' | 'creatorId' | 'members' | 'memberProfiles' | 'createdAt'>
+  groupData: Omit<Group, 'id' | 'creatorId' | 'members' | 'memberProfiles' | 'pendingMembers' | 'pendingMemberProfiles' | 'createdAt'>
 ): Promise<string> {
   try {
     // Rate limit check
@@ -645,7 +882,8 @@ export async function createGroup(
       location: groupData.location
         ? sanitizeInput(groupData.location, { maxLength: 100, allowNewlines: false })
         : undefined,
-      interests: sanitizeInterests(groupData.interests)
+      interests: sanitizeInterests(groupData.interests),
+      isPrivate: groupData.isPrivate || false
     };
 
     const userDoc = await getDoc(doc(db, 'users', creatorId));
@@ -657,6 +895,8 @@ export async function createGroup(
       creatorId,
       members: [creatorId],
       memberProfiles: { [creatorId]: userData },
+      pendingMembers: [],
+      pendingMemberProfiles: {},
       createdAt: serverTimestamp()
     });
 

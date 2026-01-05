@@ -11,7 +11,8 @@ import {
   sendPasswordResetEmail,
   deleteUser,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  updatePassword
 } from 'firebase/auth';
 import {
   doc,
@@ -59,6 +60,7 @@ interface AuthContextType {
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -244,6 +246,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateUserProfileInMatches(user.uid, sanitizedData).catch(console.error);
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user || !user.email) throw new Error('No user logged in');
+
+    // Validate new password
+    if (newPassword.length < 6) {
+      throw new Error('New password must be at least 6 characters');
+    }
+
+    // Rate limit password changes
+    const { allowed, resetIn } = checkRateLimit(user.uid, 'passwordChange');
+    if (!allowed) {
+      const resetInMinutes = Math.ceil(resetIn / 60000);
+      throw new Error(`Too many attempts. Please try again in ${resetInMinutes} minute(s).`);
+    }
+
+    // Re-authenticate user before changing password
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // Update password
+    await updatePassword(user, newPassword);
+  };
+
   const deleteAccount = async (password: string) => {
     if (!user || !user.email) throw new Error('No user logged in');
 
@@ -286,7 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount, resetPassword }}
+      value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount, resetPassword, changePassword }}
     >
       {children}
     </AuthContext.Provider>

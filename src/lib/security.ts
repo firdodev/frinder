@@ -211,6 +211,9 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   // Password reset: 3 per hour
   passwordReset: { maxRequests: 3, windowMs: 60 * 60 * 1000 },
   
+  // Password change: 3 per hour
+  passwordChange: { maxRequests: 3, windowMs: 60 * 60 * 1000 },
+  
   // Report user: 10 per hour
   report: { maxRequests: 10, windowMs: 60 * 60 * 1000 },
 };

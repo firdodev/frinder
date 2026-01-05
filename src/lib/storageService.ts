@@ -167,3 +167,37 @@ export async function uploadMessageImage(matchId: string, senderId: string, file
     throw new Error('Failed to upload image. Please try again.');
   }
 }
+
+/**
+ * Upload a group profile photo to Firebase Storage
+ * @param groupId - The group's ID
+ * @param file - The file to upload
+ * @returns The download URL of the uploaded photo
+ */
+export async function uploadGroupPhoto(groupId: string, file: File): Promise<string> {
+  try {
+    // Create a unique filename
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filename = `photo_${timestamp}.${extension}`;
+
+    // Create reference to storage location
+    const photoRef = ref(storage, `groups/${groupId}/${filename}`);
+
+    // Upload the file
+    const snapshot = await uploadBytes(photoRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        uploadedAt: new Date().toISOString()
+      }
+    });
+
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading group photo:', error);
+    throw new Error('Failed to upload group photo. Please try again.');
+  }
+}

@@ -39,7 +39,17 @@ import {
   Clock,
   MapPin,
   PartyPopper,
-  CalendarHeart
+  CalendarHeart,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Pencil,
+  Camera,
+  Lock,
+  Globe,
+  Ban
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -68,7 +78,9 @@ import {
   sendGroupMessage,
   createDateRequest,
   respondToDateRequest,
+  cancelDateRequest,
   subscribeToDateRequests,
+  updateGroup,
   type Match as FirebaseMatch,
   type Message as FirebaseMessage,
   type CallData,
@@ -76,9 +88,10 @@ import {
   type GroupMessage as FirebaseGroupMessage,
   type DateRequest
 } from '@/lib/firebaseServices';
-import { uploadMessageImage, compressImage } from '@/lib/storageService';
+import { uploadMessageImage, compressImage, uploadGroupPhoto } from '@/lib/storageService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 interface Message {
@@ -696,7 +709,9 @@ interface DateRequestBubbleProps {
   matchName: string;
   onAccept: () => void;
   onDecline: () => void;
+  onCancel: () => void;
   isResponding: boolean;
+  isCancelling: boolean;
 }
 
 function DateRequestBubble({
@@ -705,7 +720,9 @@ function DateRequestBubble({
   matchName,
   onAccept,
   onDecline,
-  isResponding
+  onCancel,
+  isResponding,
+  isCancelling
 }: DateRequestBubbleProps) {
   const formatDate = (timestamp: any) => {
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -715,6 +732,7 @@ function DateRequestBubble({
   const isPending = dateRequest.status === 'pending';
   const isAccepted = dateRequest.status === 'accepted';
   const isDeclined = dateRequest.status === 'declined';
+  const isCancelled = dateRequest.status === 'cancelled';
 
   return (
     <motion.div
@@ -728,13 +746,17 @@ function DateRequestBubble({
         {!isPending && (
           <motion.div
             initial={{ scale: 0, rotate: -30 }}
-            animate={{ scale: 1, rotate: isDeclined ? 15 : 0 }}
+            animate={{ scale: 1, rotate: isDeclined || isCancelled ? 15 : 0 }}
             transition={{ type: 'spring', delay: 0.2 }}
             className={`absolute -top-3 ${isOwn ? '-left-3' : '-right-3'} z-10`}
           >
             {isAccepted ? (
               <div className='w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shadow-lg'>
                 <PartyPopper className='w-5 h-5 text-white' />
+              </div>
+            ) : isCancelled ? (
+              <div className='w-10 h-10 rounded-full bg-gray-500 flex items-center justify-center shadow-lg transform rotate-12'>
+                <Ban className='w-5 h-5 text-white' />
               </div>
             ) : (
               <div className='w-10 h-10 rounded-full bg-red-400 flex items-center justify-center shadow-lg transform rotate-12'>
@@ -749,7 +771,7 @@ function DateRequestBubble({
             isOwn
               ? 'bg-gradient-to-br from-frinder-orange to-frinder-burnt'
               : 'bg-gradient-to-br from-pink-500 to-rose-600'
-          } ${isDeclined ? 'opacity-60' : ''}`}
+          } ${isDeclined || isCancelled ? 'opacity-60' : ''}`}
         >
           {/* Header */}
           <div className='px-4 py-3 border-b border-white/20'>
@@ -759,6 +781,7 @@ function DateRequestBubble({
               {isPending && <Badge className='ml-auto bg-white/20 text-white text-[10px]'>Pending</Badge>}
               {isAccepted && <Badge className='ml-auto bg-green-400/30 text-white text-[10px]'>Accepted! 🎉</Badge>}
               {isDeclined && <Badge className='ml-auto bg-red-400/30 text-white text-[10px]'>Declined</Badge>}
+              {isCancelled && <Badge className='ml-auto bg-gray-400/30 text-white text-[10px]'>Cancelled</Badge>}
             </div>
           </div>
 
@@ -811,6 +834,25 @@ function DateRequestBubble({
           {isOwn && isPending && (
             <div className='px-4 py-2 border-t border-white/20 text-center'>
               <span className='text-white/70 text-xs'>Waiting for {matchName}&apos;s response...</span>
+            </div>
+          )}
+
+          {/* Cancel button for accepted dates - both parties can cancel */}
+          {isAccepted && (
+            <div className='px-4 py-3 border-t border-white/20'>
+              <Button
+                onClick={onCancel}
+                disabled={isCancelling}
+                variant='outline'
+                className='w-full bg-white/10 border-white/30 text-white hover:bg-red-500/20 hover:border-red-400/50 hover:text-white'
+              >
+                {isCancelling ? (
+                  <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                ) : (
+                  <Ban className='w-4 h-4 mr-2' />
+                )}
+                Cancel Date
+              </Button>
             </div>
           )}
 
@@ -1069,6 +1111,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   });
   const [sendingDateRequest, setSendingDateRequest] = useState(false);
   const [respondingToDateRequest, setRespondingToDateRequest] = useState(false);
+  const [cancellingDateRequest, setCancellingDateRequest] = useState(false);
   const [showDateAcceptedCelebration, setShowDateAcceptedCelebration] = useState(false);
   const [celebratingDateRequest, setCelebratingDateRequest] = useState<DateRequest | null>(null);
   const lastAcceptedDateRef = useRef<string | null>(null);
@@ -1396,6 +1439,19 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
     }
   };
 
+  const handleCancelDateRequest = async (dateRequestId: string) => {
+    setCancellingDateRequest(true);
+    try {
+      await cancelDateRequest(match.id, dateRequestId, currentUserId);
+      toast.info('Date has been cancelled');
+    } catch (error) {
+      console.error('Error cancelling date request:', error);
+      toast.error('Failed to cancel date');
+    } finally {
+      setCancellingDateRequest(false);
+    }
+  };
+
   const getStatusText = () => {
     if (isOnline) return 'Online';
     if (lastSeen) {
@@ -1707,7 +1763,9 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                       matchName={match.name}
                       onAccept={() => handleAcceptDateRequest(dateRequest.id)}
                       onDecline={() => handleDeclineDateRequest(dateRequest.id)}
+                      onCancel={() => handleCancelDateRequest(dateRequest.id)}
                       isResponding={respondingToDateRequest}
+                      isCancelling={cancellingDateRequest}
                     />
                   );
                 }
@@ -2069,6 +2127,21 @@ function GroupChatView({
   const [deleting, setDeleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Edit group state
+  const [showEditGroupDialog, setShowEditGroupDialog] = useState(false);
+  const [editGroupData, setEditGroupData] = useState({
+    name: group.name,
+    description: group.description,
+    activity: group.activity || '',
+    location: group.location || '',
+    isPrivate: group.isPrivate || false,
+    photo: group.photo || ''
+  });
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [selectedGroupPhoto, setSelectedGroupPhoto] = useState<File | null>(null);
+  const [uploadingGroupPhoto, setUploadingGroupPhoto] = useState(false);
+  const groupPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = group.creatorId === currentUserId;
 
@@ -2130,6 +2203,73 @@ function GroupChatView({
     } finally {
       setDeleting(false);
       setShowDeleteDialog(false);
+    }
+  };
+
+  // Open edit group dialog
+  const handleOpenEditGroupDialog = () => {
+    setEditGroupData({
+      name: group.name,
+      description: group.description,
+      activity: group.activity || '',
+      location: group.location || '',
+      isPrivate: group.isPrivate || false,
+      photo: group.photo || ''
+    });
+    setSelectedGroupPhoto(null);
+    setShowEditGroupDialog(true);
+  };
+
+  // Handle group photo selection
+  const handleGroupPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedGroupPhoto(file);
+    }
+  };
+
+  // Save group edits
+  const handleSaveGroupEdits = async () => {
+    if (!isAdmin) return;
+
+    try {
+      setSavingGroup(true);
+
+      let photoUrl = editGroupData.photo;
+
+      // Upload new photo if selected
+      if (selectedGroupPhoto) {
+        setUploadingGroupPhoto(true);
+        try {
+          const compressed = await compressImage(selectedGroupPhoto);
+          photoUrl = await uploadGroupPhoto(group.id, compressed);
+        } catch (error) {
+          console.error('Error uploading photo:', error);
+          toast.error('Failed to upload photo');
+          setUploadingGroupPhoto(false);
+          setSavingGroup(false);
+          return;
+        }
+        setUploadingGroupPhoto(false);
+      }
+
+      await updateGroup(group.id, currentUserId, {
+        name: editGroupData.name,
+        description: editGroupData.description,
+        activity: editGroupData.activity,
+        location: editGroupData.location,
+        isPrivate: editGroupData.isPrivate,
+        photo: photoUrl
+      });
+
+      toast.success('Group updated!');
+      setShowEditGroupDialog(false);
+      setSelectedGroupPhoto(null);
+    } catch (error) {
+      console.error('Error updating group:', error);
+      toast.error('Failed to update group');
+    } finally {
+      setSavingGroup(false);
     }
   };
 
@@ -2242,16 +2382,28 @@ function GroupChatView({
                   View Members
                 </button>
                 {isAdmin && (
-                  <button
-                    onClick={() => {
-                      setShowDeleteDialog(true);
-                      setShowMenu(false);
-                    }}
-                    className='w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-950 text-red-500 flex items-center gap-2'
-                  >
-                    <Trash2 className='w-4 h-4' />
-                    Delete Group
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        handleOpenEditGroupDialog();
+                        setShowMenu(false);
+                      }}
+                      className='w-full px-4 py-2 text-left text-sm hover:bg-muted dark:hover:bg-gray-800 dark:text-white flex items-center gap-2'
+                    >
+                      <Pencil className='w-4 h-4' />
+                      Edit Group
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDeleteDialog(true);
+                        setShowMenu(false);
+                      }}
+                      className='w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-950 text-red-500 flex items-center gap-2'
+                    >
+                      <Trash2 className='w-4 h-4' />
+                      Delete Group
+                    </button>
+                  </>
                 )}
               </motion.div>
             )}
@@ -2358,6 +2510,170 @@ function GroupChatView({
                 </>
               ) : (
                 'Delete Group'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Group Dialog */}
+      <Dialog open={showEditGroupDialog} onOpenChange={setShowEditGroupDialog}>
+        <DialogContent className='dark:bg-black dark:border-gray-800 sm:max-w-lg max-h-[90vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white flex items-center gap-2'>
+              <Pencil className='w-5 h-5 text-frinder-orange' />
+              Edit Group
+            </DialogTitle>
+            <DialogDescription>Customize your group settings and appearance</DialogDescription>
+          </DialogHeader>
+          <div className='space-y-4'>
+            {/* Group Photo */}
+            <div>
+              <Label className='dark:text-white'>Group Photo</Label>
+              <div className='mt-2 flex items-center gap-4'>
+                <div className='relative'>
+                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700'>
+                    {selectedGroupPhoto ? (
+                      <img 
+                        src={URL.createObjectURL(selectedGroupPhoto)} 
+                        alt='Preview' 
+                        className='w-full h-full object-cover'
+                      />
+                    ) : editGroupData.photo ? (
+                      <img 
+                        src={editGroupData.photo} 
+                        alt={editGroupData.name} 
+                        className='w-full h-full object-cover'
+                      />
+                    ) : (
+                      <div className='w-full h-full flex items-center justify-center'>
+                        <Users className='w-10 h-10 text-muted-foreground' />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => groupPhotoInputRef.current?.click()}
+                    className='absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-frinder-orange text-white flex items-center justify-center shadow-lg hover:bg-frinder-burnt transition-colors'
+                  >
+                    <Camera className='w-4 h-4' />
+                  </button>
+                </div>
+                <input
+                  ref={groupPhotoInputRef}
+                  type='file'
+                  accept='image/*'
+                  onChange={handleGroupPhotoSelect}
+                  className='hidden'
+                />
+                <div className='flex-1'>
+                  <p className='text-sm text-muted-foreground'>
+                    Upload a photo for your group
+                  </p>
+                  {selectedGroupPhoto && (
+                    <button
+                      onClick={() => setSelectedGroupPhoto(null)}
+                      className='text-xs text-red-500 hover:text-red-600 mt-1'
+                    >
+                      Remove selected photo
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor='edit-group-name' className='dark:text-white'>
+                Group Name
+              </Label>
+              <Input
+                id='edit-group-name'
+                value={editGroupData.name}
+                onChange={e => setEditGroupData({ ...editGroupData, name: e.target.value })}
+                placeholder='Weekend Hikers'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+              />
+            </div>
+
+            <div>
+              <Label htmlFor='edit-group-description' className='dark:text-white'>
+                Description
+              </Label>
+              <Textarea
+                id='edit-group-description'
+                value={editGroupData.description}
+                onChange={e => setEditGroupData({ ...editGroupData, description: e.target.value })}
+                placeholder='What is your group about?'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+              />
+            </div>
+
+            {/* Privacy Toggle */}
+            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-gray-900'>
+              <div className='flex items-center gap-3'>
+                {editGroupData.isPrivate ? (
+                  <div className='w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center'>
+                    <Lock className='w-5 h-5 text-amber-600 dark:text-amber-400' />
+                  </div>
+                ) : (
+                  <div className='w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center'>
+                    <Globe className='w-5 h-5 text-green-600 dark:text-green-400' />
+                  </div>
+                )}
+                <div>
+                  <p className='font-medium dark:text-white'>
+                    {editGroupData.isPrivate ? 'Private Group' : 'Public Group'}
+                  </p>
+                  <p className='text-xs text-muted-foreground'>
+                    {editGroupData.isPrivate 
+                      ? 'Only approved members can join' 
+                      : 'Anyone can join this group'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={editGroupData.isPrivate}
+                onCheckedChange={(checked) => setEditGroupData({ ...editGroupData, isPrivate: checked })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor='edit-group-activity' className='dark:text-white'>
+                Activity Schedule
+              </Label>
+              <Input
+                id='edit-group-activity'
+                value={editGroupData.activity}
+                onChange={e => setEditGroupData({ ...editGroupData, activity: e.target.value })}
+                placeholder='Weekend trips'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+              />
+            </div>
+
+            <div>
+              <Label htmlFor='edit-group-location' className='dark:text-white'>
+                Location
+              </Label>
+              <Input
+                id='edit-group-location'
+                value={editGroupData.location}
+                onChange={e => setEditGroupData({ ...editGroupData, location: e.target.value })}
+                placeholder='Campus or City'
+                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+              />
+            </div>
+
+            <Button
+              className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
+              onClick={handleSaveGroupEdits}
+              disabled={savingGroup || !editGroupData.name || !editGroupData.description}
+            >
+              {savingGroup ? (
+                <>
+                  <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                  {uploadingGroupPhoto ? 'Uploading photo...' : 'Saving...'}
+                </>
+              ) : (
+                'Save Changes'
               )}
             </Button>
           </div>
@@ -2636,6 +2952,14 @@ export default function Messages() {
     match: Match;
   }
   const [acceptedDates, setAcceptedDates] = useState<AcceptedDate[]>([]);
+  // Hide dates section toggle
+  const [showDates, setShowDates] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('frinder_showDates');
+      return saved !== null ? JSON.parse(saved) : true;
+    }
+    return true;
+  });
 
   // Subscribe to date requests for all matches and show toast when outside conversation
   useEffect(() => {
@@ -2975,7 +3299,7 @@ export default function Messages() {
   }
 
   return (
-    <div className='h-full flex flex-col dark:bg-black'>
+    <div className='h-full flex flex-col dark:bg-black overflow-hidden'>
       {/* Incoming Call UI */}
       <AnimatePresence>
         {showIncomingCall && incomingCall && (
@@ -3039,19 +3363,19 @@ export default function Messages() {
       </AnimatePresence>
 
       {/* Header */}
-      <div className='px-3 sm:px-4 pt-3 sm:pt-4 pb-2'>
+      <div className='flex-shrink-0 px-4 sm:px-5 pt-4 sm:pt-5 pb-3'>
         <h1 className='text-xl sm:text-2xl font-bold dark:text-white'>Messages</h1>
       </div>
 
-      <div className='flex-1 overflow-y-auto'>
+      <div className='flex-1 min-h-0 overflow-y-auto'>
         {/* New matches */}
         {newMatches.length > 0 && (
-          <div className='px-3 sm:px-4 py-3 sm:py-4'>
-            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
-              <Sparkles className='w-3 h-3 sm:w-4 sm:h-4 text-frinder-orange' />
+          <div className='py-4 sm:py-5'>
+            <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-4 sm:mb-5 flex items-center gap-2'>
+              <Sparkles className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-frinder-orange' />
               New Matches
             </h2>
-            <div className='flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-3 sm:-mx-4 px-3 sm:px-4'>
+            <div className='flex gap-4 sm:gap-5 overflow-x-auto pb-3 pt-1 px-4 sm:px-5'>
               {newMatches.map(match => (
                 <motion.button
                   key={match.id}
@@ -3061,7 +3385,7 @@ export default function Messages() {
                   className='flex flex-col items-center gap-1.5 sm:gap-2 min-w-[60px] sm:min-w-[72px]'
                 >
                   <div className='relative'>
-                    <Avatar className='w-14 h-14 sm:w-16 sm:h-16 ring-2 ring-frinder-orange ring-offset-2 ring-offset-white dark:ring-offset-gray-900 shadow-md'>
+                    <Avatar className='w-14 h-14 sm:w-16 sm:h-16 border-2 border-frinder-orange shadow-md'>
                       <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
                       <AvatarFallback className='bg-frinder-orange text-white font-medium'>
                         {match.name[0]}
@@ -3080,9 +3404,9 @@ export default function Messages() {
 
         {/* Conversations */}
         {conversations.length > 0 && (
-          <div className='px-3 sm:px-4'>
-            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3'>Messages</h2>
-            <div className='space-y-1.5 sm:space-y-2'>
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+            <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-3 sm:mb-4'>Messages</h2>
+            <div className='px-4 sm:px-5 space-y-1'>
               <AnimatePresence>
                 {conversations.map(match => (
                   <motion.button
@@ -3091,7 +3415,7 @@ export default function Messages() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     onClick={() => setSelectedMatch(match)}
-                    className={`w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-muted dark:hover:bg-gray-800 transition-colors ${
+                    className={`w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl hover:bg-muted dark:hover:bg-gray-800 transition-colors ${
                       match.unreadCount > 0 ? 'bg-frinder-orange/5 dark:bg-frinder-orange/10' : ''
                     }`}
                   >
@@ -3160,12 +3484,12 @@ export default function Messages() {
 
         {/* Unmatched Conversations - Chat history with disabled messaging */}
         {unmatchedConversations.length > 0 && (
-          <div className='px-3 sm:px-4 mt-4'>
-            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
-              <UserX className='w-3 h-3' />
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+            <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2'>
+              <UserX className='w-3.5 h-3.5' />
               Past Conversations
             </h2>
-            <div className='space-y-1.5 sm:space-y-2'>
+            <div className='px-4 sm:px-5 space-y-1'>
               <AnimatePresence>
                 {unmatchedConversations.map(match => (
                   <motion.button
@@ -3174,7 +3498,7 @@ export default function Messages() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     onClick={() => setSelectedMatch(match)}
-                    className='w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-muted dark:hover:bg-gray-800 transition-colors opacity-60'
+                    className='w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl hover:bg-muted dark:hover:bg-gray-800 transition-colors opacity-60'
                   >
                     <div className='relative'>
                       <Avatar className='w-12 h-12 sm:w-14 sm:h-14 grayscale'>
@@ -3203,171 +3527,278 @@ export default function Messages() {
 
         {/* User's Groups */}
         {userGroups.length > 0 && (
-          <div className='px-3 sm:px-4 mt-4'>
-            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
-              <Users className='w-3 h-3 text-frinder-orange' />
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+            <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2'>
+              <Users className='w-3.5 h-3.5 text-frinder-orange' />
               Your Groups
             </h2>
-            <div className='space-y-1.5 sm:space-y-2'>
+            <div className='px-4 sm:px-5 space-y-1'>
               <AnimatePresence>
-                {userGroups.map(group => (
-                  <motion.button
-                    key={group.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    onClick={() => handleOpenGroupChat(group)}
-                    className='w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50 transition-colors text-left'
-                  >
-                    <div className='relative'>
-                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14 shadow-sm border border-gray-200 dark:border-gray-700'>
-                        <AvatarImage src={group.photo} alt={group.name} className='object-cover' />
-                        <AvatarFallback className='bg-frinder-orange text-white'>
-                          <Users className='w-5 h-5' />
-                        </AvatarFallback>
-                      </Avatar>
-                      {group.creatorId === user?.uid && (
-                        <div className='absolute -top-1 -right-1 w-5 h-5 bg-frinder-gold rounded-full flex items-center justify-center'>
-                          <Crown className='w-3 h-3 text-white' />
+                {userGroups
+                  .sort((a, b) => {
+                    // Sort by last message time, most recent first
+                    const timeA = a.lastMessageTime?.toDate?.()?.getTime() || a.createdAt?.toDate?.()?.getTime() || 0;
+                    const timeB = b.lastMessageTime?.toDate?.()?.getTime() || b.createdAt?.toDate?.()?.getTime() || 0;
+                    return timeB - timeA;
+                  })
+                  .map(group => {
+                    const lastMessageTime = group.lastMessageTime?.toDate?.();
+                    return (
+                      <motion.button
+                        key={group.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        onClick={() => handleOpenGroupChat(group)}
+                        className='w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl hover:bg-muted dark:hover:bg-gray-800 transition-colors text-left'
+                      >
+                        <div className='relative'>
+                          <Avatar className='w-12 h-12 sm:w-14 sm:h-14 shadow-sm border border-gray-200 dark:border-gray-700'>
+                            <AvatarImage src={group.photo} alt={group.name} className='object-cover' />
+                            <AvatarFallback className='bg-frinder-orange text-white'>
+                              <Users className='w-5 h-5' />
+                            </AvatarFallback>
+                          </Avatar>
+                          {group.creatorId === user?.uid && (
+                            <div className='absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-frinder-gold rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900'>
+                              <Crown className='w-2.5 h-2.5 text-white' />
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className='flex-1 text-left min-w-0'>
-                      <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
-                        <h3 className='font-semibold text-sm sm:text-base dark:text-white truncate'>{group.name}</h3>
-                        <Badge variant='outline' className='text-[10px] shrink-0'>
-                          {group.members?.length || 1} members
-                        </Badge>
-                      </div>
-                      <p className='text-xs sm:text-sm truncate text-muted-foreground'>
-                        {group.activity || group.description}
-                      </p>
-                    </div>
-                    <div className='flex items-center gap-1' onClick={e => e.stopPropagation()}>
-                      {/* Admin can view/manage members */}
-                      {group.creatorId === user?.uid && (
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleViewGroupMembers(group);
-                          }}
-                          className='p-2 rounded-full hover:bg-muted dark:hover:bg-gray-700 transition-colors'
-                          title='Manage members'
-                        >
-                          <Users className='w-4 h-4 text-frinder-orange' />
-                        </button>
-                      )}
-                      {/* Non-admin can leave */}
-                      {group.creatorId !== user?.uid && (
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleLeaveGroup(group.id);
-                          }}
-                          className='p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-colors'
-                          title='Leave group'
-                        >
-                          <LogOut className='w-4 h-4 text-red-500' />
-                        </button>
-                      )}
-                    </div>
-                  </motion.button>
-                ))}
+                        <div className='flex-1 text-left min-w-0'>
+                          <div className='flex items-center justify-between mb-0.5 sm:mb-1'>
+                            <h3 className='font-semibold text-sm sm:text-base dark:text-white truncate'>{group.name}</h3>
+                            {lastMessageTime && (
+                              <span className='text-[10px] sm:text-xs text-muted-foreground shrink-0'>
+                                {formatTime(lastMessageTime)}
+                              </span>
+                            )}
+                          </div>
+                          <p className='text-xs sm:text-sm truncate text-muted-foreground'>
+                            {group.lastMessage ? (
+                              <>
+                                {group.lastMessageSender && group.lastMessageSender !== userProfile?.displayName && (
+                                  <span className='font-medium'>{group.lastMessageSender.split(' ')[0]}: </span>
+                                )}
+                                {group.lastMessage}
+                              </>
+                            ) : (
+                              <span className='flex items-center gap-1'>
+                                <Users className='w-3 h-3' />
+                                {group.members?.length || 1} members · {group.activity || 'Start chatting!'}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </motion.button>
+                    );
+                  })}
               </AnimatePresence>
             </div>
           </div>
         )}
 
-        {/* Upcoming Dates Section */}
+        {/* Dates Section with Toggle */}
         {acceptedDates.length > 0 && (
-          <div className='px-3 sm:px-4 mt-4'>
-            <h2 className='text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3 flex items-center gap-2'>
-              <CalendarHeart className='w-3 h-3 text-frinder-orange' />
-              Upcoming Dates
-            </h2>
-            <div className='space-y-1.5 sm:space-y-2'>
-              <AnimatePresence>
-                {acceptedDates.map(({ dateRequest, match }) => {
-                  const dateObj = dateRequest.date instanceof Date ? dateRequest.date : dateRequest.date.toDate();
-                  const isPast = dateObj < new Date();
-                  const isToday = dateObj.toDateString() === new Date().toDateString();
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+            {/* Toggle Button */}
+            <button
+              onClick={() => {
+                const newValue = !showDates;
+                setShowDates(newValue);
+                localStorage.setItem('frinder_showDates', JSON.stringify(newValue));
+              }}
+              className='w-full flex items-center justify-between px-4 sm:px-5 py-2 hover:bg-muted dark:hover:bg-gray-800 transition-colors mb-3'
+            >
+              <div className='flex items-center gap-2'>
+                <CalendarHeart className='w-4 h-4 text-frinder-orange' />
+                <span className='text-xs sm:text-sm font-semibold text-muted-foreground'>
+                  My Dates ({acceptedDates.length})
+                </span>
+              </div>
+              <div className='flex items-center gap-2'>
+                {showDates ? (
+                  <>
+                    <Eye className='w-4 h-4 text-muted-foreground' />
+                    <ChevronUp className='w-4 h-4 text-muted-foreground' />
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className='w-4 h-4 text-muted-foreground' />
+                    <ChevronDown className='w-4 h-4 text-muted-foreground' />
+                  </>
+                )}
+              </div>
+            </button>
 
-                  return (
-                    <motion.button
-                      key={dateRequest.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      onClick={() => setSelectedMatch(match)}
-                      className={`w-full flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-colors text-left ${
-                        isPast
-                          ? 'bg-muted/30 dark:bg-gray-800/30'
-                          : isToday
-                          ? 'bg-frinder-orange/10 dark:bg-frinder-orange/20 border border-frinder-orange/30'
-                          : 'bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50'
-                      }`}
-                    >
-                      <div className='relative'>
-                        <Avatar
-                          className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${
-                            isToday
-                              ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900'
-                              : 'border border-gray-200 dark:border-gray-700'
-                          }`}
-                        >
-                          <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
-                          <AvatarFallback className='bg-frinder-orange text-white font-medium'>
-                            {match.name[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isToday && (
-                          <div className='absolute -top-1 -right-1 w-5 h-5 bg-frinder-orange rounded-full flex items-center justify-center'>
-                            <PartyPopper className='w-3 h-3 text-white' />
+            <AnimatePresence>
+              {showDates && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className='overflow-hidden'
+                >
+                  {/* Upcoming Dates */}
+                  {(() => {
+                    const now = new Date();
+                    const upcomingDates = acceptedDates.filter(({ dateRequest }) => {
+                      const dateObj = dateRequest.date instanceof Date ? dateRequest.date : dateRequest.date.toDate();
+                      return dateObj >= now;
+                    });
+                    const pastDates = acceptedDates.filter(({ dateRequest }) => {
+                      const dateObj = dateRequest.date instanceof Date ? dateRequest.date : dateRequest.date.toDate();
+                      return dateObj < now;
+                    });
+
+                    return (
+                      <div className='px-4 sm:px-5'>
+                        {upcomingDates.length > 0 && (
+                          <div className='mb-5'>
+                            <h3 className='text-xs font-medium text-frinder-orange mb-3 flex items-center gap-2'>
+                              <CalendarHeart className='w-3.5 h-3.5' />
+                              Upcoming Dates
+                            </h3>
+                            <div className='space-y-1'>
+                              {upcomingDates.map(({ dateRequest, match }) => {
+                                const dateObj = dateRequest.date instanceof Date ? dateRequest.date : dateRequest.date.toDate();
+                                const isToday = dateObj.toDateString() === new Date().toDateString();
+
+                                return (
+                                  <motion.button
+                                    key={dateRequest.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    onClick={() => setSelectedMatch(match)}
+                                    className={`w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl transition-colors text-left ${
+                                      isToday
+                                        ? 'bg-frinder-orange/10 dark:bg-frinder-orange/20 border border-frinder-orange/30'
+                                        : 'bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50'
+                                    }`}
+                                  >
+                                    <div className='relative'>
+                                      <Avatar
+                                        className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${
+                                          isToday
+                                            ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900'
+                                            : 'border border-gray-200 dark:border-gray-700'
+                                        }`}
+                                      >
+                                        <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
+                                        <AvatarFallback className='bg-frinder-orange text-white font-medium'>
+                                          {match.name[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {isToday && (
+                                        <div className='absolute -top-1 -right-1 w-5 h-5 bg-frinder-orange rounded-full flex items-center justify-center'>
+                                          <PartyPopper className='w-3 h-3 text-white' />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className='flex-1 text-left min-w-0'>
+                                      <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
+                                        <h3 className='font-semibold text-sm sm:text-base truncate dark:text-white'>
+                                          {dateRequest.title}
+                                        </h3>
+                                        {isToday && (
+                                          <Badge className='bg-frinder-orange text-white text-[10px] shrink-0'>Today!</Badge>
+                                        )}
+                                      </div>
+                                      <div className='flex items-center gap-3 text-xs sm:text-sm text-muted-foreground'>
+                                        <span className='flex items-center gap-1'>
+                                          <Calendar className='w-3 h-3' />
+                                          {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                        <span className='flex items-center gap-1'>
+                                          <Clock className='w-3 h-3' />
+                                          {dateRequest.time}
+                                        </span>
+                                      </div>
+                                      <div className='flex items-center gap-1 mt-0.5 text-xs text-muted-foreground'>
+                                        <MapPin className='w-3 h-3 shrink-0' />
+                                        <span className='truncate'>{dateRequest.location}</span>
+                                      </div>
+                                    </div>
+                                    <div className='flex flex-col items-end gap-1'>
+                                      <span className='text-xs text-muted-foreground'>with</span>
+                                      <span className='text-xs font-medium text-frinder-orange'>{match.name}</span>
+                                    </div>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {pastDates.length > 0 && (
+                          <div>
+                            <h3 className='text-xs font-medium text-muted-foreground mb-3 flex items-center gap-2'>
+                              <History className='w-3.5 h-3.5' />
+                              Past Dates
+                            </h3>
+                            <div className='space-y-1'>
+                              {pastDates.map(({ dateRequest, match }) => {
+                                const dateObj = dateRequest.date instanceof Date ? dateRequest.date : dateRequest.date.toDate();
+
+                                return (
+                                  <motion.button
+                                    key={dateRequest.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    onClick={() => setSelectedMatch(match)}
+                                    className='w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-muted/30 dark:bg-gray-800/30 hover:bg-muted/50 dark:hover:bg-gray-700/30 transition-colors text-left opacity-70'
+                                  >
+                                    <div className='relative'>
+                                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14 shadow-sm border border-gray-200 dark:border-gray-700'>
+                                        <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
+                                        <AvatarFallback className='bg-gray-400 text-white font-medium'>
+                                          {match.name[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </div>
+                                    <div className='flex-1 text-left min-w-0'>
+                                      <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
+                                        <h3 className='font-semibold text-sm sm:text-base truncate text-muted-foreground'>
+                                          {dateRequest.title}
+                                        </h3>
+                                        <Badge variant='outline' className='text-[10px] shrink-0 opacity-60'>
+                                          Past
+                                        </Badge>
+                                      </div>
+                                      <div className='flex items-center gap-3 text-xs sm:text-sm text-muted-foreground'>
+                                        <span className='flex items-center gap-1'>
+                                          <Calendar className='w-3 h-3' />
+                                          {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                        <span className='flex items-center gap-1'>
+                                          <Clock className='w-3 h-3' />
+                                          {dateRequest.time}
+                                        </span>
+                                      </div>
+                                      <div className='flex items-center gap-1 mt-0.5 text-xs text-muted-foreground'>
+                                        <MapPin className='w-3 h-3 shrink-0' />
+                                        <span className='truncate'>{dateRequest.location}</span>
+                                      </div>
+                                    </div>
+                                    <div className='flex flex-col items-end gap-1'>
+                                      <span className='text-xs text-muted-foreground'>with</span>
+                                      <span className='text-xs font-medium text-muted-foreground'>{match.name}</span>
+                                    </div>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
-                      <div className='flex-1 text-left min-w-0'>
-                        <div className='flex items-center gap-2 mb-0.5 sm:mb-1'>
-                          <h3
-                            className={`font-semibold text-sm sm:text-base truncate ${
-                              isPast ? 'text-muted-foreground' : 'dark:text-white'
-                            }`}
-                          >
-                            {dateRequest.title}
-                          </h3>
-                          {isToday && (
-                            <Badge className='bg-frinder-orange text-white text-[10px] shrink-0'>Today!</Badge>
-                          )}
-                          {isPast && (
-                            <Badge variant='outline' className='text-[10px] shrink-0 opacity-60'>
-                              Past
-                            </Badge>
-                          )}
-                        </div>
-                        <div className='flex items-center gap-3 text-xs sm:text-sm text-muted-foreground'>
-                          <span className='flex items-center gap-1'>
-                            <Calendar className='w-3 h-3' />
-                            {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </span>
-                          <span className='flex items-center gap-1'>
-                            <Clock className='w-3 h-3' />
-                            {dateRequest.time}
-                          </span>
-                        </div>
-                        <div className='flex items-center gap-1 mt-0.5 text-xs text-muted-foreground'>
-                          <MapPin className='w-3 h-3 shrink-0' />
-                          <span className='truncate'>{dateRequest.location}</span>
-                        </div>
-                      </div>
-                      <div className='flex flex-col items-end gap-1'>
-                        <span className='text-xs text-muted-foreground'>with</span>
-                        <span className='text-xs font-medium text-frinder-orange'>{match.name}</span>
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
+                    );
+                  })()}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -3434,17 +3865,17 @@ export default function Messages() {
         </Dialog>
 
         {/* Empty state */}
-        {matches.length === 0 && (
-          <div className='flex flex-col items-center justify-center h-full text-center px-6 sm:px-8'>
+        {matches.length === 0 && userGroups.length === 0 && (
+          <div className='flex flex-col items-center justify-center h-full text-center px-8 sm:px-10'>
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className='w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#ed8c00]/10 flex items-center justify-center mb-4 sm:mb-6'
+              className='w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-frinder-orange/10 flex items-center justify-center mb-6 sm:mb-8'
             >
-              <Heart className='w-10 h-10 sm:w-12 sm:h-12 text-[#ed8c00]' />
+              <Heart className='w-12 h-12 sm:w-14 sm:h-14 text-frinder-orange' />
             </motion.div>
-            <h2 className='text-xl sm:text-2xl font-bold mb-2 dark:text-white'>No matches yet</h2>
-            <p className='text-muted-foreground text-sm sm:text-base'>Start swiping to find your match!</p>
+            <h2 className='text-xl sm:text-2xl font-bold mb-3 dark:text-white'>No matches yet</h2>
+            <p className='text-muted-foreground text-sm sm:text-base max-w-xs'>Start swiping to find your match!</p>
           </div>
         )}
       </div>

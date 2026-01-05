@@ -29,6 +29,7 @@ import {
   getUserProfileStats,
   subscribeToUserCredits,
   subscribeToUserSubscription,
+  isDisplayNameTaken,
   type UserCredits,
   type UserSubscription
 } from '@/lib/firebaseServices';
@@ -57,7 +58,9 @@ import {
   Ban,
   Check,
   Gift,
-  Users
+  Users,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -78,6 +81,12 @@ export default function Profile() {
   // Stats state
   const [profileStats, setProfileStats] = useState({ matches: 0, likesReceived: 0, superLikesReceived: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
+  
+  // Display name validation state
+  const [checkingDisplayName, setCheckingDisplayName] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const [displayNameValid, setDisplayNameValid] = useState(true); // Start as valid since it's their current name
+  const displayNameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Credits and subscription state
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
@@ -140,7 +149,61 @@ export default function Profile() {
     relationshipGoal: userProfile?.relationshipGoal || 'relationship'
   };
 
+  // Check display name availability with debounce
+  const checkDisplayName = async (name: string) => {
+    if (displayNameCheckTimeout.current) {
+      clearTimeout(displayNameCheckTimeout.current);
+    }
+
+    const trimmedName = name.trim();
+    
+    // If it's the same as current name, it's valid
+    if (trimmedName.toLowerCase() === (userProfile?.displayName || '').toLowerCase()) {
+      setDisplayNameError(null);
+      setDisplayNameValid(true);
+      setCheckingDisplayName(false);
+      return;
+    }
+    
+    if (trimmedName.length < 2) {
+      setDisplayNameError('Display name must be at least 2 characters');
+      setDisplayNameValid(false);
+      setCheckingDisplayName(false);
+      return;
+    }
+
+    setCheckingDisplayName(true);
+    setDisplayNameError(null);
+    setDisplayNameValid(false);
+
+    displayNameCheckTimeout.current = setTimeout(async () => {
+      try {
+        const isTaken = await isDisplayNameTaken(trimmedName, user?.uid);
+        if (isTaken) {
+          setDisplayNameError('This display name is already taken');
+          setDisplayNameValid(false);
+        } else {
+          setDisplayNameError(null);
+          setDisplayNameValid(true);
+        }
+      } catch (error) {
+        console.error('Error checking display name:', error);
+      } finally {
+        setCheckingDisplayName(false);
+      }
+    }, 500);
+  };
+
+  const handleDisplayNameChange = (value: string) => {
+    setEditData(prev => ({ ...prev, displayName: value }));
+    checkDisplayName(value);
+  };
+
   const handleSaveProfile = async () => {
+    if (displayNameError || !displayNameValid || checkingDisplayName) {
+      toast.error('Please use a valid display name');
+      return;
+    }
     try {
       await updateProfile(editData);
       setIsEditing(false);
@@ -427,12 +490,34 @@ export default function Profile() {
                       <Label htmlFor='name' className='dark:text-white'>
                         Display Name
                       </Label>
-                      <Input
-                        id='name'
-                        value={editData.displayName}
-                        onChange={e => setEditData(prev => ({ ...prev, displayName: e.target.value }))}
-                        className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
-                      />
+                      <div className='relative'>
+                        <Input
+                          id='name'
+                          value={editData.displayName}
+                          onChange={e => handleDisplayNameChange(e.target.value)}
+                          className={`dark:bg-gray-900 dark:border-gray-800 dark:text-white pr-10 ${
+                            displayNameError ? 'border-red-500 focus-visible:ring-red-500' : 
+                            displayNameValid ? 'border-green-500 focus-visible:ring-green-500' : ''
+                          }`}
+                        />
+                        <div className='absolute right-3 top-1/2 -translate-y-1/2'>
+                          {checkingDisplayName && (
+                            <Loader2 className='w-4 h-4 text-muted-foreground animate-spin' />
+                          )}
+                          {!checkingDisplayName && displayNameError && (
+                            <AlertCircle className='w-4 h-4 text-red-500' />
+                          )}
+                          {!checkingDisplayName && displayNameValid && (
+                            <CheckCircle className='w-4 h-4 text-green-500' />
+                          )}
+                        </div>
+                      </div>
+                      {displayNameError && (
+                        <p className='text-xs text-red-500 flex items-center gap-1'>
+                          <AlertCircle className='w-3 h-3' />
+                          {displayNameError}
+                        </p>
+                      )}
                     </div>
 
                     <div className='grid grid-cols-2 gap-3'>
