@@ -536,7 +536,7 @@ export default function MainApp() {
                 className='relative flex flex-col items-center gap-1 p-2 min-w-[50px] sm:min-w-[60px]'
               >
                 <div className='relative'>
-                  {tab.id === 'profile' && userProfile?.profileImageUrl ? (
+                  {tab.id === 'profile' && userProfile?.photos?.[0] ? (
                     <div
                       className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full overflow-hidden transition-all ${
                         activeTab === tab.id
@@ -545,7 +545,7 @@ export default function MainApp() {
                       }`}
                     >
                       <img
-                        src={userProfile.profileImageUrl}
+                        src={userProfile.photos[0]}
                         alt='Profile'
                         className='w-full h-full object-cover'
                       />
