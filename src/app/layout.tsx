@@ -160,9 +160,7 @@ export const metadata: Metadata = {
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' }
     ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
-    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
     shortcut: '/favicon.ico'
   },
 
@@ -177,11 +175,9 @@ export const metadata: Metadata = {
     startupImage: ['/frinder-logo.png']
   },
 
-  // Verification (add your actual verification codes from Google Search Console)
-  // To get your code: Go to https://search.google.com/search-console → Add property → frinder.co → HTML tag method
+  // Verification (Google Search Console verified)
   verification: {
-    google: 'ADD_YOUR_GOOGLE_VERIFICATION_CODE_HERE'
-    // After verifying, submit sitemap at: https://search.google.com/search-console/sitemaps
+    google: 'F60JZzvbgAAsau_N02xNcR-vF7vJlda023ILQCNphOk'
   },
 
   // Category
@@ -310,7 +306,8 @@ const jsonLd = {
       about: {
         '@id': 'https://frinder.co/#organization'
       },
-      description: 'The #1 FREE social app for finding friends and meaningful connections. Join millions of users today!',
+      description:
+        'The #1 FREE social app for finding friends and meaningful connections. Join millions of users today!',
       breadcrumb: {
         '@id': 'https://frinder.co/#breadcrumb'
       },
@@ -436,11 +433,11 @@ export default function RootLayout({
 
         {/* Canonical URL */}
         <link rel='canonical' href='https://frinder.co' />
-        
+
         {/* Geo Tags for Local SEO */}
         <meta name='geo.region' content='US' />
         <meta name='geo.placename' content='United States' />
-        
+
         {/* Additional SEO meta tags */}
         <meta name='rating' content='general' />
         <meta name='revisit-after' content='1 days' />
@@ -450,10 +447,13 @@ export default function RootLayout({
         <meta name='target' content='all' />
         <meta name='HandheldFriendly' content='True' />
         <meta name='MobileOptimized' content='320' />
-        
+
         {/* Schema.org WebPage */}
         <meta itemProp='name' content='Frinder - Find Friends & Meaningful Connections' />
-        <meta itemProp='description' content='The #1 FREE app for finding friends and meaningful connections. Swipe, match, and chat with people near you.' />
+        <meta
+          itemProp='description'
+          content='The #1 FREE app for finding friends and meaningful connections. Swipe, match, and chat with people near you.'
+        />
         <meta itemProp='image' content='https://frinder.co/og-image.png' />
 
         {/* JSON-LD Structured Data */}

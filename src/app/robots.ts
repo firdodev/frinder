@@ -6,15 +6,15 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/checkout/'],
+        disallow: ['/api/', '/checkout/']
       },
       {
         userAgent: 'Googlebot',
         allow: '/',
-        disallow: ['/api/'],
-      },
+        disallow: ['/api/']
+      }
     ],
     sitemap: 'https://frinder.co/sitemap.xml',
-    host: 'https://frinder.co',
+    host: 'https://frinder.co'
   };
 }

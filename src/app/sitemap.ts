@@ -9,19 +9,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: baseUrl,
       lastModified: currentDate,
       changeFrequency: 'daily',
-      priority: 1.0,
+      priority: 1.0
     },
     {
       url: `${baseUrl}/shop`,
       lastModified: currentDate,
       changeFrequency: 'weekly',
-      priority: 0.9,
+      priority: 0.9
     },
     {
       url: `${baseUrl}/profile`,
       lastModified: currentDate,
       changeFrequency: 'weekly',
-      priority: 0.8,
-    },
+      priority: 0.8
+    }
   ];
 }

@@ -1864,17 +1864,20 @@ export interface RedeemCode {
 // Valid redeem codes (checked directly, no Firebase init needed)
 export const VALID_REDEEM_CODES: { [code: string]: 'pro' | 'superlikes' } = {
   // Pro codes (random alphanumeric)
-  'X7K9M2P4Q1': 'pro',
-  'R3T8W5N6J2': 'pro',
+  X7K9M2P4Q1: 'pro',
+  R3T8W5N6J2: 'pro',
   // Super likes codes (random alphanumeric)
-  'B4H7L9C1F6': 'superlikes',
-  'Y2V5Z8D3G7': 'superlikes'
+  B4H7L9C1F6: 'superlikes',
+  Y2V5Z8D3G7: 'superlikes'
 };
 
 // Validate and redeem a code
-export async function redeemCode(userId: string, code: string): Promise<{ success: boolean; type?: 'pro' | 'superlikes'; error?: string }> {
+export async function redeemCode(
+  userId: string,
+  code: string
+): Promise<{ success: boolean; type?: 'pro' | 'superlikes'; error?: string }> {
   const upperCode = code.trim().toUpperCase();
-  
+
   // First check if it's a valid code from our list
   const codeType = VALID_REDEEM_CODES[upperCode];
   if (!codeType) {
@@ -1922,7 +1925,7 @@ export async function redeemCode(userId: string, code: string): Promise<{ succes
 export async function purchasePremiumWithSuperLikes(userId: string): Promise<void> {
   const subRef = doc(db, 'userSubscriptions', userId);
   const creditsRef = doc(db, 'userCredits', userId);
-  
+
   await getUserSubscription(userId); // Ensure initialized
   await getUserCredits(userId); // Ensure initialized
 
@@ -1956,22 +1959,24 @@ export async function purchasePremiumWithSuperLikes(userId: string): Promise<voi
 }
 
 // Check if Pro user can use a super like (1 per day, 15 per month)
-export async function canUseProSuperLike(userId: string): Promise<{ canUse: boolean; reason?: string; remaining?: number }> {
+export async function canUseProSuperLike(
+  userId: string
+): Promise<{ canUse: boolean; reason?: string; remaining?: number }> {
   const subRef = doc(db, 'userSubscriptions', userId);
   const subDoc = await getDoc(subRef);
-  
+
   if (!subDoc.exists()) {
     return { canUse: false, reason: 'No subscription found' };
   }
 
   const sub = subDoc.data();
-  
+
   if (!sub.isPremium) {
     return { canUse: false, reason: 'Not a Pro user' };
   }
 
   const now = new Date();
-  
+
   // Check if monthly reset is needed
   if (sub.proSuperLikesResetAt && sub.proSuperLikesResetAt.toDate() < now) {
     // Reset monthly super likes
@@ -1997,7 +2002,7 @@ export async function canUseProSuperLike(userId: string): Promise<{ canUse: bool
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     lastUsed.setHours(0, 0, 0, 0);
-    
+
     if (lastUsed.getTime() === today.getTime()) {
       return { canUse: false, reason: 'You can only use 1 Pro super like per day. Try again tomorrow!', remaining };
     }
@@ -2015,13 +2020,13 @@ export async function useProSuperLike(userId: string): Promise<boolean> {
 
   const subRef = doc(db, 'userSubscriptions', userId);
   const creditsRef = doc(db, 'userCredits', userId);
-  
+
   // Update both subscription and credits to keep them in sync
   await updateDoc(subRef, {
     proSuperLikesRemaining: increment(-1),
     lastProSuperLikeUsed: serverTimestamp()
   });
-  
+
   // Also decrement userCredits.superLikes to keep UI in sync
   await updateDoc(creditsRef, {
     superLikes: increment(-1)

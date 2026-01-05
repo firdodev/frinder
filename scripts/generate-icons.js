@@ -24,7 +24,7 @@ async function generateIcons() {
     { name: 'favicon-32x32.png', size: 32 },
     { name: 'apple-touch-icon.png', size: 180 },
     { name: 'icon-192.png', size: 192 },
-    { name: 'icon-512.png', size: 512 },
+    { name: 'icon-512.png', size: 512 }
   ];
 
   for (const { name, size } of faviconSizes) {
@@ -57,7 +57,7 @@ async function generateIcons() {
         </linearGradient>
       </defs>
       <rect width="${ogWidth}" height="${ogHeight}" fill="url(#grad)"/>
-      <text x="${ogWidth/2}" y="${ogHeight - 80}" 
+      <text x="${ogWidth / 2}" y="${ogHeight - 80}" 
             font-family="Arial, sans-serif" 
             font-size="48" 
             font-weight="bold" 
@@ -76,11 +76,13 @@ async function generateIcons() {
 
   // Composite logo onto background
   await sharp(ogBackground)
-    .composite([{
-      input: resizedLogo,
-      left: Math.floor((ogWidth - logoSize) / 2),
-      top: Math.floor((ogHeight - logoSize) / 2) - 40,
-    }])
+    .composite([
+      {
+        input: resizedLogo,
+        left: Math.floor((ogWidth - logoSize) / 2),
+        top: Math.floor((ogHeight - logoSize) / 2) - 40
+      }
+    ])
     .png()
     .toFile(path.join(publicDir, 'og-image.png'));
   console.log(`✓ Generated og-image.png (${ogWidth}x${ogHeight})`);

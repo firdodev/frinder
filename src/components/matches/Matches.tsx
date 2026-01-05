@@ -81,7 +81,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
     if (!user?.uid) return;
 
     setLoading(true);
-    
+
     // Subscribe to matches
     const unsubscribeMatches = subscribeToMatches(user.uid, async (firebaseMatches: FirebaseMatch[]) => {
       const mappedMatches: MatchProfile[] = await Promise.all(
@@ -115,12 +115,12 @@ export default function Matches({ onStartChat }: MatchesProps) {
     });
 
     // Subscribe to pending requests (outgoing)
-    const unsubscribePending = subscribeToPendingRequests(user.uid, (requests) => {
+    const unsubscribePending = subscribeToPendingRequests(user.uid, requests => {
       setPendingRequests(requests);
     });
 
     // Subscribe to incoming requests (people who liked you)
-    const unsubscribeIncoming = subscribeToIncomingRequests(user.uid, (requests) => {
+    const unsubscribeIncoming = subscribeToIncomingRequests(user.uid, requests => {
       setIncomingRequests(requests);
     });
 
@@ -175,9 +175,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
     }
   };
 
-  const filteredMatches = matches.filter(m =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMatches = matches.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const formatMatchDate = (date: Date) => {
     const now = new Date();
@@ -209,7 +207,8 @@ export default function Matches({ onStartChat }: MatchesProps) {
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Unmatch {matchToUnmatch?.name}?</DialogTitle>
             <DialogDescription>
-              This will remove your match and you won't be able to message each other anymore. This action cannot be undone.
+              This will remove your match and you won't be able to message each other anymore. This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <div className='flex gap-3 mt-4'>
@@ -244,11 +243,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
             >
               {/* Match Profile Header */}
               <div className='relative h-72 lg:h-64'>
-                <img
-                  src={selectedMatch.photo}
-                  alt={selectedMatch.name}
-                  className='w-full h-full object-cover'
-                />
+                <img src={selectedMatch.photo} alt={selectedMatch.name} className='w-full h-full object-cover' />
                 <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
                 <button
                   onClick={() => setSelectedMatch(null)}
@@ -258,7 +253,8 @@ export default function Matches({ onStartChat }: MatchesProps) {
                 </button>
                 <div className='absolute bottom-4 left-4 right-4'>
                   <h2 className='text-2xl font-bold text-white'>
-                    {selectedMatch.name}{selectedMatch.age ? `, ${selectedMatch.age}` : ''}
+                    {selectedMatch.name}
+                    {selectedMatch.age ? `, ${selectedMatch.age}` : ''}
                   </h2>
                   {selectedMatch.location && (
                     <div className='flex items-center gap-1 text-white/80 mt-1'>
@@ -476,13 +472,15 @@ export default function Matches({ onStartChat }: MatchesProps) {
                       </Badge>
                     </div>
                     <h2 className='text-2xl font-bold text-white'>
-                      {selectedPending.displayName}{selectedPending.age ? `, ${selectedPending.age}` : ''}
+                      {selectedPending.displayName}
+                      {selectedPending.age ? `, ${selectedPending.age}` : ''}
                     </h2>
                     {selectedPending.city && (
                       <div className='flex items-center gap-1 text-white/80 mt-1'>
                         <MapPin className='w-4 h-4' />
                         <span className='text-sm'>
-                          {selectedPending.city}{selectedPending.country ? `, ${selectedPending.country}` : ''}
+                          {selectedPending.city}
+                          {selectedPending.country ? `, ${selectedPending.country}` : ''}
                         </span>
                       </div>
                     )}
@@ -642,13 +640,15 @@ export default function Matches({ onStartChat }: MatchesProps) {
                       </Badge>
                     </div>
                     <h2 className='text-2xl font-bold text-white'>
-                      {selectedIncoming.displayName}{selectedIncoming.age ? `, ${selectedIncoming.age}` : ''}
+                      {selectedIncoming.displayName}
+                      {selectedIncoming.age ? `, ${selectedIncoming.age}` : ''}
                     </h2>
                     {selectedIncoming.city && (
                       <div className='flex items-center gap-1 text-white/80 mt-1'>
                         <MapPin className='w-4 h-4' />
                         <span className='text-sm'>
-                          {selectedIncoming.city}{selectedIncoming.country ? `, ${selectedIncoming.country}` : ''}
+                          {selectedIncoming.city}
+                          {selectedIncoming.country ? `, ${selectedIncoming.country}` : ''}
                         </span>
                       </div>
                     )}
@@ -742,56 +742,48 @@ export default function Matches({ onStartChat }: MatchesProps) {
 
         {/* Matches Grid */}
         <div className='p-4'>
-        {filteredMatches.length === 0 ? (
-          <div className='flex flex-col items-center justify-center h-full text-center px-6'>
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className='w-20 h-20 rounded-full bg-frinder-orange/10 flex items-center justify-center mb-4'
-            >
-              {searchQuery ? (
-                <Search className='w-10 h-10 text-frinder-orange' />
-              ) : (
-                <Heart className='w-10 h-10 text-frinder-orange' />
-              )}
-            </motion.div>
-            <h2 className='text-xl font-bold mb-2 dark:text-white'>
-              {searchQuery ? 'No matches found' : 'No matches yet'}
-            </h2>
-            <p className='text-muted-foreground'>
-              {searchQuery
-                ? 'Try a different search term'
-                : 'Start swiping to find your perfect match!'}
-            </p>
-          </div>
-        ) : (
-          <div className='grid grid-cols-4 gap-1.5'>
-            {filteredMatches.map(match => (
+          {filteredMatches.length === 0 ? (
+            <div className='flex flex-col items-center justify-center h-full text-center px-6'>
               <motion.div
-                key={match.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedMatch(match)}
-                className='cursor-pointer'
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className='w-20 h-20 rounded-full bg-frinder-orange/10 flex items-center justify-center mb-4'
               >
-                <div className='relative aspect-square rounded-lg overflow-hidden'>
-                  <img
-                    src={match.photo}
-                    alt={match.name}
-                    className='w-full h-full object-cover'
-                  />
-                  <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent' />
-                  <div className='absolute bottom-0 left-0 right-0 p-1'>
-                    <p className='text-white text-[10px] font-medium truncate'>
-                      {match.name.split(' ')[0]}
-                    </p>
-                  </div>
-                </div>
+                {searchQuery ? (
+                  <Search className='w-10 h-10 text-frinder-orange' />
+                ) : (
+                  <Heart className='w-10 h-10 text-frinder-orange' />
+                )}
               </motion.div>
-            ))}
-          </div>
-        )}
+              <h2 className='text-xl font-bold mb-2 dark:text-white'>
+                {searchQuery ? 'No matches found' : 'No matches yet'}
+              </h2>
+              <p className='text-muted-foreground'>
+                {searchQuery ? 'Try a different search term' : 'Start swiping to find your perfect match!'}
+              </p>
+            </div>
+          ) : (
+            <div className='grid grid-cols-4 gap-1.5'>
+              {filteredMatches.map(match => (
+                <motion.div
+                  key={match.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSelectedMatch(match)}
+                  className='cursor-pointer'
+                >
+                  <div className='relative aspect-square rounded-lg overflow-hidden'>
+                    <img src={match.photo} alt={match.name} className='w-full h-full object-cover' />
+                    <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent' />
+                    <div className='absolute bottom-0 left-0 right-0 p-1'>
+                      <p className='text-white text-[10px] font-medium truncate'>{match.name.split(' ')[0]}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

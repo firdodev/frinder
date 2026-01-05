@@ -61,50 +61,53 @@ export default function Search({ onStartChat }: SearchProps) {
   const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
-  const performSearch = useCallback(async (query: string) => {
-    if (!user?.uid || !query.trim()) {
-      setResults([]);
-      return;
-    }
+  const performSearch = useCallback(
+    async (query: string) => {
+      if (!user?.uid || !query.trim()) {
+        setResults([]);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const users = await searchUsers(user.uid, query);
-      
-      // Check match and swipe status for each user
-      const resultsWithStatus = await Promise.all(
-        users.map(async (u) => {
-          const [matchStatus, swipeStatus] = await Promise.all([
-            checkIfMatched(user.uid, u.id),
-            checkSwipeStatus(user.uid, u.id)
-          ]);
+      setLoading(true);
+      try {
+        const users = await searchUsers(user.uid, query);
 
-          return {
-            id: u.id,
-            displayName: u.displayName || 'Unknown',
-            age: u.age,
-            photo: u.photos?.[0] || '',
-            photos: u.photos || [],
-            bio: u.bio,
-            city: u.city,
-            country: u.country,
-            interests: u.interests || [],
-            lookingFor: u.lookingFor,
-            swipeStatus,
-            isMatched: matchStatus.isMatched,
-            matchId: matchStatus.matchId
-          };
-        })
-      );
+        // Check match and swipe status for each user
+        const resultsWithStatus = await Promise.all(
+          users.map(async u => {
+            const [matchStatus, swipeStatus] = await Promise.all([
+              checkIfMatched(user.uid, u.id),
+              checkSwipeStatus(user.uid, u.id)
+            ]);
 
-      setResults(resultsWithStatus);
-    } catch (error) {
-      console.error('Search error:', error);
-      toast.error('Failed to search');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
+            return {
+              id: u.id,
+              displayName: u.displayName || 'Unknown',
+              age: u.age,
+              photo: u.photos?.[0] || '',
+              photos: u.photos || [],
+              bio: u.bio,
+              city: u.city,
+              country: u.country,
+              interests: u.interests || [],
+              lookingFor: u.lookingFor,
+              swipeStatus,
+              isMatched: matchStatus.isMatched,
+              matchId: matchStatus.matchId
+            };
+          })
+        );
+
+        setResults(resultsWithStatus);
+      } catch (error) {
+        console.error('Search error:', error);
+        toast.error('Failed to search');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user?.uid]
+  );
 
   // Debounced search
   useEffect(() => {
@@ -134,30 +137,30 @@ export default function Search({ onStartChat }: SearchProps) {
     setSendingRequest(targetUser.id);
     try {
       const result = await sendMatchRequest(user.uid, targetUser.id);
-      
+
       if (result.isMatch) {
         toast.success(`It's a match! You and ${targetUser.displayName} liked each other!`, {
           icon: '💕'
         });
         // Update the result to show as matched
-        setResults(prev => prev.map(r => 
-          r.id === targetUser.id 
-            ? { ...r, isMatched: true, matchId: result.matchId, swipeStatus: 'right' as const }
-            : r
-        ));
+        setResults(prev =>
+          prev.map(r =>
+            r.id === targetUser.id
+              ? { ...r, isMatched: true, matchId: result.matchId, swipeStatus: 'right' as const }
+              : r
+          )
+        );
         if (selectedUser?.id === targetUser.id) {
-          setSelectedUser(prev => prev ? { ...prev, isMatched: true, matchId: result.matchId, swipeStatus: 'right' } : null);
+          setSelectedUser(prev =>
+            prev ? { ...prev, isMatched: true, matchId: result.matchId, swipeStatus: 'right' } : null
+          );
         }
       } else {
         toast.success(`Request sent to ${targetUser.displayName}!`);
         // Update swipe status
-        setResults(prev => prev.map(r => 
-          r.id === targetUser.id 
-            ? { ...r, swipeStatus: 'right' as const }
-            : r
-        ));
+        setResults(prev => prev.map(r => (r.id === targetUser.id ? { ...r, swipeStatus: 'right' as const } : r)));
         if (selectedUser?.id === targetUser.id) {
-          setSelectedUser(prev => prev ? { ...prev, swipeStatus: 'right' } : null);
+          setSelectedUser(prev => (prev ? { ...prev, swipeStatus: 'right' } : null));
         }
       }
     } catch (error) {
@@ -175,13 +178,9 @@ export default function Search({ onStartChat }: SearchProps) {
       await cancelPendingRequest(user.uid, targetUser.id);
       toast.success('Request cancelled');
       // Update swipe status back to none
-      setResults(prev => prev.map(r => 
-        r.id === targetUser.id 
-          ? { ...r, swipeStatus: 'none' as const }
-          : r
-      ));
+      setResults(prev => prev.map(r => (r.id === targetUser.id ? { ...r, swipeStatus: 'none' as const } : r)));
       if (selectedUser?.id === targetUser.id) {
-        setSelectedUser(prev => prev ? { ...prev, swipeStatus: 'none' } : null);
+        setSelectedUser(prev => (prev ? { ...prev, swipeStatus: 'none' } : null));
       }
     } catch (error) {
       toast.error('Failed to cancel request');
@@ -195,7 +194,7 @@ export default function Search({ onStartChat }: SearchProps) {
       return (
         <Button
           size='sm'
-          onClick={(e) => {
+          onClick={e => {
             e.stopPropagation();
             if (result.matchId && onStartChat) {
               onStartChat(result.matchId, result.displayName, result.photo, result.id);
@@ -211,10 +210,10 @@ export default function Search({ onStartChat }: SearchProps) {
 
     if (result.swipeStatus === 'right' || result.swipeStatus === 'superlike') {
       return (
-        <Button 
-          size='sm' 
-          variant='outline' 
-          onClick={(e) => {
+        <Button
+          size='sm'
+          variant='outline'
+          onClick={e => {
             e.stopPropagation();
             handleCancelRequest(result);
           }}
@@ -236,7 +235,7 @@ export default function Search({ onStartChat }: SearchProps) {
     return (
       <Button
         size='sm'
-        onClick={(e) => {
+        onClick={e => {
           e.stopPropagation();
           handleSendRequest(result);
         }}
@@ -277,11 +276,7 @@ export default function Search({ onStartChat }: SearchProps) {
             >
               {/* Profile Header */}
               <div className='relative h-64'>
-                <img
-                  src={selectedUser.photo}
-                  alt={selectedUser.displayName}
-                  className='w-full h-full object-cover'
-                />
+                <img src={selectedUser.photo} alt={selectedUser.displayName} className='w-full h-full object-cover' />
                 <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
                 <button
                   onClick={() => setSelectedUser(null)}
@@ -289,7 +284,7 @@ export default function Search({ onStartChat }: SearchProps) {
                 >
                   <X className='w-5 h-5' />
                 </button>
-                
+
                 {/* Match indicator */}
                 {selectedUser.isMatched && (
                   <div className='absolute top-4 left-4 flex items-center gap-1 bg-frinder-orange px-3 py-1.5 rounded-full'>
@@ -300,7 +295,8 @@ export default function Search({ onStartChat }: SearchProps) {
 
                 <div className='absolute bottom-4 left-4 right-4'>
                   <h2 className='text-2xl font-bold text-white'>
-                    {selectedUser.displayName}{selectedUser.age ? `, ${selectedUser.age}` : ''}
+                    {selectedUser.displayName}
+                    {selectedUser.age ? `, ${selectedUser.age}` : ''}
                   </h2>
                   {(selectedUser.city || selectedUser.country) && (
                     <div className='flex items-center gap-1 text-white/80 mt-1'>
@@ -321,7 +317,12 @@ export default function Search({ onStartChat }: SearchProps) {
                     <Button
                       onClick={() => {
                         if (selectedUser.matchId && onStartChat) {
-                          onStartChat(selectedUser.matchId, selectedUser.displayName, selectedUser.photo, selectedUser.id);
+                          onStartChat(
+                            selectedUser.matchId,
+                            selectedUser.displayName,
+                            selectedUser.photo,
+                            selectedUser.id
+                          );
                           setSelectedUser(null);
                         }
                       }}
@@ -331,8 +332,8 @@ export default function Search({ onStartChat }: SearchProps) {
                       Message
                     </Button>
                   ) : selectedUser.swipeStatus === 'right' || selectedUser.swipeStatus === 'superlike' ? (
-                    <Button 
-                      variant='outline' 
+                    <Button
+                      variant='outline'
                       onClick={() => handleCancelRequest(selectedUser)}
                       disabled={cancelingRequest === selectedUser.id}
                       className='flex-1 h-12 text-red-500 border-red-300 hover:bg-red-50 dark:hover:bg-red-950'
@@ -467,12 +468,8 @@ export default function Search({ onStartChat }: SearchProps) {
         ) : results.length > 0 ? (
           <div className='space-y-3'>
             {results.map(result => (
-              <motion.div
-                key={result.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <Card 
+              <motion.div key={result.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                <Card
                   className='overflow-hidden cursor-pointer hover:shadow-lg transition-shadow dark:bg-gray-900 dark:border-gray-800'
                   onClick={() => setSelectedUser(result)}
                 >
@@ -494,25 +491,20 @@ export default function Search({ onStartChat }: SearchProps) {
                       <div className='flex-1 min-w-0'>
                         <div className='flex items-center gap-2'>
                           <h3 className='font-semibold dark:text-white truncate'>
-                            {result.displayName}{result.age ? `, ${result.age}` : ''}
+                            {result.displayName}
+                            {result.age ? `, ${result.age}` : ''}
                           </h3>
                           {result.isMatched && (
-                            <Badge className='bg-frinder-orange/10 text-frinder-orange text-xs'>
-                              Matched
-                            </Badge>
+                            <Badge className='bg-frinder-orange/10 text-frinder-orange text-xs'>Matched</Badge>
                           )}
                         </div>
                         {(result.city || result.country) && (
                           <div className='flex items-center gap-1 text-muted-foreground text-sm'>
                             <MapPin className='w-3 h-3' />
-                            <span className='truncate'>
-                              {[result.city, result.country].filter(Boolean).join(', ')}
-                            </span>
+                            <span className='truncate'>{[result.city, result.country].filter(Boolean).join(', ')}</span>
                           </div>
                         )}
-                        {result.bio && (
-                          <p className='text-xs text-muted-foreground truncate mt-0.5'>{result.bio}</p>
-                        )}
+                        {result.bio && <p className='text-xs text-muted-foreground truncate mt-0.5'>{result.bio}</p>}
                       </div>
                       {getActionButton(result)}
                     </div>
