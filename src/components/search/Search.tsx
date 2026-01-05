@@ -18,7 +18,8 @@ import {
   Check,
   UserPlus,
   MessageCircle,
-  Star
+  Star,
+  Users
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -40,6 +41,7 @@ interface SearchResult {
   city?: string;
   country?: string;
   interests?: string[];
+  lookingFor?: 'people' | 'groups' | 'both';
   swipeStatus: 'none' | 'left' | 'right' | 'superlike';
   isMatched: boolean;
   matchId?: string;
@@ -87,6 +89,7 @@ export default function Search({ onStartChat }: SearchProps) {
             city: u.city,
             country: u.country,
             interests: u.interests || [],
+            lookingFor: u.lookingFor,
             swipeStatus,
             isMatched: matchStatus.isMatched,
             matchId: matchStatus.matchId
@@ -370,6 +373,19 @@ export default function Search({ onStartChat }: SearchProps) {
                     </>
                   )}
                 </div>
+
+                {/* Looking For */}
+                {selectedUser.lookingFor && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
+                    <Badge className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'>
+                      <Users className='w-3 h-3 mr-1.5' />
+                      {selectedUser.lookingFor === 'people' && 'People to meet'}
+                      {selectedUser.lookingFor === 'groups' && 'Groups to join'}
+                      {selectedUser.lookingFor === 'both' && 'People & Groups'}
+                    </Badge>
+                  </div>
+                )}
 
                 {/* Bio */}
                 {selectedUser.bio && (

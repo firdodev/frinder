@@ -220,20 +220,13 @@ export default function MainApp() {
             </span>
           </motion.button>
 
-          {/* Credits Display - Mobile */}
-          <div className='flex items-center gap-2'>
-            <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 dark:bg-blue-500/20'>
-              <Star className='w-3.5 h-3.5 text-blue-500' fill='currentColor' />
-              <span className='text-xs font-semibold text-blue-600 dark:text-blue-400'>
-                {userSubscription?.unlimitedSuperLikes ? '∞' : userCredits?.superLikes ?? 0}
-              </span>
+          {/* Pro Badge - Mobile (super likes only shown on profile page) */}
+          {userSubscription?.isPremium && (
+            <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
+              <Crown className='w-3.5 h-3.5 text-frinder-orange' />
+              <span className='text-xs font-semibold text-frinder-orange'>PRO</span>
             </div>
-            {userSubscription?.isPremium && (
-              <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
-                <Crown className='w-3.5 h-3.5 text-frinder-orange' />
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Desktop Header */}

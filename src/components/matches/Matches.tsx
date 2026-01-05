@@ -55,6 +55,7 @@ interface MatchProfile {
   isOnline?: boolean;
   lastSeen?: Date;
   relationshipGoal?: 'relationship' | 'casual' | 'friends';
+  lookingFor?: 'people' | 'groups' | 'both';
 }
 
 interface MatchesProps {
@@ -103,7 +104,8 @@ export default function Matches({ onStartChat }: MatchesProps) {
             interests: otherUserProfile?.interests || [],
             matchedAt: m.createdAt instanceof Date ? m.createdAt : m.createdAt?.toDate() || new Date(),
             isOnline: false,
-            relationshipGoal: otherUserProfile?.relationshipGoal
+            relationshipGoal: otherUserProfile?.relationshipGoal,
+            lookingFor: otherUserProfile?.lookingFor
           };
         })
       );
@@ -297,7 +299,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
                   </Button>
                 </div>
 
-                {/* Looking For */}
+                {/* Looking For (Relationship Goal) */}
                 {selectedMatch.relationshipGoal && (
                   <div className='mb-6'>
                     <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
@@ -306,6 +308,19 @@ export default function Matches({ onStartChat }: MatchesProps) {
                       {selectedMatch.relationshipGoal === 'relationship' && 'A relationship'}
                       {selectedMatch.relationshipGoal === 'casual' && 'Something casual'}
                       {selectedMatch.relationshipGoal === 'friends' && 'Just friends'}
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Interested In (People/Groups) */}
+                {selectedMatch.lookingFor && (
+                  <div className='mb-6'>
+                    <h3 className='font-semibold dark:text-white mb-2'>Interested In</h3>
+                    <Badge className='bg-blue-500/10 text-blue-500 border border-blue-500/20'>
+                      <Users className='w-3 h-3 mr-1.5' />
+                      {selectedMatch.lookingFor === 'people' && 'Meeting people'}
+                      {selectedMatch.lookingFor === 'groups' && 'Joining groups'}
+                      {selectedMatch.lookingFor === 'both' && 'People & Groups'}
                     </Badge>
                   </div>
                 )}

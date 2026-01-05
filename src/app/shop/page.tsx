@@ -11,10 +11,11 @@ import {
   purchasePremium,
   purchaseAdFree,
   subscribeToUserSubscription,
+  redeemCode,
   type UserSubscription
 } from '@/lib/firebaseServices';
 import { toast } from 'sonner';
-import { ArrowLeft, Crown, Star, Zap, Shield, Check, Ban, Loader2, ChevronRight, XCircle } from 'lucide-react';
+import { ArrowLeft, Crown, Star, Zap, Shield, Check, Ban, Loader2, ChevronRight, XCircle, Gift } from 'lucide-react';
 
 // Environment-based plan IDs
 const WHOP_PLAN_IDS = {
@@ -49,6 +50,8 @@ export default function ShopPage() {
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [redeemCodeInput, setRedeemCodeInput] = useState('');
+  const [redeemingCode, setRedeemingCode] = useState(false);
   const checkoutRef = useCheckoutEmbedControls();
 
   useEffect(() => {
@@ -135,6 +138,45 @@ export default function ShopPage() {
       toast.error('Failed to cancel subscription. Please try again.');
     } finally {
       setCancellingSubscription(false);
+    }
+  };
+
+  const handleRedeemCode = async () => {
+    if (!user?.uid) {
+      toast.error('Please sign in to redeem a code');
+      return;
+    }
+
+    if (!redeemCodeInput.trim()) {
+      toast.error('Please enter a code');
+      return;
+    }
+
+    setRedeemingCode(true);
+    try {
+      const result = await redeemCode(user.uid, redeemCodeInput);
+
+      if (result.success) {
+        if (result.type === 'pro') {
+          toast.success('Welcome to Frinder Pro! 🎉', {
+            description: 'All premium features are now unlocked.'
+          });
+        } else if (result.type === 'superlikes') {
+          toast.success('Super Likes added! ⭐', {
+            description: 'You received 5 Super Likes.'
+          });
+        }
+        setRedeemCodeInput('');
+      } else {
+        toast.error('Failed to redeem code', {
+          description: result.error
+        });
+      }
+    } catch (error) {
+      console.error('Error redeeming code:', error);
+      toast.error('Failed to redeem code. Please try again.');
+    } finally {
+      setRedeemingCode(false);
     }
   };
 
@@ -365,6 +407,30 @@ export default function ShopPage() {
                   <div className='flex items-center gap-1.5 text-xs text-gray-400'>
                     <Zap className='w-3.5 h-3.5' />
                     <span>Instant delivery</span>
+                  </div>
+                </div>
+
+                {/* Redeem Code Section */}
+                <div className='mt-4 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800'>
+                  <div className='flex items-center gap-2 mb-3'>
+                    <Gift className='w-5 h-5 text-frinder-orange' />
+                    <h3 className='font-semibold text-gray-900 dark:text-white'>Have a code?</h3>
+                  </div>
+                  <div className='flex gap-2'>
+                    <input
+                      type='text'
+                      value={redeemCodeInput}
+                      onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
+                      placeholder='Enter redeem code'
+                      className='flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-frinder-orange dark:text-white'
+                    />
+                    <button
+                      onClick={handleRedeemCode}
+                      disabled={redeemingCode || !redeemCodeInput.trim()}
+                      className='px-4 py-2 text-sm font-medium text-white bg-frinder-orange hover:bg-frinder-burnt rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                    >
+                      {redeemingCode ? <Loader2 className='w-4 h-4 animate-spin' /> : 'Redeem'}
+                    </button>
                   </div>
                 </div>
 

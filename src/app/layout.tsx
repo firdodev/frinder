@@ -41,30 +41,34 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   // Basic metadata
   title: {
-    default: 'Frinder - Find Friends & Meaningful Connections',
-    template: '%s | Frinder'
+    default: 'Frinder - #1 App to Find Friends & Meet New People Near You',
+    template: '%s | Frinder - Find Friends'
   },
   description:
-    'Frinder is the #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests. Join millions discovering friendships today!',
+    'Frinder is the #1 FREE social app to find friends and meaningful connections near you. Swipe, match, chat, and meet new people who share your interests. Join millions discovering real friendships today! Download now.',
   keywords: [
-    'dating app',
-    'find friends',
-    'social networking',
-    'meet people',
-    'dating',
-    'friendship app',
-    'match making',
-    'swipe app',
-    'social app',
-    'connect with people',
     'frinder',
-    'new friends',
+    'frinder app',
+    'find friends app',
+    'meet new people',
+    'dating app',
+    'social networking app',
+    'friendship app',
+    'match making app',
+    'swipe app',
+    'make friends online',
+    'find friends near me',
+    'connect with people',
+    'new friends app',
     'relationship app',
-    'chat app',
+    'chat and meet',
     'meet singles',
     'online dating',
     'friendship',
-    'meaningful connections'
+    'meaningful connections',
+    'social app',
+    'tinder alternative',
+    'bumble alternative'
   ],
   authors: [{ name: 'Frinder', url: 'https://frinder.co' }],
   creator: 'Frinder',
@@ -73,9 +77,10 @@ export const metadata: Metadata = {
   // Canonical URL
   metadataBase: new URL('https://frinder.co'),
   alternates: {
-    canonical: '/',
+    canonical: 'https://frinder.co',
     languages: {
-      'en-US': '/en-US'
+      'en-US': 'https://frinder.co',
+      'x-default': 'https://frinder.co'
     }
   },
 
@@ -85,12 +90,13 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://frinder.co',
     siteName: 'Frinder',
-    title: 'Frinder - Find Friends & Meaningful Connections',
+    title: 'Frinder - #1 App to Find Friends & Meet New People',
     description:
-      'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
+      'Join millions on Frinder! The #1 FREE app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests. Download now!',
     images: [
       {
         url: 'https://frinder.co/og-image.png',
+        secureUrl: 'https://frinder.co/og-image.png',
         width: 1200,
         height: 630,
         alt: 'Frinder - Find Friends & Meaningful Connections',
@@ -102,12 +108,15 @@ export const metadata: Metadata = {
   // Twitter Card
   twitter: {
     card: 'summary_large_image',
-    site: '@frinder',
-    creator: '@frinder',
-    title: 'Frinder - Find Friends & Meaningful Connections',
+    site: '@frinderapp',
+    creator: '@frinderapp',
+    title: 'Frinder - #1 App to Find Friends & Meet New People',
     description:
-      'Join millions on Frinder! The #1 app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
-    images: ['https://frinder.co/og-image.png']
+      'Join millions on Frinder! The #1 FREE app for finding friends and meaningful connections. Swipe, match, and chat with people who share your interests.',
+    images: {
+      url: 'https://frinder.co/og-image.png',
+      alt: 'Frinder - Find Friends App'
+    }
   },
 
   // App Links
@@ -168,11 +177,11 @@ export const metadata: Metadata = {
     startupImage: ['/frinder-logo.png']
   },
 
-  // Verification (add your actual verification codes)
+  // Verification (add your actual verification codes from Google Search Console)
+  // To get your code: Go to https://search.google.com/search-console → Add property → frinder.co → HTML tag method
   verification: {
-    google: 'your-google-verification-code',
-    yandex: 'your-yandex-verification-code'
-    // yahoo: 'your-yahoo-verification-code',
+    google: 'ADD_YOUR_GOOGLE_VERIFICATION_CODE_HERE'
+    // After verifying, submit sitemap at: https://search.google.com/search-console/sitemaps
   },
 
   // Category
@@ -202,7 +211,7 @@ export const viewport: Viewport = {
   colorScheme: 'light dark'
 };
 
-// JSON-LD Structured Data for rich snippets
+// JSON-LD Structured Data for rich snippets - Optimized for Google
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
@@ -210,45 +219,59 @@ const jsonLd = {
       '@type': 'WebApplication',
       '@id': 'https://frinder.co/#app',
       name: 'Frinder',
+      alternateName: 'Frinder App',
       url: 'https://frinder.co',
       description:
-        'Frinder is the #1 social app for finding friends and meaningful connections. Swipe, match, chat, and meet new people who share your interests.',
+        'Frinder is the #1 FREE social app for finding friends and meaningful connections near you. Swipe, match, chat, and meet new people who share your interests.',
       applicationCategory: 'SocialNetworkingApplication',
-      operatingSystem: 'Any',
+      operatingSystem: 'Web, iOS, Android',
+      browserRequirements: 'Requires JavaScript',
+      softwareVersion: '2.0',
       offers: {
         '@type': 'Offer',
         price: '0',
-        priceCurrency: 'USD'
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock'
       },
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: '4.8',
-        ratingCount: '125000',
+        ratingCount: '150000',
         bestRating: '5',
-        worstRating: '1'
+        worstRating: '1',
+        reviewCount: '125000'
       },
       author: {
         '@type': 'Organization',
         name: 'Frinder'
-      }
+      },
+      screenshot: 'https://frinder.co/og-image.png',
+      featureList: 'Smart Matching, Group Activities, Instant Chat, Verified Users, Super Likes'
     },
     {
       '@type': 'Organization',
       '@id': 'https://frinder.co/#organization',
       name: 'Frinder',
+      legalName: 'Frinder Inc.',
       url: 'https://frinder.co',
       logo: {
         '@type': 'ImageObject',
+        '@id': 'https://frinder.co/#logo',
         url: 'https://frinder.co/frinder-logo.png',
+        contentUrl: 'https://frinder.co/frinder-logo.png',
         width: 512,
-        height: 512
+        height: 512,
+        caption: 'Frinder Logo'
+      },
+      image: {
+        '@id': 'https://frinder.co/#logo'
       },
       sameAs: [
-        'https://twitter.com/frinder',
-        'https://facebook.com/frinder',
-        'https://instagram.com/frinder',
+        'https://twitter.com/frinderapp',
+        'https://facebook.com/frinderapp',
+        'https://instagram.com/frinderapp',
         'https://linkedin.com/company/frinder',
-        'https://tiktok.com/@frinder'
+        'https://tiktok.com/@frinderapp'
       ],
       contactPoint: {
         '@type': 'ContactPoint',
@@ -262,10 +285,11 @@ const jsonLd = {
       '@id': 'https://frinder.co/#website',
       url: 'https://frinder.co',
       name: 'Frinder',
-      description: 'Find Friends & Meaningful Connections',
+      description: 'Find Friends & Meaningful Connections Near You',
       publisher: {
         '@id': 'https://frinder.co/#organization'
       },
+      inLanguage: 'en-US',
       potentialAction: {
         '@type': 'SearchAction',
         target: {
@@ -276,7 +300,42 @@ const jsonLd = {
       }
     },
     {
-      '@type': 'MobileApplication',
+      '@type': 'WebPage',
+      '@id': 'https://frinder.co/#webpage',
+      url: 'https://frinder.co',
+      name: 'Frinder - #1 App to Find Friends & Meet New People Near You',
+      isPartOf: {
+        '@id': 'https://frinder.co/#website'
+      },
+      about: {
+        '@id': 'https://frinder.co/#organization'
+      },
+      description: 'The #1 FREE social app for finding friends and meaningful connections. Join millions of users today!',
+      breadcrumb: {
+        '@id': 'https://frinder.co/#breadcrumb'
+      },
+      inLanguage: 'en-US',
+      primaryImageOfPage: {
+        '@type': 'ImageObject',
+        url: 'https://frinder.co/og-image.png'
+      },
+      datePublished: '2024-01-01',
+      dateModified: '2026-01-05'
+    },
+    {
+      '@type': 'BreadcrumbList',
+      '@id': 'https://frinder.co/#breadcrumb',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: 'https://frinder.co'
+        }
+      ]
+    },
+    {
+      '@type': 'SoftwareApplication',
       '@id': 'https://frinder.co/#mobile-app',
       name: 'Frinder',
       operatingSystem: 'iOS, Android',
@@ -289,8 +348,9 @@ const jsonLd = {
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: '4.8',
-        ratingCount: '125000'
-      }
+        ratingCount: '150000'
+      },
+      downloadUrl: 'https://frinder.co'
     },
     {
       '@type': 'FAQPage',
@@ -301,7 +361,7 @@ const jsonLd = {
           name: 'What is Frinder?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Frinder is a social networking app that helps you find friends and meaningful connections. Swipe through profiles, match with people who share your interests, and start conversations.'
+            text: 'Frinder is a FREE social networking app that helps you find friends and meaningful connections near you. Swipe through profiles, match with people who share your interests, and start conversations to build real relationships.'
           }
         },
         {
@@ -309,7 +369,7 @@ const jsonLd = {
           name: 'Is Frinder free to use?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Yes! Frinder is free to download and use. We also offer optional premium features like Frinder Pro for enhanced experiences.'
+            text: 'Yes! Frinder is completely free to download and use. You can swipe, match, and chat without paying anything. We also offer optional premium features like Frinder Pro with Super Likes and advanced filters.'
           }
         },
         {
@@ -317,10 +377,42 @@ const jsonLd = {
           name: 'How does Frinder work?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: "Create your profile, set your preferences, and start swiping! When you and another person both like each other, it's a match. Then you can chat and plan to meet up."
+            text: "It's easy! Create your profile with photos and interests, then start swiping through profiles of people near you. When you and another person both like each other, it's a match! Then you can chat and plan to meet up."
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'Is Frinder safe?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'Yes! Frinder requires email verification to ensure real users. We have robust safety features including the ability to report and block users, and our team actively monitors for inappropriate behavior.'
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'How is Frinder different from other dating apps?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'Frinder focuses on meaningful connections, not just dating. You can find friends, join groups for activities, and connect with people who share your interests. Our smart matching algorithm prioritizes shared interests and nearby users.'
           }
         }
       ]
+    },
+    {
+      '@type': 'Product',
+      name: 'Frinder Pro',
+      description: 'Premium subscription with Super Likes, See Who Liked You, Advanced Filters, and Ad-Free experience',
+      brand: {
+        '@type': 'Brand',
+        name: 'Frinder'
+      },
+      offers: {
+        '@type': 'Offer',
+        price: '9.99',
+        priceCurrency: 'USD',
+        priceValidUntil: '2026-12-31',
+        availability: 'https://schema.org/InStock'
+      }
     }
   ]
 };
@@ -341,6 +433,28 @@ export default function RootLayout({
         {/* DNS Prefetch */}
         <link rel='dns-prefetch' href='https://www.google-analytics.com' />
         <link rel='dns-prefetch' href='https://www.googletagmanager.com' />
+
+        {/* Canonical URL */}
+        <link rel='canonical' href='https://frinder.co' />
+        
+        {/* Geo Tags for Local SEO */}
+        <meta name='geo.region' content='US' />
+        <meta name='geo.placename' content='United States' />
+        
+        {/* Additional SEO meta tags */}
+        <meta name='rating' content='general' />
+        <meta name='revisit-after' content='1 days' />
+        <meta name='distribution' content='global' />
+        <meta name='language' content='English' />
+        <meta name='coverage' content='Worldwide' />
+        <meta name='target' content='all' />
+        <meta name='HandheldFriendly' content='True' />
+        <meta name='MobileOptimized' content='320' />
+        
+        {/* Schema.org WebPage */}
+        <meta itemProp='name' content='Frinder - Find Friends & Meaningful Connections' />
+        <meta itemProp='description' content='The #1 FREE app for finding friends and meaningful connections. Swipe, match, and chat with people near you.' />
+        <meta itemProp='image' content='https://frinder.co/og-image.png' />
 
         {/* JSON-LD Structured Data */}
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

@@ -59,6 +59,10 @@ export interface UserSubscription {
   // Whop subscription management
   membershipId?: string | null;
   cancelAtPeriodEnd?: boolean;
+  // Pro super likes (15/month, 1/day)
+  proSuperLikesRemaining?: number;
+  proSuperLikesResetAt?: Timestamp | null;
+  lastProSuperLikeUsed?: Timestamp | null;
 }
 
 export interface Match {
@@ -218,6 +222,10 @@ export async function recordSwipe(
         // Shouldn't happen if UI checked first, but handle gracefully
         console.warn('Super like used but no credits available');
       }
+
+      // TRANSFER: Give the super like to the recipient!
+      // The person who got super liked receives 1 super like credit
+      await addSuperLikes(toUserId, 1);
 
       // Create automatic match for super like
       const matchId = await createMatch(fromUserId, toUserId, true);
@@ -1723,13 +1731,21 @@ export function subscribeToUserSubscription(
   });
 }
 
-// Check if user can use a super like (has credits or premium)
+// Check if user can use a super like (has credits, daily free, or Pro)
 export async function canUseSuperLike(userId: string): Promise<{ canUse: boolean; reason?: string }> {
   const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
 
-  // Premium users have unlimited super likes
-  if (subscription.isPremium && subscription.unlimitedSuperLikes) {
-    return { canUse: true };
+  // Pro users use the Pro super like system (15/month, 1/day)
+  if (subscription.isPremium) {
+    const proCheck = await canUseProSuperLike(userId);
+    if (proCheck.canUse) {
+      return { canUse: true };
+    }
+    // If Pro but can't use Pro super like, check regular credits
+    if (credits.superLikes > 0) {
+      return { canUse: true };
+    }
+    return { canUse: false, reason: proCheck.reason };
   }
 
   // Check if user has super likes available
@@ -1761,9 +1777,20 @@ export async function useSuperLike(userId: string): Promise<boolean> {
   const creditsRef = doc(db, 'userCredits', userId);
   const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
 
-  // Premium users don't consume super likes
-  if (subscription.isPremium && subscription.unlimitedSuperLikes) {
-    return true;
+  // Pro users use the Pro super like system first
+  if (subscription.isPremium) {
+    const proUsed = await useProSuperLike(userId);
+    if (proUsed) {
+      return true;
+    }
+    // Fallback to regular credits if Pro super likes exhausted
+    if (credits.superLikes > 0) {
+      await updateDoc(creditsRef, {
+        superLikes: increment(-1)
+      });
+      return true;
+    }
+    return false;
   }
 
   // Check if user has super likes
@@ -1820,27 +1847,192 @@ export async function incrementSwipeCount(userId: string): Promise<{ showAd: boo
   return { showAd, swipeCount: newCount };
 }
 
-// Purchase premium subscription
-export async function purchasePremium(userId: string): Promise<void> {
-  const subRef = doc(db, 'userSubscriptions', userId);
-  await getUserSubscription(userId); // Ensure initialized
+// =====================================
+// REDEEM CODES
+// =====================================
 
+// Redeem code types
+export interface RedeemCode {
+  code: string;
+  type: 'pro' | 'superlikes';
+  used: boolean;
+  usedBy?: string;
+  usedAt?: Timestamp;
+  createdAt: Timestamp;
+}
+
+// Valid redeem codes (checked directly, no Firebase init needed)
+export const VALID_REDEEM_CODES: { [code: string]: 'pro' | 'superlikes' } = {
+  // Pro codes (random alphanumeric)
+  'X7K9M2P4Q1': 'pro',
+  'R3T8W5N6J2': 'pro',
+  // Super likes codes (random alphanumeric)
+  'B4H7L9C1F6': 'superlikes',
+  'Y2V5Z8D3G7': 'superlikes'
+};
+
+// Validate and redeem a code
+export async function redeemCode(userId: string, code: string): Promise<{ success: boolean; type?: 'pro' | 'superlikes'; error?: string }> {
+  const upperCode = code.trim().toUpperCase();
+  
+  // First check if it's a valid code from our list
+  const codeType = VALID_REDEEM_CODES[upperCode];
+  if (!codeType) {
+    return { success: false, error: 'Invalid code' };
+  }
+
+  // Check if code was already used (in Firebase)
+  const codeRef = doc(db, 'redeemCodes', upperCode);
+  const codeDoc = await getDoc(codeRef);
+
+  if (codeDoc.exists()) {
+    const codeData = codeDoc.data() as RedeemCode;
+    if (codeData.used) {
+      return { success: false, error: 'This code has already been used' };
+    }
+  }
+
+  // Mark code as used in Firebase
+  await setDoc(codeRef, {
+    code: upperCode,
+    type: codeType,
+    used: true,
+    usedBy: userId,
+    usedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  });
+
+  // Apply the reward
+  if (codeType === 'pro') {
+    await purchasePremiumWithSuperLikes(userId);
+    return { success: true, type: 'pro' };
+  } else if (codeType === 'superlikes') {
+    await addSuperLikes(userId, 5);
+    return { success: true, type: 'superlikes' };
+  }
+
+  return { success: false, error: 'Unknown code type' };
+}
+
+// =====================================
+// PRO SUPER LIKES (15/month, 1/day renewable)
+// =====================================
+
+// Purchase premium subscription with proper super likes (15/month, not unlimited)
+export async function purchasePremiumWithSuperLikes(userId: string): Promise<void> {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  const creditsRef = doc(db, 'userCredits', userId);
+  
+  await getUserSubscription(userId); // Ensure initialized
+  await getUserCredits(userId); // Ensure initialized
+
+  const now = new Date();
   const expiresAt = new Date();
   expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 month
 
+  // Update subscription - NOT unlimited super likes anymore
   await updateDoc(subRef, {
     isPremium: true,
     premiumExpiresAt: Timestamp.fromDate(expiresAt),
-    // Premium benefits
-    unlimitedSuperLikes: true,
+    // Premium benefits - but NOT unlimitedSuperLikes
+    unlimitedSuperLikes: false, // Changed to false!
     canSeeWhoLikedYou: true,
     unlimitedRewinds: true,
     priorityInDiscovery: true,
     advancedFilters: true,
     // Premium includes ad-free
     isAdFree: true,
-    adFreeExpiresAt: Timestamp.fromDate(expiresAt)
+    adFreeExpiresAt: Timestamp.fromDate(expiresAt),
+    // Pro super likes tracking
+    proSuperLikesRemaining: 15,
+    proSuperLikesResetAt: Timestamp.fromDate(expiresAt),
+    lastProSuperLikeUsed: null
   });
+
+  // Also sync userCredits.superLikes to 15 so all UI shows same count
+  await updateDoc(creditsRef, {
+    superLikes: 15
+  });
+}
+
+// Check if Pro user can use a super like (1 per day, 15 per month)
+export async function canUseProSuperLike(userId: string): Promise<{ canUse: boolean; reason?: string; remaining?: number }> {
+  const subRef = doc(db, 'userSubscriptions', userId);
+  const subDoc = await getDoc(subRef);
+  
+  if (!subDoc.exists()) {
+    return { canUse: false, reason: 'No subscription found' };
+  }
+
+  const sub = subDoc.data();
+  
+  if (!sub.isPremium) {
+    return { canUse: false, reason: 'Not a Pro user' };
+  }
+
+  const now = new Date();
+  
+  // Check if monthly reset is needed
+  if (sub.proSuperLikesResetAt && sub.proSuperLikesResetAt.toDate() < now) {
+    // Reset monthly super likes
+    const newResetAt = new Date();
+    newResetAt.setMonth(newResetAt.getMonth() + 1);
+    await updateDoc(subRef, {
+      proSuperLikesRemaining: 15,
+      proSuperLikesResetAt: Timestamp.fromDate(newResetAt),
+      lastProSuperLikeUsed: null
+    });
+    return { canUse: true, remaining: 15 };
+  }
+
+  // Check remaining super likes
+  const remaining = sub.proSuperLikesRemaining ?? 15;
+  if (remaining <= 0) {
+    return { canUse: false, reason: 'No Pro super likes remaining this month', remaining: 0 };
+  }
+
+  // Check if already used one today (1 per day limit)
+  if (sub.lastProSuperLikeUsed) {
+    const lastUsed = sub.lastProSuperLikeUsed.toDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    lastUsed.setHours(0, 0, 0, 0);
+    
+    if (lastUsed.getTime() === today.getTime()) {
+      return { canUse: false, reason: 'You can only use 1 Pro super like per day. Try again tomorrow!', remaining };
+    }
+  }
+
+  return { canUse: true, remaining };
+}
+
+// Use a Pro super like
+export async function useProSuperLike(userId: string): Promise<boolean> {
+  const check = await canUseProSuperLike(userId);
+  if (!check.canUse) {
+    return false;
+  }
+
+  const subRef = doc(db, 'userSubscriptions', userId);
+  const creditsRef = doc(db, 'userCredits', userId);
+  
+  // Update both subscription and credits to keep them in sync
+  await updateDoc(subRef, {
+    proSuperLikesRemaining: increment(-1),
+    lastProSuperLikeUsed: serverTimestamp()
+  });
+  
+  // Also decrement userCredits.superLikes to keep UI in sync
+  await updateDoc(creditsRef, {
+    superLikes: increment(-1)
+  });
+
+  return true;
+}
+
+// Purchase premium subscription (legacy - redirects to new function)
+export async function purchasePremium(userId: string): Promise<void> {
+  await purchasePremiumWithSuperLikes(userId);
 }
 
 // Purchase ad-free subscription
