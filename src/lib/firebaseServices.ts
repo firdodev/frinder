@@ -148,7 +148,7 @@ export async function isDisplayNameTaken(displayName: string, currentUserId?: st
   }
 }
 
-// Get users to swipe on (filtered by opposite gender, same city, and shared interests)
+// Get users to swipe on (filtered by same city and shared interests)
 export async function getUsersToSwipe(
   currentUserId: string,
   currentUserProfile?: UserProfile,
@@ -181,13 +181,7 @@ export async function getUsersToSwipe(
 
     // Apply filters if current user profile is available
     if (currentUserProfile) {
-      // Filter by opposite gender
-      const oppositeGender =
-        currentUserProfile.gender === 'male' ? 'female' : currentUserProfile.gender === 'female' ? 'male' : null;
-
-      if (oppositeGender) {
-        users = users.filter(user => user.gender === oppositeGender);
-      }
+      // No gender filter - show all genders (girls can see girls, boys can see boys)
 
       // Filter by same city (if user has city set)
       if (currentUserProfile.city) {
