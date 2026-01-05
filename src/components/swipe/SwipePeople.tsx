@@ -1030,18 +1030,6 @@ export default function SwipePeople() {
             >
               <Heart className='w-7 h-7 sm:w-8 sm:h-8 text-green-500' fill='currentColor' />
             </motion.button>
-
-            {/* Boost / Upgrade */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setShowUpgradeDialog(true)}
-              className='w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border border-muted dark:border-gray-800 transition-shadow hover:shadow-xl'
-            >
-              <svg className='w-5 h-5 sm:w-6 sm:h-6 text-frinder-burnt' viewBox='0 0 24 24' fill='currentColor'>
-                <path d='M13 3L4 14h7l-1 7 9-11h-7l1-7z' />
-              </svg>
-            </motion.button>
           </div>
 
           {/* Super Likes Counter */}

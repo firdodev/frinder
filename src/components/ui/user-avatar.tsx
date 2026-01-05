@@ -69,3 +69,4 @@ export function UserAvatar({ src, name, className, fallbackClassName, showInitia
 // Export the color getter for use in other components
 export { getAvatarColor, AVATAR_COLORS };
 
+
