@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Heart, MessageCircle, ThumbsUp, Gift, Bell, Mail, Smartphone } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationsSheetProps {
   open: boolean;
@@ -15,6 +16,15 @@ interface NotificationsSheetProps {
 
 export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetProps) {
   const { notifications, updateNotification } = useSettings();
+  const { userProfile, updateProfile } = useAuth();
+
+  const handleEmailNotificationsChange = async (checked: boolean) => {
+    try {
+      await updateProfile({ emailNotifications: checked });
+    } catch (error) {
+      console.error('Error updating email notifications:', error);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -115,12 +125,19 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                 </div>
               </div>
 
-              <div className='flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
-                <Mail className='w-5 h-5 text-[#ed8c00]' />
-                <div>
-                  <p className='text-sm font-medium dark:text-white'>Email Notifications</p>
-                  <p className='text-xs text-gray-500 dark:text-gray-400'>Important updates only</p>
+              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+                <div className='flex items-center gap-3'>
+                  <Mail className='w-5 h-5 text-[#ed8c00]' />
+                  <div>
+                    <p className='text-sm font-medium dark:text-white'>Email Notifications</p>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Receive emails for likes, superlikes & matches</p>
+                  </div>
                 </div>
+                <Switch
+                  checked={userProfile?.emailNotifications !== false}
+                  onCheckedChange={handleEmailNotificationsChange}
+                  className='data-[state=checked]:bg-[#ed8c00]'
+                />
               </div>
 
               <div className='flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>

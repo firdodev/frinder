@@ -57,6 +57,8 @@ import {
   subscribeToUnmatchedConversations,
   subscribeToMessages,
   sendMessage,
+  editMessage,
+  deleteMessageForEveryone,
   markMessagesAsRead,
   subscribeToUserPresence,
   unmatchUser,
@@ -76,6 +78,8 @@ import {
   deleteGroup,
   subscribeToGroupMessages,
   sendGroupMessage,
+  editGroupMessage,
+  deleteGroupMessageForEveryone,
   createDateRequest,
   respondToDateRequest,
   cancelDateRequest,
@@ -102,6 +106,8 @@ interface Message {
   type: 'text' | 'image';
   imageUrl?: string;
   isRead: boolean;
+  edited?: boolean;
+  deleted?: boolean;
   replyTo?: {
     id: string;
     text: string;
@@ -563,6 +569,8 @@ interface MessageBubbleProps {
   onViewImage: () => void;
   swipeDirection: number;
   onScrollToMessage?: (messageId: string) => void;
+  onEdit?: (message: Message) => void;
+  onDelete?: (message: Message) => void;
 }
 
 function MessageBubble({
@@ -572,15 +580,34 @@ function MessageBubble({
   onReply,
   onViewImage,
   swipeDirection,
-  onScrollToMessage
+  onScrollToMessage,
+  onEdit,
+  onDelete
 }: MessageBubbleProps) {
   const x = useMotionValue(0);
   const [showReplyIndicator, setShowReplyIndicator] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate opacity for reply indicator based on swipe distance
   const replyIndicatorOpacity = useTransform(x, isOwn ? [-60, -30, 0] : [0, 30, 60], isOwn ? [1, 0.5, 0] : [0, 0.5, 1]);
 
+  const handleLongPressStart = () => {
+    if (message.deleted) return;
+    longPressTimer.current = setTimeout(() => {
+      setShowOptionsMenu(true);
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    handleLongPressEnd();
     const threshold = 50;
     const offset = info.offset.x;
 
@@ -594,111 +621,190 @@ function MessageBubble({
   };
 
   const handleDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    handleLongPressEnd();
     const threshold = 30;
     const offset = info.offset.x;
     setShowReplyIndicator((isOwn && offset < -threshold) || (!isOwn && offset > threshold));
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} relative group px-2 overflow-x-hidden`}
-    >
-      {/* Reply indicator for non-own messages (left side) */}
-      {!isOwn && (
-        <motion.div
-          style={{ opacity: replyIndicatorOpacity }}
-          className='absolute left-2 top-1/2 -translate-y-1/2 -translate-x-6 pointer-events-none'
-        >
-          <Reply className='w-5 h-5 text-frinder-orange' />
-        </motion.div>
-      )}
-
-      {/* Desktop reply button - appears on hover */}
-      <button
-        onClick={onReply}
-        className={`hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 ${
-          isOwn ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]'
-        }`}
-      >
-        <Reply className='w-4 h-4 text-muted-foreground' />
-      </button>
-
-      {/* Swipeable container */}
+    <>
       <motion.div
-        drag='x'
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.5}
-        dragSnapToOrigin={true}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
-        style={{ x }}
-        className='max-w-[80%] sm:max-w-[75%] touch-pan-y'
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} relative group px-2 overflow-x-hidden`}
       >
-        {/* Reply preview if this message is replying to another - clickable to scroll */}
-        {message.replyTo && (
-          <div
-            onClick={() => message.replyTo?.id && onScrollToMessage?.(message.replyTo.id)}
-            className={`mb-1 px-2 py-1 rounded-lg text-xs overflow-hidden cursor-pointer transition-opacity hover:opacity-80 active:opacity-60 ${
-              isOwn
-                ? 'bg-frinder-burnt/30 border-l-2 border-white/50'
-                : 'bg-muted/50 dark:bg-gray-800/50 border-l-2 border-frinder-orange'
-            }`}
+        {/* Reply indicator for non-own messages (left side) */}
+        {!isOwn && (
+          <motion.div
+            style={{ opacity: replyIndicatorOpacity }}
+            className='absolute left-2 top-1/2 -translate-y-1/2 -translate-x-6 pointer-events-none'
           >
-            <span className='font-medium text-[10px] block truncate'>
-              {message.replyTo.senderId === (isOwn ? 'You' : matchName) ? 'You' : matchName}
-            </span>
-            <span className='opacity-70 line-clamp-1 break-all'>{message.replyTo.text}</span>
-          </div>
+            <Reply className='w-5 h-5 text-frinder-orange' />
+          </motion.div>
         )}
 
-        <div
-          className={`rounded-2xl overflow-hidden ${
-            isOwn
-              ? 'bg-frinder-orange text-white rounded-br-sm'
-              : 'bg-muted dark:bg-gray-900 text-foreground dark:text-white rounded-bl-sm'
-          } ${message.type === 'image' ? 'p-1' : 'px-3 sm:px-4 py-2'}`}
+        {/* Desktop reply button - appears on hover */}
+        {!message.deleted && (
+          <button
+            onClick={onReply}
+            className={`hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 ${
+              isOwn ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]'
+            }`}
+          >
+            <Reply className='w-4 h-4 text-muted-foreground' />
+          </button>
+        )}
+
+        {/* Desktop more options button - appears on hover for own messages */}
+        {isOwn && !message.deleted && (
+          <button
+            onClick={() => setShowOptionsMenu(true)}
+            className='hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 left-[calc(100%-44px)]'
+          >
+            <MoreVertical className='w-4 h-4 text-muted-foreground' />
+          </button>
+        )}
+
+        {/* Swipeable container */}
+        <motion.div
+          drag='x'
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.5}
+          dragSnapToOrigin={true}
+          onDrag={handleDrag}
+          onDragEnd={handleDragEnd}
+          onPointerDown={handleLongPressStart}
+          onPointerUp={handleLongPressEnd}
+          onPointerLeave={handleLongPressEnd}
+          style={{ x }}
+          className='max-w-[80%] sm:max-w-[75%] touch-pan-y'
         >
-          {/* Image message */}
-          {message.type === 'image' && message.imageUrl && (
-            <div className='cursor-pointer relative group/image' onClick={onViewImage}>
-              <img src={message.imageUrl} alt='Shared image' className='rounded-xl max-w-full max-h-64 object-cover' />
-              <div className='absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors rounded-xl flex items-center justify-center opacity-0 group-hover/image:opacity-100'>
-                <ZoomIn className='w-8 h-8 text-white drop-shadow-lg' />
-              </div>
+          {/* Reply preview if this message is replying to another - clickable to scroll */}
+          {message.replyTo && !message.deleted && (
+            <div
+              onClick={() => message.replyTo?.id && onScrollToMessage?.(message.replyTo.id)}
+              className={`mb-1 px-2 py-1 rounded-lg text-xs overflow-hidden cursor-pointer transition-opacity hover:opacity-80 active:opacity-60 ${
+                isOwn
+                  ? 'bg-frinder-burnt/30 border-l-2 border-white/50'
+                  : 'bg-muted/50 dark:bg-gray-800/50 border-l-2 border-frinder-orange'
+              }`}
+            >
+              <span className='font-medium text-[10px] block truncate'>
+                {message.replyTo.senderId === (isOwn ? 'You' : matchName) ? 'You' : matchName}
+              </span>
+              <span className='opacity-70 line-clamp-1 break-all'>{message.replyTo.text}</span>
             </div>
           )}
 
-          {/* Text message */}
-          {message.type === 'text' && message.text && <p className='text-sm sm:text-base'>{message.text}</p>}
-
           <div
-            className={`flex items-center gap-1 justify-end mt-1 ${message.type === 'image' ? 'px-2 pb-1' : ''} ${
-              isOwn ? 'text-white/70' : 'text-muted-foreground'
-            }`}
+            className={`rounded-2xl overflow-hidden ${
+              message.deleted
+                ? 'bg-muted/50 dark:bg-gray-800/50 text-muted-foreground italic'
+                : isOwn
+                ? 'bg-frinder-orange text-white rounded-br-sm'
+                : 'bg-muted dark:bg-gray-900 text-foreground dark:text-white rounded-bl-sm'
+            } ${message.type === 'image' && !message.deleted ? 'p-1' : 'px-3 sm:px-4 py-2'}`}
           >
-            <span className='text-[10px] sm:text-xs'>{formatTime(message.timestamp)}</span>
-            {isOwn &&
-              (message.isRead ? (
-                <CheckCheck className='w-3.5 h-3.5 text-blue-300' />
-              ) : (
-                <Check className='w-3.5 h-3.5' />
-              ))}
+            {/* Deleted message */}
+            {message.deleted ? (
+              <p className='text-sm flex items-center gap-1'>
+                <Ban className='w-3.5 h-3.5' />
+                This message was deleted
+              </p>
+            ) : (
+              <>
+                {/* Image message */}
+                {message.type === 'image' && message.imageUrl && (
+                  <div className='cursor-pointer relative group/image' onClick={onViewImage}>
+                    <img src={message.imageUrl} alt='Shared image' className='rounded-xl max-w-full max-h-64 object-cover' />
+                    <div className='absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors rounded-xl flex items-center justify-center opacity-0 group-hover/image:opacity-100'>
+                      <ZoomIn className='w-8 h-8 text-white drop-shadow-lg' />
+                    </div>
+                  </div>
+                )}
+
+                {/* Text message */}
+                {message.type === 'text' && message.text && <p className='text-sm sm:text-base'>{message.text}</p>}
+              </>
+            )}
+
+            <div
+              className={`flex items-center gap-1 justify-end mt-1 ${message.type === 'image' && !message.deleted ? 'px-2 pb-1' : ''} ${
+                message.deleted ? 'text-muted-foreground' : isOwn ? 'text-white/70' : 'text-muted-foreground'
+              }`}
+            >
+              {message.edited && !message.deleted && <span className='text-[10px] sm:text-xs'>edited</span>}
+              <span className='text-[10px] sm:text-xs'>{formatTime(message.timestamp)}</span>
+              {isOwn && !message.deleted &&
+                (message.isRead ? (
+                  <CheckCheck className='w-3.5 h-3.5 text-blue-300' />
+                ) : (
+                  <Check className='w-3.5 h-3.5' />
+                ))}
+            </div>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Reply indicator for own messages (right side) */}
+        {isOwn && (
+          <motion.div
+            style={{ opacity: replyIndicatorOpacity }}
+            className='absolute right-2 top-1/2 -translate-y-1/2 translate-x-6 pointer-events-none'
+          >
+            <Reply className='w-5 h-5 text-frinder-orange' />
+          </motion.div>
+        )}
       </motion.div>
 
-      {/* Reply indicator for own messages (right side) */}
-      {isOwn && (
-        <motion.div
-          style={{ opacity: replyIndicatorOpacity }}
-          className='absolute right-2 top-1/2 -translate-y-1/2 translate-x-6 pointer-events-none'
-        >
-          <Reply className='w-5 h-5 text-frinder-orange' />
-        </motion.div>
-      )}
-    </motion.div>
+      {/* Options menu dialog */}
+      <Dialog open={showOptionsMenu} onOpenChange={setShowOptionsMenu}>
+        <DialogContent className='sm:max-w-[280px] dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Message Options</DialogTitle>
+          </DialogHeader>
+          <div className='flex flex-col gap-2'>
+            <Button
+              variant='outline'
+              className='w-full justify-start gap-2'
+              onClick={() => {
+                setShowOptionsMenu(false);
+                onReply();
+              }}
+            >
+              <Reply className='w-4 h-4' />
+              Reply
+            </Button>
+            {isOwn && message.type === 'text' && (
+              <Button
+                variant='outline'
+                className='w-full justify-start gap-2'
+                onClick={() => {
+                  setShowOptionsMenu(false);
+                  onEdit?.(message);
+                }}
+              >
+                <Pencil className='w-4 h-4' />
+                Edit
+              </Button>
+            )}
+            {isOwn && (
+              <Button
+                variant='outline'
+                className='w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+                onClick={() => {
+                  setShowOptionsMenu(false);
+                  onDelete?.(message);
+                }}
+              >
+                <Trash2 className='w-4 h-4' />
+                Delete for Everyone
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -1119,6 +1225,14 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  // Edit/Delete message state
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [editText, setEditText] = useState('');
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingMessage, setDeletingMessage] = useState<Message | null>(null);
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
+  const [isDeletingMessage, setIsDeletingMessage] = useState(false);
 
   // Subscribe to date requests
   useEffect(() => {
@@ -1342,6 +1456,56 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
   const cancelReply = useCallback(() => {
     setReplyingTo(null);
   }, []);
+
+  // Handle edit message
+  const handleEditMessage = useCallback((message: Message) => {
+    setEditingMessage(message);
+    setEditText(message.text);
+    setShowEditDialog(true);
+  }, []);
+
+  // Submit edit message
+  const submitEditMessage = async () => {
+    if (!editingMessage || !editText.trim()) return;
+    
+    setIsEditingMessage(true);
+    try {
+      await editMessage(match.id, editingMessage.id, currentUserId, editText);
+      toast.success('Message edited');
+      setShowEditDialog(false);
+      setEditingMessage(null);
+      setEditText('');
+    } catch (error: any) {
+      console.error('Error editing message:', error);
+      toast.error(error.message || 'Failed to edit message');
+    } finally {
+      setIsEditingMessage(false);
+    }
+  };
+
+  // Handle delete message
+  const handleDeleteMessage = useCallback((message: Message) => {
+    setDeletingMessage(message);
+    setShowDeleteDialog(true);
+  }, []);
+
+  // Submit delete message
+  const submitDeleteMessage = async () => {
+    if (!deletingMessage) return;
+    
+    setIsDeletingMessage(true);
+    try {
+      await deleteMessageForEveryone(match.id, deletingMessage.id, currentUserId);
+      toast.success('Message deleted');
+      setShowDeleteDialog(false);
+      setDeletingMessage(null);
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      toast.error(error.message || 'Failed to delete message');
+    } finally {
+      setIsDeletingMessage(false);
+    }
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1748,6 +1912,8 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                         onViewImage={() => setViewingImage(message.imageUrl!)}
                         swipeDirection={swipeDirection}
                         onScrollToMessage={scrollToMessage}
+                        onEdit={handleEditMessage}
+                        onDelete={handleDeleteMessage}
                       />
                     </div>
                   );
@@ -2088,6 +2254,86 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           isOwn={celebratingDateRequest?.senderId === currentUserId}
         />
       </AnimatePresence>
+
+      {/* Edit Message Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Edit Message</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4'>
+            <Textarea
+              value={editText}
+              onChange={e => setEditText(e.target.value)}
+              placeholder='Enter your message...'
+              className='dark:bg-gray-800 dark:border-gray-700 dark:text-white min-h-[100px]'
+            />
+            <div className='flex gap-2 justify-end'>
+              <Button
+                variant='outline'
+                onClick={() => {
+                  setShowEditDialog(false);
+                  setEditingMessage(null);
+                  setEditText('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={submitEditMessage}
+                disabled={isEditingMessage || !editText.trim()}
+                className='bg-frinder-orange hover:bg-frinder-burnt'
+              >
+                {isEditingMessage ? (
+                  <>
+                    <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                    Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Message Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Delete Message</DialogTitle>
+            <DialogDescription>
+              This message will be deleted for everyone. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='flex gap-2 justify-end'>
+            <Button
+              variant='outline'
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeletingMessage(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitDeleteMessage}
+              disabled={isDeletingMessage}
+              className='bg-red-500 hover:bg-red-600 text-white'
+            >
+              {isDeletingMessage ? (
+                <>
+                  <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                  Deleting...
+                </>
+              ) : (
+                'Delete for Everyone'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -2142,6 +2388,15 @@ function GroupChatView({
   const [selectedGroupPhoto, setSelectedGroupPhoto] = useState<File | null>(null);
   const [uploadingGroupPhoto, setUploadingGroupPhoto] = useState(false);
   const groupPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit/delete message state
+  const [editingGroupMessage, setEditingGroupMessage] = useState<FirebaseGroupMessage | null>(null);
+  const [editGroupMessageText, setEditGroupMessageText] = useState('');
+  const [showEditGroupMessageDialog, setShowEditGroupMessageDialog] = useState(false);
+  const [showDeleteGroupMessageDialog, setShowDeleteGroupMessageDialog] = useState(false);
+  const [deletingGroupMessage, setDeletingGroupMessage] = useState<FirebaseGroupMessage | null>(null);
+  const [isEditingGroupMessage, setIsEditingGroupMessage] = useState(false);
+  const [isDeletingGroupMessage, setIsDeletingGroupMessage] = useState(false);
 
   const isAdmin = group.creatorId === currentUserId;
 
@@ -2324,6 +2579,56 @@ function GroupChatView({
 
   const handleSwipeToReply = (message: FirebaseGroupMessage) => {
     setReplyingTo(message);
+  };
+
+  // Handle edit group message
+  const handleEditGroupMessage = (message: FirebaseGroupMessage) => {
+    setEditingGroupMessage(message);
+    setEditGroupMessageText(message.text);
+    setShowEditGroupMessageDialog(true);
+  };
+
+  // Submit edit group message
+  const submitEditGroupMessage = async () => {
+    if (!editingGroupMessage || !editGroupMessageText.trim()) return;
+    
+    setIsEditingGroupMessage(true);
+    try {
+      await editGroupMessage(group.id, editingGroupMessage.id, currentUserId, editGroupMessageText.trim());
+      toast.success('Message edited');
+      setShowEditGroupMessageDialog(false);
+      setEditingGroupMessage(null);
+      setEditGroupMessageText('');
+    } catch (error: any) {
+      console.error('Error editing message:', error);
+      toast.error(error.message || 'Failed to edit message');
+    } finally {
+      setIsEditingGroupMessage(false);
+    }
+  };
+
+  // Handle delete group message
+  const handleDeleteGroupMessage = (message: FirebaseGroupMessage) => {
+    setDeletingGroupMessage(message);
+    setShowDeleteGroupMessageDialog(true);
+  };
+
+  // Submit delete group message
+  const submitDeleteGroupMessage = async () => {
+    if (!deletingGroupMessage) return;
+    
+    setIsDeletingGroupMessage(true);
+    try {
+      await deleteGroupMessageForEveryone(group.id, deletingGroupMessage.id, currentUserId);
+      toast.success('Message deleted');
+      setShowDeleteGroupMessageDialog(false);
+      setDeletingGroupMessage(null);
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      toast.error(error.message || 'Failed to delete message');
+    } finally {
+      setIsDeletingGroupMessage(false);
+    }
   };
 
   return (
@@ -2680,6 +2985,97 @@ function GroupChatView({
         </DialogContent>
       </Dialog>
 
+      {/* Edit Message Dialog */}
+      <Dialog open={showEditGroupMessageDialog} onOpenChange={setShowEditGroupMessageDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white flex items-center gap-2'>
+              <Pencil className='w-5 h-5 text-frinder-orange' />
+              Edit Message
+            </DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4'>
+            <Textarea
+              value={editGroupMessageText}
+              onChange={(e) => setEditGroupMessageText(e.target.value)}
+              placeholder='Edit your message...'
+              className='min-h-[100px] dark:bg-gray-800 dark:border-gray-700 dark:text-white'
+            />
+            <div className='flex gap-2'>
+              <Button
+                variant='outline'
+                className='flex-1 dark:border-gray-700 dark:text-white'
+                onClick={() => {
+                  setShowEditGroupMessageDialog(false);
+                  setEditingGroupMessage(null);
+                  setEditGroupMessageText('');
+                }}
+                disabled={isEditingGroupMessage}
+              >
+                Cancel
+              </Button>
+              <Button
+                className='flex-1 bg-frinder-orange hover:bg-frinder-burnt text-white'
+                onClick={submitEditGroupMessage}
+                disabled={isEditingGroupMessage || !editGroupMessageText.trim()}
+              >
+                {isEditingGroupMessage ? (
+                  <>
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                    Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Message Confirmation Dialog */}
+      <Dialog open={showDeleteGroupMessageDialog} onOpenChange={setShowDeleteGroupMessageDialog}>
+        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white flex items-center gap-2 text-red-500'>
+              <Trash2 className='w-5 h-5' />
+              Delete Message
+            </DialogTitle>
+            <DialogDescription>
+              This message will be deleted for everyone in the group. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='flex gap-2 mt-4'>
+            <Button
+              variant='outline'
+              className='flex-1 dark:border-gray-700 dark:text-white'
+              onClick={() => {
+                setShowDeleteGroupMessageDialog(false);
+                setDeletingGroupMessage(null);
+              }}
+              disabled={isDeletingGroupMessage}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant='destructive'
+              className='flex-1'
+              onClick={submitDeleteGroupMessage}
+              disabled={isDeletingGroupMessage}
+            >
+              {isDeletingGroupMessage ? (
+                <>
+                  <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Messages Area */}
       <div className='flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4'>
         <AnimatePresence>
@@ -2697,6 +3093,8 @@ function GroupChatView({
                 showName={showName}
                 onSwipeReply={() => handleSwipeToReply(message)}
                 onImageClick={url => setPreviewImage(url)}
+                onEdit={handleEditGroupMessage}
+                onDelete={handleDeleteGroupMessage}
               />
             );
           })}
@@ -2820,6 +3218,8 @@ interface GroupMessageBubbleProps {
   showName: boolean;
   onSwipeReply: () => void;
   onImageClick: (url: string) => void;
+  onEdit?: (message: FirebaseGroupMessage) => void;
+  onDelete?: (message: FirebaseGroupMessage) => void;
 }
 
 function GroupMessageBubble({
@@ -2828,12 +3228,31 @@ function GroupMessageBubble({
   showAvatar,
   showName,
   onSwipeReply,
-  onImageClick
+  onImageClick,
+  onEdit,
+  onDelete
 }: GroupMessageBubbleProps) {
   const x = useMotionValue(0);
   const replyOpacity = useTransform(x, [0, 50], [0, 1]);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleLongPressStart = () => {
+    if (message.deleted) return;
+    longPressTimer.current = setTimeout(() => {
+      setShowOptionsMenu(true);
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    handleLongPressEnd();
     if (info.offset.x > 50) {
       onSwipeReply();
     }
@@ -2842,89 +3261,169 @@ function GroupMessageBubble({
   const timestamp = message.timestamp?.toDate ? message.timestamp.toDate() : new Date();
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
-    >
-      {/* Reply indicator */}
-      {!isOwn && (
-        <motion.div style={{ opacity: replyOpacity }} className='flex-shrink-0'>
-          <CornerDownLeft className='w-4 h-4 text-frinder-orange' />
-        </motion.div>
-      )}
-
-      {/* Avatar for other users - WhatsApp style */}
-      {!isOwn && (
-        <div className='flex-shrink-0 w-7 h-7'>
-          {showAvatar && (
-            <Avatar className='w-7 h-7'>
-              <AvatarImage src={message.senderPhoto} alt={message.senderName} />
-              <AvatarFallback className='bg-frinder-orange text-white text-xs'>
-                {message.senderName?.[0] || '?'}
-              </AvatarFallback>
-            </Avatar>
-          )}
-        </div>
-      )}
-
+    <>
       <motion.div
-        drag='x'
-        dragConstraints={{ left: 0, right: isOwn ? 0 : 80 }}
-        dragElastic={0.2}
-        onDragEnd={handleDragEnd}
-        style={{ x }}
-        className={`max-w-[75%] ${isOwn ? 'order-1' : ''}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'} group`}
       >
-        {/* Sender name for group messages */}
-        {showName && <p className='text-xs font-medium text-frinder-orange mb-1 ml-1'>{message.senderName}</p>}
+        {/* Reply indicator */}
+        {!isOwn && (
+          <motion.div style={{ opacity: replyOpacity }} className='flex-shrink-0'>
+            <CornerDownLeft className='w-4 h-4 text-frinder-orange' />
+          </motion.div>
+        )}
 
-        <div
-          className={`rounded-2xl px-3 py-2 ${
-            isOwn ? 'bg-frinder-orange text-white rounded-br-md' : 'bg-muted dark:bg-gray-800 rounded-bl-md'
-          }`}
+        {/* Avatar for other users - WhatsApp style */}
+        {!isOwn && (
+          <div className='flex-shrink-0 w-7 h-7'>
+            {showAvatar && (
+              <Avatar className='w-7 h-7'>
+                <AvatarImage src={message.senderPhoto} alt={message.senderName} />
+                <AvatarFallback className='bg-frinder-orange text-white text-xs'>
+                  {message.senderName?.[0] || '?'}
+                </AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        )}
+
+        {/* Desktop more options button - appears on hover for own messages */}
+        {isOwn && !message.deleted && (
+          <button
+            onClick={() => setShowOptionsMenu(true)}
+            className='hidden sm:flex w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 self-center'
+          >
+            <MoreVertical className='w-4 h-4 text-muted-foreground' />
+          </button>
+        )}
+
+        <motion.div
+          drag='x'
+          dragConstraints={{ left: 0, right: isOwn ? 0 : 80 }}
+          dragElastic={0.2}
+          onDragEnd={handleDragEnd}
+          onPointerDown={handleLongPressStart}
+          onPointerUp={handleLongPressEnd}
+          onPointerLeave={handleLongPressEnd}
+          style={{ x }}
+          className={`max-w-[75%] ${isOwn ? 'order-1' : ''}`}
         >
-          {/* Reply preview */}
-          {message.replyTo && (
-            <div className={`mb-2 p-2 rounded-lg text-xs ${isOwn ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}>
-              <p className={`font-medium ${isOwn ? 'text-white/80' : 'text-frinder-orange'}`}>
-                {message.replyTo.senderName}
+          {/* Sender name for group messages */}
+          {showName && !message.deleted && <p className='text-xs font-medium text-frinder-orange mb-1 ml-1'>{message.senderName}</p>}
+
+          <div
+            className={`rounded-2xl px-3 py-2 ${
+              message.deleted
+                ? 'bg-muted/50 dark:bg-gray-800/50 text-muted-foreground italic'
+                : isOwn
+                ? 'bg-frinder-orange text-white rounded-br-md'
+                : 'bg-muted dark:bg-gray-800 rounded-bl-md'
+            }`}
+          >
+            {/* Deleted message */}
+            {message.deleted ? (
+              <p className='text-sm flex items-center gap-1'>
+                <Ban className='w-3.5 h-3.5' />
+                This message was deleted
               </p>
-              <p className={isOwn ? 'text-white/70' : 'text-muted-foreground'}>{message.replyTo.text}</p>
+            ) : (
+              <>
+                {/* Reply preview */}
+                {message.replyTo && (
+                  <div className={`mb-2 p-2 rounded-lg text-xs ${isOwn ? 'bg-white/20' : 'bg-black/5 dark:bg-white/10'}`}>
+                    <p className={`font-medium ${isOwn ? 'text-white/80' : 'text-frinder-orange'}`}>
+                      {message.replyTo.senderName}
+                    </p>
+                    <p className={isOwn ? 'text-white/70' : 'text-muted-foreground'}>{message.replyTo.text}</p>
+                  </div>
+                )}
+
+                {/* Image */}
+                {message.type === 'image' && message.imageUrl && (
+                  <div className='mb-2 -mx-1 -mt-1'>
+                    <img
+                      src={message.imageUrl}
+                      alt='Shared'
+                      className='rounded-lg max-w-full cursor-pointer'
+                      onClick={() => onImageClick(message.imageUrl!)}
+                    />
+                  </div>
+                )}
+
+                {/* Text */}
+                {message.text && message.text !== '📷 Photo' && (
+                  <p className={`text-sm ${isOwn ? 'text-white' : 'dark:text-white'}`}>{message.text}</p>
+                )}
+              </>
+            )}
+
+            {/* Timestamp */}
+            <div className={`flex items-center gap-1 justify-end mt-1 ${message.deleted ? 'text-muted-foreground' : isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>
+              {message.edited && !message.deleted && <span className='text-[10px]'>edited</span>}
+              <span className='text-[10px]'>
+                {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
-          )}
+          </div>
+        </motion.div>
 
-          {/* Image */}
-          {message.type === 'image' && message.imageUrl && (
-            <div className='mb-2 -mx-1 -mt-1'>
-              <img
-                src={message.imageUrl}
-                alt='Shared'
-                className='rounded-lg max-w-full cursor-pointer'
-                onClick={() => onImageClick(message.imageUrl!)}
-              />
-            </div>
-          )}
-
-          {/* Text */}
-          {message.text && message.text !== '📷 Photo' && (
-            <p className={`text-sm ${isOwn ? 'text-white' : 'dark:text-white'}`}>{message.text}</p>
-          )}
-
-          {/* Timestamp */}
-          <p className={`text-[10px] mt-1 ${isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>
-            {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
+        {/* Reply indicator for own messages */}
+        {isOwn && (
+          <motion.div style={{ opacity: replyOpacity }} className='flex-shrink-0 order-0'>
+            <CornerDownLeft className='w-4 h-4 text-frinder-orange' />
+          </motion.div>
+        )}
       </motion.div>
 
-      {/* Reply indicator for own messages */}
-      {isOwn && (
-        <motion.div style={{ opacity: replyOpacity }} className='flex-shrink-0 order-0'>
-          <CornerDownLeft className='w-4 h-4 text-frinder-orange' />
-        </motion.div>
-      )}
-    </motion.div>
+      {/* Options menu dialog */}
+      <Dialog open={showOptionsMenu} onOpenChange={setShowOptionsMenu}>
+        <DialogContent className='sm:max-w-[280px] dark:bg-gray-900 dark:border-gray-800'>
+          <DialogHeader>
+            <DialogTitle className='dark:text-white'>Message Options</DialogTitle>
+          </DialogHeader>
+          <div className='flex flex-col gap-2'>
+            <Button
+              variant='outline'
+              className='w-full justify-start gap-2'
+              onClick={() => {
+                setShowOptionsMenu(false);
+                onSwipeReply();
+              }}
+            >
+              <Reply className='w-4 h-4' />
+              Reply
+            </Button>
+            {isOwn && message.type === 'text' && (
+              <Button
+                variant='outline'
+                className='w-full justify-start gap-2'
+                onClick={() => {
+                  setShowOptionsMenu(false);
+                  onEdit?.(message);
+                }}
+              >
+                <Pencil className='w-4 h-4' />
+                Edit
+              </Button>
+            )}
+            {isOwn && (
+              <Button
+                variant='outline'
+                className='w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+                onClick={() => {
+                  setShowOptionsMenu(false);
+                  onDelete?.(message);
+                }}
+              >
+                <Trash2 className='w-4 h-4' />
+                Delete for Everyone
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

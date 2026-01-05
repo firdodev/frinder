@@ -149,6 +149,7 @@ export async function isDisplayNameTaken(displayName: string, currentUserId?: st
 }
 
 // Get users to swipe on (excludes users already interacted with)
+// Users swiped left will reappear after 7 days
 export async function getUsersToSwipe(
   currentUserId: string,
   currentUserProfile?: UserProfile,
@@ -159,8 +160,30 @@ export async function getUsersToSwipe(
     const swipesRef = collection(db, 'swipes');
     const swipedQuery = query(swipesRef, where('fromUserId', '==', currentUserId));
     const swipedSnapshot = await getDocs(swipedQuery);
-    const swipedUserIds = swipedSnapshot.docs.map(doc => doc.data().toUserId);
-    swipedUserIds.push(currentUserId); // Exclude self
+    
+    // Filter out swipes: exclude right/superlike swipes, and left swipes within 7 days
+    const REAPPEAR_AFTER_DAYS = 7;
+    const reappearThreshold = new Date();
+    reappearThreshold.setDate(reappearThreshold.getDate() - REAPPEAR_AFTER_DAYS);
+    
+    const excludedUserIds: string[] = [currentUserId]; // Always exclude self
+    
+    swipedSnapshot.docs.forEach(swipeDoc => {
+      const swipeData = swipeDoc.data();
+      const direction = swipeData.direction;
+      const timestamp = swipeData.timestamp?.toDate ? swipeData.timestamp.toDate() : null;
+      
+      // Always exclude users who were liked (right) or superliked
+      if (direction === 'right' || direction === 'superlike') {
+        excludedUserIds.push(swipeData.toUserId);
+      } else if (direction === 'left') {
+        // Only exclude left swipes if they were within the last 7 days
+        if (timestamp && timestamp > reappearThreshold) {
+          excludedUserIds.push(swipeData.toUserId);
+        }
+        // If timestamp is older than 7 days (or null), don't exclude - they can reappear
+      }
+    });
 
     // Get all users with complete profiles
     const usersRef = collection(db, 'users');
@@ -174,7 +197,7 @@ export async function getUsersToSwipe(
     let users: UserProfile[] = [];
     usersSnapshot.docs.forEach(doc => {
       const userData = doc.data() as UserProfile;
-      if (!swipedUserIds.includes(userData.uid)) {
+      if (!excludedUserIds.includes(userData.uid)) {
         users.push(userData);
       }
     });
@@ -185,6 +208,52 @@ export async function getUsersToSwipe(
   } catch (error) {
     console.error('Error getting users to swipe:', error);
     return [];
+  }
+}
+
+// Send notification email (like, superlike, match)
+export async function sendNotificationEmail(
+  toUserId: string,
+  fromUserId: string,
+  type: 'like' | 'superlike' | 'match'
+): Promise<void> {
+  try {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
+    // Get recipient's profile
+    const toUserDoc = await getDoc(doc(db, 'users', toUserId));
+    if (!toUserDoc.exists()) return;
+    const toUser = toUserDoc.data() as UserProfile;
+    
+    // Get sender's profile
+    const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
+    if (!fromUserDoc.exists()) return;
+    const fromUser = fromUserDoc.data() as UserProfile;
+    
+    // Check if recipient has email notifications enabled (default to true if not set)
+    const emailNotificationsEnabled = toUser.emailNotifications !== false;
+    if (!emailNotificationsEnabled) return;
+    
+    // Check if recipient has a valid email
+    if (!toUser.email) return;
+    
+    // Send notification email via API (uses nodemailer on server)
+    const baseUrl = window.location.origin;
+    await fetch(`${baseUrl}/api/send-notification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        toEmail: toUser.email,
+        toName: toUser.displayName,
+        fromName: fromUser.displayName,
+        fromPhoto: fromUser.photos?.[0] || '',
+        type
+      })
+    });
+  } catch (error) {
+    // Don't throw - email is non-critical
+    console.error('Error sending notification email:', error);
   }
 }
 
@@ -237,6 +306,9 @@ export async function recordSwipe(
         seen: false
       });
 
+      // Send superlike email notification to recipient
+      sendNotificationEmail(toUserId, fromUserId, 'superlike');
+
       return { isMatch: true, matchId, isSuperLike: true };
     }
 
@@ -251,7 +323,15 @@ export async function recordSwipe(
       ) {
         // It's a match!
         const matchId = await createMatch(fromUserId, toUserId);
+        
+        // Send match email notifications to both users
+        sendNotificationEmail(toUserId, fromUserId, 'match');
+        sendNotificationEmail(fromUserId, toUserId, 'match');
+        
         return { isMatch: true, matchId };
+      } else {
+        // Send like email notification (not a match yet)
+        sendNotificationEmail(toUserId, fromUserId, 'like');
       }
     }
 
@@ -451,6 +531,73 @@ export async function sendMessage(
     return messageDoc.id;
   } catch (error) {
     console.error('Error sending message:', error);
+    throw error;
+  }
+}
+
+// Edit a message
+export async function editMessage(
+  matchId: string,
+  messageId: string,
+  senderId: string,
+  newText: string
+): Promise<void> {
+  try {
+    const messageRef = doc(db, 'matches', matchId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (!messageDoc.exists()) {
+      throw new Error('Message not found');
+    }
+    
+    const messageData = messageDoc.data();
+    if (messageData.senderId !== senderId) {
+      throw new Error('You can only edit your own messages');
+    }
+    
+    const sanitizedText = sanitizeMessage(newText);
+    if (!sanitizedText) {
+      throw new Error('Message cannot be empty');
+    }
+    
+    await updateDoc(messageRef, {
+      text: sanitizedText,
+      edited: true,
+      editedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error editing message:', error);
+    throw error;
+  }
+}
+
+// Delete a message for everyone
+export async function deleteMessageForEveryone(
+  matchId: string,
+  messageId: string,
+  senderId: string
+): Promise<void> {
+  try {
+    const messageRef = doc(db, 'matches', matchId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (!messageDoc.exists()) {
+      throw new Error('Message not found');
+    }
+    
+    const messageData = messageDoc.data();
+    if (messageData.senderId !== senderId) {
+      throw new Error('You can only delete your own messages');
+    }
+    
+    await updateDoc(messageRef, {
+      deleted: true,
+      deletedAt: serverTimestamp(),
+      text: 'This message was deleted',
+      imageUrl: null
+    });
+  } catch (error) {
+    console.error('Error deleting message:', error);
     throw error;
   }
 }
@@ -1786,6 +1933,73 @@ export async function sendGroupMessage(
     return messageDoc.id;
   } catch (error) {
     console.error('Error sending group message:', error);
+    throw error;
+  }
+}
+
+// Edit a group message
+export async function editGroupMessage(
+  groupId: string,
+  messageId: string,
+  senderId: string,
+  newText: string
+): Promise<void> {
+  try {
+    const messageRef = doc(db, 'groups', groupId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (!messageDoc.exists()) {
+      throw new Error('Message not found');
+    }
+    
+    const messageData = messageDoc.data();
+    if (messageData.senderId !== senderId) {
+      throw new Error('You can only edit your own messages');
+    }
+    
+    const sanitizedText = sanitizeMessage(newText);
+    if (!sanitizedText) {
+      throw new Error('Message cannot be empty');
+    }
+    
+    await updateDoc(messageRef, {
+      text: sanitizedText,
+      edited: true,
+      editedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error editing group message:', error);
+    throw error;
+  }
+}
+
+// Delete a group message for everyone
+export async function deleteGroupMessageForEveryone(
+  groupId: string,
+  messageId: string,
+  senderId: string
+): Promise<void> {
+  try {
+    const messageRef = doc(db, 'groups', groupId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (!messageDoc.exists()) {
+      throw new Error('Message not found');
+    }
+    
+    const messageData = messageDoc.data();
+    if (messageData.senderId !== senderId) {
+      throw new Error('You can only delete your own messages');
+    }
+    
+    await updateDoc(messageRef, {
+      deleted: true,
+      deletedAt: serverTimestamp(),
+      text: 'This message was deleted',
+      imageUrl: null
+    });
+  } catch (error) {
+    console.error('Error deleting group message:', error);
     throw error;
   }
 }

@@ -48,6 +48,7 @@ export interface UserProfile {
   createdAt: Date;
   isProfileComplete: boolean;
   isEmailVerified: boolean;
+  emailNotifications?: boolean;
 }
 
 interface AuthContextType {
