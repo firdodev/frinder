@@ -148,7 +148,7 @@ export async function isDisplayNameTaken(displayName: string, currentUserId?: st
   }
 }
 
-// Get users to swipe on (filtered by same city and shared interests)
+// Get users to swipe on (excludes users already interacted with)
 export async function getUsersToSwipe(
   currentUserId: string,
   currentUserProfile?: UserProfile,
@@ -179,37 +179,7 @@ export async function getUsersToSwipe(
       }
     });
 
-    // Apply filters if current user profile is available
-    if (currentUserProfile) {
-      // No gender filter - show all genders (girls can see girls, boys can see boys)
-
-      // Sort by location proximity (same city first, then same country, then others)
-      if (currentUserProfile.city || currentUserProfile.country) {
-        const sameCity = users.filter(user => user.city && user.city === currentUserProfile.city);
-        const sameCountry = users.filter(
-          user => user.country === currentUserProfile.country && user.city !== currentUserProfile.city
-        );
-        const others = users.filter(
-          user => user.country !== currentUserProfile.country
-        );
-        // Prioritize but include all users
-        users = [...sameCity, ...sameCountry, ...others];
-      }
-
-      // Sort by shared interests (more shared interests = higher priority)
-      if (currentUserProfile.interests && currentUserProfile.interests.length > 0) {
-        const usersWithScore = users
-          .map(user => ({
-            ...user,
-            _sharedInterests:
-              user.interests?.filter(interest => currentUserProfile.interests?.includes(interest)).length || 0
-          }))
-          .sort((a, b) => (b._sharedInterests || 0) - (a._sharedInterests || 0));
-
-        // Remove the temporary field
-        users = usersWithScore.map(({ _sharedInterests, ...user }) => user as UserProfile);
-      }
-    }
+    // No filters applied - show all users regardless of gender, location, or interests
 
     return users.slice(0, limitCount);
   } catch (error) {

@@ -92,7 +92,7 @@ export default function ProfileSetup() {
   const [formData, setFormData] = useState({
     displayName: userProfile?.displayName || '',
     bio: userProfile?.bio || '',
-    age: userProfile?.age || 18,
+    age: userProfile?.age?.toString() || '',
     gender: userProfile?.gender || ('other' as 'male' | 'female' | 'other'),
     country: userProfile?.country || '',
     city: userProfile?.city || '',
@@ -225,6 +225,7 @@ export default function ProfileSetup() {
     try {
       await updateProfile({
         ...formData,
+        age: parseInt(formData.age) || 18,
         isProfileComplete: true
       });
       toast.success('Profile created successfully!');
@@ -239,7 +240,7 @@ export default function ProfileSetup() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return formData.displayName.trim().length >= 2 && formData.age >= 18 && formData.gender !== 'other' && !displayNameError && displayNameValid && !checkingDisplayName;
+        return formData.displayName.trim().length >= 2 && parseInt(formData.age) >= 18 && formData.gender !== 'other' && !displayNameError && displayNameValid && !checkingDisplayName;
       case 2:
         return formData.country && formData.city;
       case 3:
@@ -351,8 +352,9 @@ export default function ProfileSetup() {
                         min={18}
                         max={99}
                         value={formData.age}
-                        onChange={e => setFormData(prev => ({ ...prev, age: parseInt(e.target.value) || 18 }))}
+                        onChange={e => setFormData(prev => ({ ...prev, age: e.target.value }))}
                         className='text-lg h-12'
+                        placeholder='18'
                       />
                     </div>
                     <div className='space-y-2'>
