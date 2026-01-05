@@ -183,17 +183,17 @@ export async function getUsersToSwipe(
     if (currentUserProfile) {
       // No gender filter - show all genders (girls can see girls, boys can see boys)
 
-      // Filter by same city (if user has city set)
-      if (currentUserProfile.city) {
-        const sameCity = users.filter(user => user.city === currentUserProfile.city);
-        // If there are users in the same city, prioritize them
-        if (sameCity.length > 0) {
-          // Also include nearby users from same country
-          const sameCountry = users.filter(
-            user => user.country === currentUserProfile.country && user.city !== currentUserProfile.city
-          );
-          users = [...sameCity, ...sameCountry];
-        }
+      // Sort by location proximity (same city first, then same country, then others)
+      if (currentUserProfile.city || currentUserProfile.country) {
+        const sameCity = users.filter(user => user.city && user.city === currentUserProfile.city);
+        const sameCountry = users.filter(
+          user => user.country === currentUserProfile.country && user.city !== currentUserProfile.city
+        );
+        const others = users.filter(
+          user => user.country !== currentUserProfile.country
+        );
+        // Prioritize but include all users
+        users = [...sameCity, ...sameCountry, ...others];
       }
 
       // Sort by shared interests (more shared interests = higher priority)
