@@ -2928,7 +2928,12 @@ function GroupMessageBubble({
   );
 }
 
-export default function Messages() {
+interface MessagesProps {
+  initialGroupId?: string | null;
+  onGroupOpened?: () => void;
+}
+
+export default function Messages({ initialGroupId, onGroupOpened }: MessagesProps) {
   const { user, userProfile } = useAuth();
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -3060,6 +3065,19 @@ export default function Messages() {
 
     return () => unsubscribe();
   }, [user?.uid]);
+
+  // Handle opening a group from external navigation (e.g., Groups tab)
+  useEffect(() => {
+    if (initialGroupId && userGroups.length > 0) {
+      const group = userGroups.find(g => g.id === initialGroupId);
+      if (group) {
+        setSelectedGroup(group);
+        setShowGroupChat(true);
+        setSelectedMatch(null);
+        onGroupOpened?.();
+      }
+    }
+  }, [initialGroupId, userGroups, onGroupOpened]);
 
   // Load group members when viewing group
   const handleViewGroupMembers = async (group: FirebaseGroup) => {

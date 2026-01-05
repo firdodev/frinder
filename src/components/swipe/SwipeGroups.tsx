@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from 'framer-motion';
-import { Heart, X, Star, RotateCcw, Users, MapPin, Plus, Loader2, Lock, Globe, Crown, Check, XCircle, ChevronDown, ChevronUp, Clock, Pencil, Camera, Image as ImageIcon } from 'lucide-react';
+import { Heart, X, Star, RotateCcw, Users, MapPin, Plus, Loader2, Lock, Globe, Crown, Check, XCircle, ChevronDown, ChevronUp, Clock, Pencil, Camera, Image as ImageIcon, Trash2, MessageCircle, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
-import { getGroupsToSwipe, joinGroup, createGroup, subscribeToMyCreatedGroups, approveJoinRequest, declineJoinRequest, updateGroup, type Group as FirebaseGroup } from '@/lib/firebaseServices';
+import { getGroupsToSwipe, joinGroup, createGroup, subscribeToMyCreatedGroups, subscribeToUserGroups, approveJoinRequest, declineJoinRequest, updateGroup, deleteGroup, leaveGroup, type Group as FirebaseGroup } from '@/lib/firebaseServices';
 import { uploadGroupPhoto, compressImage } from '@/lib/storageService';
 import { toast } from 'sonner';
 
@@ -178,15 +178,22 @@ function SwipeGroupCard({ group, onSwipe, isTop }: SwipeGroupCardProps) {
   );
 }
 
-export default function SwipeGroups() {
+interface SwipeGroupsProps {
+  onOpenGroupChat?: (groupId: string) => void;
+}
+
+export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
   const { user, userProfile } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [joinedGroups, setJoinedGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastAction, setLastAction] = useState<{ group: Group; direction: string } | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showMyGroups, setShowMyGroups] = useState(true);
+  const [showJoinedGroups, setShowJoinedGroups] = useState(true);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+  const [leavingGroup, setLeavingGroup] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState({
     name: '',
     description: '',
@@ -211,6 +218,8 @@ export default function SwipeGroups() {
     photo: ''
   });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editCustomInterest, setEditCustomInterest] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -351,6 +360,41 @@ export default function SwipeGroups() {
       }));
 
       setMyGroups(mappedGroups);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Subscribe to all user's groups (to get joined groups that aren't created by user)
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToUserGroups(user.uid, (firebaseGroups) => {
+      // Filter to only groups the user didn't create
+      const joinedOnly = firebaseGroups.filter((g: FirebaseGroup) => g.creatorId !== user.uid);
+      
+      const mappedGroups: Group[] = joinedOnly.map((g: FirebaseGroup) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        photo: g.photo || 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800',
+        members:
+          g.members?.map(memberId => {
+            const profile = g.memberProfiles?.[memberId];
+            return {
+              id: memberId,
+              name: profile?.displayName || 'Unknown',
+              photo: profile?.photos?.[0] || '/placeholder-avatar.png'
+            };
+          }) || [],
+        interests: g.interests || [],
+        activity: g.activity || 'Weekly meetups',
+        location: g.location,
+        isPrivate: g.isPrivate || false,
+        creatorId: g.creatorId
+      }));
+
+      setJoinedGroups(mappedGroups);
     });
 
     return () => unsubscribe();
@@ -554,6 +598,41 @@ export default function SwipeGroups() {
     }
   };
 
+  // Delete group
+  const handleDeleteGroup = async () => {
+    if (!user?.uid || !editingGroup) return;
+
+    try {
+      setDeleting(true);
+      await deleteGroup(editingGroup.id, user.uid);
+      toast.success('Group deleted successfully');
+      setShowDeleteConfirm(false);
+      setShowEditDialog(false);
+      setEditingGroup(null);
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      toast.error('Failed to delete group');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Leave group (for joined groups)
+  const handleLeaveGroup = async (groupId: string) => {
+    if (!user?.uid) return;
+
+    try {
+      setLeavingGroup(groupId);
+      await leaveGroup(groupId, user.uid);
+      toast.success('Left group successfully');
+    } catch (error: any) {
+      console.error('Error leaving group:', error);
+      toast.error(error.message || 'Failed to leave group');
+    } finally {
+      setLeavingGroup(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className='h-full flex items-center justify-center'>
@@ -729,7 +808,10 @@ export default function SwipeGroups() {
       </Dialog>
 
       {/* Edit Group Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) setShowDeleteConfirm(false);
+      }}>
         <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-gray-800'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Edit Group</DialogTitle>
@@ -934,7 +1016,7 @@ export default function SwipeGroups() {
             <Button
               className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
               onClick={handleSaveGroup}
-              disabled={saving || !editGroup.name || !editGroup.description}
+              disabled={saving || deleting || !editGroup.name || !editGroup.description}
             >
               {saving ? (
                 <>
@@ -945,6 +1027,51 @@ export default function SwipeGroups() {
                 'Save Changes'
               )}
             </Button>
+
+            {/* Delete Group Section */}
+            <div className='pt-4 mt-4 border-t border-gray-200 dark:border-gray-800'>
+              {!showDeleteConfirm ? (
+                <Button
+                  variant='outline'
+                  className='w-full border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20'
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={saving || deleting}
+                >
+                  <Trash2 className='w-4 h-4 mr-2' />
+                  Delete Group
+                </Button>
+              ) : (
+                <div className='space-y-3'>
+                  <p className='text-sm text-center text-red-500 font-medium'>
+                    Are you sure you want to delete this group? This action cannot be undone.
+                  </p>
+                  <div className='flex gap-2'>
+                    <Button
+                      variant='outline'
+                      className='flex-1'
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className='flex-1 bg-red-500 hover:bg-red-600 text-white'
+                      onClick={handleDeleteGroup}
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                          Deleting...
+                        </>
+                      ) : (
+                        'Delete'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -994,7 +1121,10 @@ export default function SwipeGroups() {
                       className='p-3 rounded-lg bg-card border dark:border-gray-800'
                     >
                       <div className='flex items-start gap-3'>
-                        <div className='relative'>
+                        <button
+                          onClick={() => onOpenGroupChat?.(group.id)}
+                          className='relative hover:opacity-80 transition-opacity'
+                        >
                           {group.photo ? (
                             <img 
                               src={group.photo} 
@@ -1006,8 +1136,11 @@ export default function SwipeGroups() {
                               <Users className='w-6 h-6 text-muted-foreground' />
                             </div>
                           )}
-                        </div>
-                        <div className='flex-1 min-w-0'>
+                        </button>
+                        <button 
+                          onClick={() => onOpenGroupChat?.(group.id)}
+                          className='flex-1 min-w-0 text-left hover:opacity-80 transition-opacity'
+                        >
                           <div className='flex items-center gap-2'>
                             <h3 className='font-semibold dark:text-white truncate'>{group.name}</h3>
                             {group.isPrivate ? (
@@ -1020,17 +1153,27 @@ export default function SwipeGroups() {
                             <Users className='w-3 h-3' />
                             <span>{group.members.length} members</span>
                           </div>
+                        </button>
+                        <div className='flex items-center gap-1'>
+                          {/* Chat button */}
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='shrink-0 h-8 px-2 gap-1 dark:border-gray-700 text-frinder-orange hover:text-frinder-burnt hover:bg-frinder-orange/10'
+                            onClick={() => onOpenGroupChat?.(group.id)}
+                          >
+                            <MessageCircle className='w-3.5 h-3.5' />
+                          </Button>
+                          {/* Edit button */}
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='shrink-0 h-8 px-2 gap-1 dark:border-gray-700'
+                            onClick={() => handleOpenEditDialog(group)}
+                          >
+                            <Pencil className='w-3.5 h-3.5' />
+                          </Button>
                         </div>
-                        {/* Edit button */}
-                        <Button
-                          size='sm'
-                          variant='outline'
-                          className='shrink-0 h-8 px-2 gap-1 dark:border-gray-700'
-                          onClick={() => handleOpenEditDialog(group)}
-                        >
-                          <Pencil className='w-3.5 h-3.5' />
-                          <span className='text-xs'>Edit</span>
-                        </Button>
                       </div>
 
                       {/* Pending Requests Section */}
@@ -1086,6 +1229,112 @@ export default function SwipeGroups() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Joined Groups Section */}
+      {joinedGroups.length > 0 && (
+        <div className='px-4 mb-4'>
+          <button 
+            onClick={() => setShowJoinedGroups(!showJoinedGroups)}
+            className='w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 dark:bg-gray-900 hover:bg-muted dark:hover:bg-gray-800 transition-colors'
+          >
+            <div className='flex items-center gap-2'>
+              <Users className='w-5 h-5 text-green-500' />
+              <span className='font-semibold dark:text-white'>Joined Groups</span>
+              <Badge variant='secondary' className='bg-green-500/10 text-green-500'>
+                {joinedGroups.length}
+              </Badge>
+            </div>
+            {showJoinedGroups ? (
+              <ChevronUp className='w-5 h-5 text-muted-foreground' />
+            ) : (
+              <ChevronDown className='w-5 h-5 text-muted-foreground' />
+            )}
+          </button>
+          <AnimatePresence>
+            {showJoinedGroups && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className='overflow-hidden'
+              >
+                <div className='space-y-3 mt-3 max-h-[300px] overflow-y-auto'>
+                  {joinedGroups.map(group => (
+                    <div 
+                      key={group.id} 
+                      className='p-3 rounded-lg bg-card border dark:border-gray-800'
+                    >
+                      <div className='flex items-start gap-3'>
+                        <button
+                          onClick={() => onOpenGroupChat?.(group.id)}
+                          className='relative hover:opacity-80 transition-opacity'
+                        >
+                          {group.photo ? (
+                            <img 
+                              src={group.photo} 
+                              alt={group.name} 
+                              className='w-14 h-14 rounded-lg object-cover'
+                            />
+                          ) : (
+                            <div className='w-14 h-14 rounded-lg bg-muted dark:bg-gray-800 flex items-center justify-center'>
+                              <Users className='w-6 h-6 text-muted-foreground' />
+                            </div>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => onOpenGroupChat?.(group.id)}
+                          className='flex-1 min-w-0 text-left hover:opacity-80 transition-opacity'
+                        >
+                          <div className='flex items-center gap-2'>
+                            <h3 className='font-semibold dark:text-white truncate'>{group.name}</h3>
+                            {group.isPrivate ? (
+                              <Lock className='w-3.5 h-3.5 text-amber-500 flex-shrink-0' />
+                            ) : (
+                              <Globe className='w-3.5 h-3.5 text-green-500 flex-shrink-0' />
+                            )}
+                          </div>
+                          <div className='flex items-center gap-2 text-xs text-muted-foreground'>
+                            <Users className='w-3 h-3' />
+                            <span>{group.members.length} members</span>
+                          </div>
+                        </button>
+                        <div className='flex items-center gap-1'>
+                          {/* Message button */}
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='shrink-0 h-8 px-2 gap-1 dark:border-gray-700 text-frinder-orange hover:text-frinder-burnt hover:bg-frinder-orange/10'
+                            onClick={() => onOpenGroupChat?.(group.id)}
+                          >
+                            <MessageCircle className='w-3.5 h-3.5' />
+                            <span className='text-xs'>Chat</span>
+                          </Button>
+                          {/* Leave button */}
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='shrink-0 h-8 px-2 gap-1 dark:border-gray-700 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+                            onClick={() => handleLeaveGroup(group.id)}
+                            disabled={leavingGroup === group.id}
+                          >
+                            {leavingGroup === group.id ? (
+                              <Loader2 className='w-3.5 h-3.5 animate-spin' />
+                            ) : (
+                              <LogOut className='w-3.5 h-3.5' />
+                            )}
+                            <span className='text-xs'>Leave</span>
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

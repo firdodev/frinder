@@ -50,6 +50,7 @@ export default function MainApp() {
     photo: string;
     otherUserId: string;
   } | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   // Subscribe to unread message count
   useEffect(() => {
@@ -89,18 +90,23 @@ export default function MainApp() {
     setActiveTab('messages');
   };
 
+  const handleOpenGroupChat = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    setActiveTab('messages');
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'swipe':
         return <SwipePeople />;
       case 'groups':
-        return <SwipeGroups />;
+        return <SwipeGroups onOpenGroupChat={handleOpenGroupChat} />;
       case 'search':
         return <SearchComponent />;
       case 'matches':
         return <Matches onStartChat={handleStartChat} />;
       case 'messages':
-        return <Messages />;
+        return <Messages initialGroupId={selectedGroupId} onGroupOpened={() => setSelectedGroupId(null)} />;
       case 'profile':
         return <Profile />;
       default:
