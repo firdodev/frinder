@@ -1855,6 +1855,8 @@ export interface GroupMessage {
     senderId: string;
     senderName: string;
   };
+  edited?: boolean;
+  deleted?: boolean;
 }
 
 // Send a message to a group
