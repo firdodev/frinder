@@ -14,7 +14,14 @@ import {
   Sparkles,
   Search,
   Star,
-  Crown
+  Crown,
+  ShoppingBag,
+  X,
+  ChevronRight,
+  Zap,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowUp
 } from 'lucide-react';
 import SwipePeople from '@/components/swipe/SwipePeople';
 import SwipeGroups from '@/components/swipe/SwipeGroups';
@@ -33,8 +40,181 @@ import {
 } from '@/lib/firebaseServices';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SettingsSheet } from '@/components/profile/SettingsSheet';
+import { Button } from '@/components/ui/button';
 
 type Tab = 'swipe' | 'groups' | 'search' | 'matches' | 'messages' | 'profile';
+
+// Onboarding Tutorial Component
+function OnboardingTutorial({ onComplete }: { onComplete: () => void }) {
+  const [step, setStep] = useState(0);
+  
+  const steps = [
+    {
+      icon: Heart,
+      title: "Welcome to Frinder!",
+      description: "Let's show you how to find your perfect match",
+      color: "from-frinder-orange to-frinder-gold",
+      details: [
+        "Swipe through profiles",
+        "Match with people who like you back",
+        "Start meaningful conversations"
+      ]
+    },
+    {
+      icon: ThumbsUp,
+      title: "Like Someone",
+      description: "Swipe right or tap the heart to like",
+      color: "from-green-400 to-emerald-500",
+      details: [
+        "Swipe the card to the RIGHT",
+        "Or tap the green heart button",
+        "If they like you back, it's a match!"
+      ]
+    },
+    {
+      icon: ThumbsDown,
+      title: "Pass on Someone",
+      description: "Swipe left or tap X to pass",
+      color: "from-red-400 to-rose-500",
+      details: [
+        "Swipe the card to the LEFT",
+        "Or tap the red X button",
+        "Don't worry, they may appear again later"
+      ]
+    },
+    {
+      icon: Star,
+      title: "Super Like ⭐",
+      description: "Stand out from the crowd!",
+      color: "from-blue-400 to-indigo-500",
+      details: [
+        "Swipe UP or tap the star button",
+        "They'll know you really like them",
+        "Much higher chance of matching!"
+      ]
+    },
+    {
+      icon: ShoppingBag,
+      title: "Get More Features",
+      description: "Visit the Shop for upgrades",
+      color: "from-purple-400 to-pink-500",
+      details: [
+        "Go to Profile → Shop",
+        "Buy Super Likes to stand out",
+        "Upgrade to Pro for unlimited features"
+      ]
+    }
+  ];
+
+  const currentStep = steps[step];
+  const Icon = currentStep.icon;
+  const isLastStep = step === steps.length - 1;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+    >
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: -20 }}
+        transition={{ type: "spring", duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        {/* Progress dots */}
+        <div className="flex justify-center gap-2 mb-8">
+          {steps.map((_, i) => (
+            <motion.div
+              key={i}
+              className={`h-2 rounded-full transition-all ${
+                i === step ? 'w-8 bg-white' : 'w-2 bg-white/30'
+              }`}
+              animate={{ scale: i === step ? 1 : 0.8 }}
+            />
+          ))}
+        </div>
+
+        {/* Card */}
+        <div className="bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl">
+          {/* Icon header */}
+          <div className={`bg-gradient-to-br ${currentStep.color} p-8 flex justify-center`}>
+            <motion.div
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: step === 3 ? [0, -10, 10, 0] : 0 
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+            >
+              <Icon className="w-12 h-12 text-white" />
+            </motion.div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 text-center">
+            <h2 className="text-2xl font-bold mb-2 dark:text-white">{currentStep.title}</h2>
+            <p className="text-muted-foreground mb-6">{currentStep.description}</p>
+
+            <div className="space-y-3 mb-8">
+              {currentStep.details.map((detail, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-center gap-3 text-left bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3"
+                >
+                  <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${currentStep.color} flex items-center justify-center text-white text-xs font-bold`}>
+                    {i + 1}
+                  </div>
+                  <span className="text-sm dark:text-gray-200">{detail}</span>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              {step > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(s => s - 1)}
+                  className="flex-1"
+                >
+                  Back
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  if (isLastStep) {
+                    onComplete();
+                  } else {
+                    setStep(s => s + 1);
+                  }
+                }}
+                className={`flex-1 bg-gradient-to-r ${currentStep.color} text-white border-0 hover:opacity-90`}
+              >
+                {isLastStep ? "Start Swiping!" : "Next"}
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Skip button */}
+        <button
+          onClick={onComplete}
+          className="w-full mt-4 text-white/60 hover:text-white text-sm transition-colors"
+        >
+          Skip tutorial
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('swipe');
@@ -44,6 +224,7 @@ export default function MainApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [selectedChatInfo, setSelectedChatInfo] = useState<{
     matchId: string;
     name: string;
@@ -51,6 +232,21 @@ export default function MainApp() {
     otherUserId: string;
   } | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  // Check if user has seen onboarding
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('frinder_onboarding_complete');
+    if (!hasSeenOnboarding) {
+      // Small delay to let the app load first
+      const timer = setTimeout(() => setShowOnboarding(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('frinder_onboarding_complete', 'true');
+    setShowOnboarding(false);
+  };
 
   // Subscribe to unread message count
   useEffect(() => {
@@ -115,9 +311,14 @@ export default function MainApp() {
   };
 
   return (
-    <div className='h-screen flex bg-background dark:bg-black'>
+    <div className='h-screen flex bg-gray-100 dark:bg-black'>
+      {/* Onboarding Tutorial */}
+      <AnimatePresence>
+        {showOnboarding && <OnboardingTutorial onComplete={handleOnboardingComplete} />}
+      </AnimatePresence>
+
       {/* Desktop Sidebar - hidden on mobile */}
-      <aside className='hidden lg:flex flex-col w-72 border-r bg-white dark:bg-black dark:border-gray-800'>
+      <aside className='hidden lg:flex flex-col w-80 bg-white dark:bg-gray-950 m-3 rounded-2xl shadow-xl dark:shadow-none dark:border dark:border-gray-800'>
         {/* Logo */}
         <div className='p-6 border-b dark:border-gray-800'>
           <motion.button
@@ -126,7 +327,7 @@ export default function MainApp() {
             onClick={() => setActiveTab('swipe')}
             className='flex items-center gap-3 hover:opacity-80 transition-opacity'
           >
-            <Image src='/frinder-logo.png' alt='Frinder' width={36} height={36} className='rounded-lg' priority />
+            <Image src='/frinder-logo.png' alt='Frinder' width={40} height={40} className='rounded-xl shadow-md' priority />
             <div className='text-left'>
               <span className='text-2xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
                 Frinder
@@ -138,40 +339,67 @@ export default function MainApp() {
 
         {/* User Profile Card */}
         <div className='p-4'>
-          <div className='bg-gradient-to-br from-frinder-orange/10 to-frinder-gold/10 dark:from-frinder-orange/20 dark:to-frinder-gold/20 rounded-xl p-4'>
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className='bg-gradient-to-br from-frinder-orange/10 via-frinder-gold/5 to-transparent dark:from-frinder-orange/20 dark:via-frinder-gold/10 dark:to-transparent rounded-2xl p-4 border border-frinder-orange/20 dark:border-frinder-orange/30'
+          >
             <div className='flex items-center gap-3'>
               <button onClick={() => setActiveTab('profile')} className='hover:opacity-80 transition-opacity'>
-                <Avatar className='w-12 h-12 border-2 border-frinder-orange cursor-pointer'>
+                <Avatar className='w-14 h-14 border-2 border-frinder-orange cursor-pointer shadow-lg shadow-frinder-orange/20'>
                   <AvatarImage src={userProfile?.photos?.[0]} alt={userProfile?.displayName} />
-                  <AvatarFallback className='bg-frinder-orange text-white'>
+                  <AvatarFallback className='bg-frinder-orange text-white text-lg'>
                     {userProfile?.displayName?.[0] || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </button>
               <div className='flex-1 min-w-0'>
-                <h3 className='font-semibold text-sm truncate dark:text-white'>{userProfile?.displayName || 'User'}</h3>
+                <h3 className='font-semibold truncate dark:text-white'>{userProfile?.displayName || 'User'}</h3>
                 <p className='text-xs text-muted-foreground truncate'>
                   {userProfile?.city}, {userProfile?.country}
                 </p>
+                {userSubscription?.isPremium && (
+                  <div className='flex items-center gap-1 mt-1'>
+                    <Crown className='w-3 h-3 text-frinder-orange' />
+                    <span className='text-[10px] font-semibold text-frinder-orange'>PRO MEMBER</span>
+                  </div>
+                )}
               </div>
-              <Sparkles className='w-5 h-5 text-frinder-orange' />
+              <motion.div
+                animate={{ rotate: [0, 15, -15, 0] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+              >
+                <Sparkles className='w-5 h-5 text-frinder-orange' />
+              </motion.div>
             </div>
-          </div>
+            {/* Super Likes Counter */}
+            <div className='mt-3 pt-3 border-t border-frinder-orange/20 dark:border-frinder-orange/30 flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <Star className='w-4 h-4 text-blue-500' fill='currentColor' />
+                <span className='text-xs text-muted-foreground'>Super Likes</span>
+              </div>
+              <span className='text-sm font-bold text-blue-500'>
+                {userCredits?.superLikes ?? 0}
+              </span>
+            </div>
+          </motion.div>
         </div>
 
         {/* Navigation */}
-        <nav className='flex-1 px-3 py-2'>
+        <nav className='flex-1 px-4 py-2 overflow-y-auto'>
           <div className='space-y-1'>
-            {tabs.map(tab => (
+            {tabs.map((tab, index) => (
               <motion.button
                 key={tab.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
                   activeTab === tab.id
-                    ? 'bg-frinder-orange text-white shadow-lg shadow-frinder-orange/25'
-                    : 'hover:bg-muted dark:hover:bg-gray-900 text-muted-foreground hover:text-foreground dark:hover:text-white'
+                    ? 'bg-gradient-to-r from-frinder-orange to-frinder-burnt text-white shadow-lg shadow-frinder-orange/30'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-muted-foreground hover:text-foreground dark:hover:text-white'
                 }`}
               >
                 <div className='relative'>
@@ -180,12 +408,19 @@ export default function MainApp() {
                     fill={activeTab === tab.id && tab.fillActive ? 'currentColor' : 'none'}
                   />
                   {tab.id === 'messages' && unreadCount > 0 && (
-                    <span className='absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-1'>
+                    <motion.span 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className='absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 shadow-md'
+                    >
                       {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
+                    </motion.span>
                   )}
                 </div>
                 <span className='font-medium'>{tab.label}</span>
+                {activeTab === tab.id && (
+                  <ChevronRight className='w-4 h-4 ml-auto' />
+                )}
               </motion.button>
             ))}
           </div>
@@ -195,23 +430,23 @@ export default function MainApp() {
         <div className='p-4 border-t dark:border-gray-800 space-y-2'>
           <button
             onClick={() => setSettingsOpen(true)}
-            className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted dark:hover:bg-gray-900 text-muted-foreground hover:text-foreground dark:hover:text-white transition-all'
+            className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 text-muted-foreground hover:text-foreground dark:hover:text-white transition-all'
           >
             <Settings className='w-5 h-5' />
             <span className='font-medium'>Settings</span>
           </button>
           <button
             onClick={() => signOut()}
-            className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-all'
+            className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-all group'
           >
-            <LogOut className='w-5 h-5' />
+            <LogOut className='w-5 h-5 group-hover:translate-x-1 transition-transform' />
             <span className='font-medium'>Sign Out</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className='flex-1 flex flex-col min-w-0'>
+      <div className='flex-1 flex flex-col min-w-0 lg:my-3 lg:mr-3'>
         {/* Mobile Header - hidden on desktop */}
         <div className='lg:hidden px-4 py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
           <motion.button
@@ -220,35 +455,51 @@ export default function MainApp() {
             onClick={() => setActiveTab('swipe')}
             className='flex items-center gap-2 hover:opacity-80 transition-opacity'
           >
-            <img src='/frinder-logo.png' alt='Frinder' className='w-8 h-8 rounded-lg' />
+            <img src='/frinder-logo.png' alt='Frinder' className='w-8 h-8 rounded-lg shadow-sm' />
             <span className='text-xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
               Frinder
             </span>
           </motion.button>
 
-          {/* Pro Badge - Mobile (super likes only shown on profile page) */}
-          {userSubscription?.isPremium && (
-            <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
-              <Crown className='w-3.5 h-3.5 text-frinder-orange' />
-              <span className='text-xs font-semibold text-frinder-orange'>PRO</span>
+          {/* Pro Badge & Super Likes - Mobile */}
+          <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10'>
+              <Star className='w-3 h-3 text-blue-500' fill='currentColor' />
+              <span className='text-xs font-semibold text-blue-500'>
+                {userCredits?.superLikes ?? 0}
+              </span>
             </div>
-          )}
+            {userSubscription?.isPremium && (
+              <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
+                <Crown className='w-3.5 h-3.5 text-frinder-orange' />
+                <span className='text-xs font-semibold text-frinder-orange'>PRO</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Desktop Header */}
-        <div className='hidden lg:flex px-6 py-4 items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
+        <div className='hidden lg:flex px-6 py-5 items-center justify-between bg-white dark:bg-gray-950 rounded-t-2xl border-b dark:border-gray-800'>
           <div>
             <h1 className='text-2xl font-bold dark:text-white'>{tabs.find(t => t.id === activeTab)?.label}</h1>
             <p className='text-sm text-muted-foreground'>
               {activeTab === 'swipe' && 'Find your perfect match'}
               {activeTab === 'groups' && 'Join groups with similar interests'}
+              {activeTab === 'search' && 'Search for people and groups'}
               {activeTab === 'matches' && 'View and interact with your matches'}
               {activeTab === 'messages' && 'Chat with your matches'}
               {activeTab === 'profile' && 'Manage your profile'}
             </p>
           </div>
-          <div className='flex items-center gap-3'>
-            <Avatar className='w-10 h-10 border-2 border-frinder-orange'>
+          <div className='flex items-center gap-4'>
+            {/* Desktop Super Likes indicator */}
+            <div className='flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 dark:bg-blue-500/20'>
+              <Star className='w-4 h-4 text-blue-500' fill='currentColor' />
+              <span className='text-sm font-semibold text-blue-500'>
+                {userCredits?.superLikes ?? 0}
+              </span>
+            </div>
+            <Avatar className='w-10 h-10 border-2 border-frinder-orange shadow-lg shadow-frinder-orange/20'>
               <AvatarImage src={userProfile?.photos?.[0]} alt={userProfile?.displayName} />
               <AvatarFallback className='bg-frinder-orange text-white'>
                 {userProfile?.displayName?.[0] || 'U'}
@@ -258,7 +509,7 @@ export default function MainApp() {
         </div>
 
         {/* Content */}
-        <div className='flex-1 overflow-hidden'>
+        <div className='flex-1 overflow-hidden pb-20 lg:pb-0 lg:bg-white lg:dark:bg-gray-950 lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-gray-800'>
           <AnimatePresence mode='wait'>
             <motion.div
               key={activeTab}
@@ -274,7 +525,7 @@ export default function MainApp() {
         </div>
 
         {/* Mobile Bottom Navigation - hidden on desktop */}
-        <div className='lg:hidden border-t bg-white dark:bg-black dark:border-gray-800 safe-bottom'>
+        <div className='lg:hidden fixed bottom-0 left-0 right-0 mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-gray-800 shadow-lg safe-bottom'>
           <div className='flex items-center justify-around py-2 pb-safe'>
             {tabs.map(tab => (
               <motion.button
@@ -282,24 +533,44 @@ export default function MainApp() {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setActiveTab(tab.id)}
-                className='relative flex flex-col items-center gap-1 p-2 min-w-[60px] sm:min-w-[64px]'
+                className='relative flex flex-col items-center gap-1 p-2 min-w-[50px] sm:min-w-[60px]'
               >
                 <div className='relative'>
-                  <tab.icon
-                    className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
-                      activeTab === tab.id || tab.id === 'swipe' ? 'text-frinder-orange' : 'text-muted-foreground'
-                    }`}
-                    fill={(activeTab === tab.id && tab.fillActive) || tab.id === 'swipe' ? 'currentColor' : 'none'}
-                  />
+                  {tab.id === 'profile' && userProfile?.profileImageUrl ? (
+                    <div
+                      className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full overflow-hidden transition-all ${
+                        activeTab === tab.id
+                          ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-black'
+                          : 'ring-1 ring-gray-200 dark:ring-gray-700'
+                      }`}
+                    >
+                      <img
+                        src={userProfile.profileImageUrl}
+                        alt='Profile'
+                        className='w-full h-full object-cover'
+                      />
+                    </div>
+                  ) : (
+                    <tab.icon
+                      className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
+                        activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
+                      }`}
+                      fill={activeTab === tab.id && tab.fillActive ? 'currentColor' : 'none'}
+                    />
+                  )}
                   {tab.id === 'messages' && unreadCount > 0 && (
-                    <span className='absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1'>
+                    <motion.span 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className='absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-0.5'
+                    >
                       {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
+                    </motion.span>
                   )}
                 </div>
                 <span
                   className={`text-[10px] sm:text-xs font-medium transition-colors ${
-                    activeTab === tab.id || tab.id === 'swipe' ? 'text-frinder-orange' : 'text-muted-foreground'
+                    activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
                   }`}
                 >
                   {tab.label}
@@ -307,7 +578,7 @@ export default function MainApp() {
                 {activeTab === tab.id && (
                   <motion.div
                     layoutId='activeTab'
-                    className='absolute -bottom-2 w-1 h-1 rounded-full bg-frinder-orange'
+                    className='absolute -bottom-1 w-6 h-1 rounded-full bg-frinder-orange'
                   />
                 )}
               </motion.button>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserAvatar, getAvatarColor } from '@/components/ui/user-avatar';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -49,7 +50,8 @@ import {
   Camera,
   Lock,
   Globe,
-  Ban
+  Ban,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -1776,12 +1778,13 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
           <ChevronLeft className='w-5 h-5 sm:w-6 sm:h-6 dark:text-white' />
         </button>
         <button onClick={() => setShowProfileDialog(true)} className='relative hover:opacity-80 transition-opacity'>
-          <Avatar className={`w-9 h-9 sm:w-10 sm:h-10 ${match.isUnmatched ? 'grayscale' : ''}`}>
-            <AvatarImage src={match.photo} alt={match.name} />
-            <AvatarFallback className={match.isUnmatched ? 'bg-gray-400 text-white' : 'bg-frinder-orange text-white'}>
-              {match.name[0]}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            src={match.photo}
+            name={match.name}
+            className={`w-9 h-9 sm:w-10 sm:h-10 ${match.isUnmatched ? 'grayscale' : ''}`}
+            fallbackClassName={match.isUnmatched ? 'bg-gray-400' : undefined}
+            showInitial={!!match.photo}
+          />
           {isOnline && !match.isUnmatched && (
             <span className='absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-black' />
           )}
@@ -2741,12 +2744,12 @@ function GroupChatView({
                   key={member.uid}
                   className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
                 >
-                  <Avatar className='w-10 h-10'>
-                    <AvatarImage src={member.photos?.[0]} alt={member.displayName} />
-                    <AvatarFallback className='bg-frinder-orange text-white'>
-                      {member.displayName?.[0] || '?'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    src={member.photos?.[0]}
+                    name={member.displayName}
+                    className='w-10 h-10'
+                    showInitial={!!member.photos?.[0]}
+                  />
                   <div className='flex-1 min-w-0'>
                     <div className='flex items-center gap-2'>
                       <span className='font-medium dark:text-white truncate'>{member.displayName}</span>
@@ -3278,12 +3281,13 @@ function GroupMessageBubble({
         {!isOwn && (
           <div className='flex-shrink-0 w-7 h-7'>
             {showAvatar && (
-              <Avatar className='w-7 h-7'>
-                <AvatarImage src={message.senderPhoto} alt={message.senderName} />
-                <AvatarFallback className='bg-frinder-orange text-white text-xs'>
-                  {message.senderName?.[0] || '?'}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                src={message.senderPhoto}
+                name={message.senderName}
+                className='w-7 h-7'
+                fallbackClassName='text-xs'
+                showInitial={!!message.senderPhoto}
+              />
             )}
           </div>
         )}
@@ -3902,12 +3906,12 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
                   className='flex flex-col items-center gap-1.5 sm:gap-2 min-w-[60px] sm:min-w-[72px]'
                 >
                   <div className='relative'>
-                    <Avatar className='w-14 h-14 sm:w-16 sm:h-16 border-2 border-frinder-orange shadow-md'>
-                      <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
-                      <AvatarFallback className='bg-frinder-orange text-white font-medium'>
-                        {match.name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      src={match.photo}
+                      name={match.name}
+                      className='w-14 h-14 sm:w-16 sm:h-16 border-2 border-frinder-orange shadow-md'
+                      showInitial={!!match.photo}
+                    />
                     {match.isOnline && (
                       <span className='absolute bottom-1 right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
                     )}
@@ -3937,18 +3941,16 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
                     }`}
                   >
                     <div className='relative'>
-                      <Avatar
+                      <UserAvatar
+                        src={match.photo}
+                        name={match.name}
                         className={`w-12 h-12 sm:w-14 sm:h-14 shadow-sm ${
                           match.unreadCount > 0
                             ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-gray-900'
                             : 'border border-gray-200 dark:border-gray-700'
                         }`}
-                      >
-                        <AvatarImage src={match.photo} alt={match.name} className='object-cover' />
-                        <AvatarFallback className='bg-frinder-orange text-white font-medium'>
-                          {match.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
+                        showInitial={!!match.photo}
+                      />
                       {match.isOnline && !match.unreadCount && (
                         <span className='absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 border-2 border-white dark:border-gray-900' />
                       )}
@@ -4018,10 +4020,13 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
                     className='w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl hover:bg-muted dark:hover:bg-gray-800 transition-colors opacity-60'
                   >
                     <div className='relative'>
-                      <Avatar className='w-12 h-12 sm:w-14 sm:h-14 grayscale'>
-                        <AvatarImage src={match.photo} alt={match.name} />
-                        <AvatarFallback className='bg-gray-400 text-white'>{match.name[0]}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        src={match.photo}
+                        name={match.name}
+                        className='w-12 h-12 sm:w-14 sm:h-14 grayscale'
+                        fallbackClassName='bg-gray-400'
+                        showInitial={!!match.photo}
+                      />
                     </div>
                     <div className='flex-1 text-left min-w-0'>
                       <div className='flex items-center justify-between mb-0.5 sm:mb-1'>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserAvatar, getAvatarColor } from '@/components/ui/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,8 @@ import {
   UserPlus,
   MessageCircle,
   Star,
-  Users
+  Users,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -59,7 +60,9 @@ export default function Search({ onStartChat }: SearchProps) {
   const [selectedUser, setSelectedUser] = useState<SearchResult | null>(null);
   const [sendingRequest, setSendingRequest] = useState<string | null>(null);
   const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const cacheRef = useRef<Map<string, SearchResult[]>>(new Map());
 
   const performSearch = useCallback(
     async (query: string) => {
@@ -68,40 +71,71 @@ export default function Search({ onStartChat }: SearchProps) {
         return;
       }
 
+      const trimmedQuery = query.trim().toLowerCase();
+      
+      // Check cache first
+      if (cacheRef.current.has(trimmedQuery)) {
+        setResults(cacheRef.current.get(trimmedQuery)!);
+        return;
+      }
+
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setLoading(true);
       try {
         const users = await searchUsers(user.uid, query);
 
-        // Check match and swipe status for each user
-        const resultsWithStatus = await Promise.all(
-          users.map(async u => {
-            const [matchStatus, swipeStatus] = await Promise.all([
-              checkIfMatched(user.uid, u.id),
-              checkSwipeStatus(user.uid, u.id)
-            ]);
+        // Check match and swipe status for each user in parallel batches
+        const batchSize = 5;
+        const resultsWithStatus: SearchResult[] = [];
+        
+        for (let i = 0; i < users.length; i += batchSize) {
+          const batch = users.slice(i, i + batchSize);
+          const batchResults = await Promise.all(
+            batch.map(async u => {
+              const [matchStatus, swipeStatus] = await Promise.all([
+                checkIfMatched(user.uid, u.id),
+                checkSwipeStatus(user.uid, u.id)
+              ]);
 
-            return {
-              id: u.id,
-              displayName: u.displayName || 'Unknown',
-              age: u.age,
-              photo: u.photos?.[0] || '',
-              photos: u.photos || [],
-              bio: u.bio,
-              city: u.city,
-              country: u.country,
-              interests: u.interests || [],
-              lookingFor: u.lookingFor,
-              swipeStatus,
-              isMatched: matchStatus.isMatched,
-              matchId: matchStatus.matchId
-            };
-          })
-        );
+              return {
+                id: u.id,
+                displayName: u.displayName || 'Unknown',
+                age: u.age,
+                photo: u.photos?.[0] || '',
+                photos: u.photos || [],
+                bio: u.bio,
+                city: u.city,
+                country: u.country,
+                interests: u.interests || [],
+                lookingFor: u.lookingFor,
+                swipeStatus,
+                isMatched: matchStatus.isMatched,
+                matchId: matchStatus.matchId
+              };
+            })
+          );
+          resultsWithStatus.push(...batchResults);
+        }
+
+        // Cache the results
+        cacheRef.current.set(trimmedQuery, resultsWithStatus);
+        // Limit cache size
+        if (cacheRef.current.size > 20) {
+          const firstKey = cacheRef.current.keys().next().value;
+          if (firstKey) cacheRef.current.delete(firstKey);
+        }
 
         setResults(resultsWithStatus);
       } catch (error) {
-        console.error('Search error:', error);
-        toast.error('Failed to search');
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Search error:', error);
+          toast.error('Failed to search');
+        }
       } finally {
         setLoading(false);
       }
@@ -109,27 +143,28 @@ export default function Search({ onStartChat }: SearchProps) {
     [user?.uid]
   );
 
-  // Debounced search
+  // Debounced search with longer delay for optimization
   useEffect(() => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
 
     if (searchQuery.trim()) {
-      const timer = setTimeout(() => {
+      // Use shorter delay for cached queries
+      const delay = cacheRef.current.has(searchQuery.trim().toLowerCase()) ? 100 : 400;
+      debounceRef.current = setTimeout(() => {
         performSearch(searchQuery);
-      }, 300);
-      setDebounceTimer(timer);
+      }, delay);
     } else {
       setResults([]);
     }
 
     return () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
     };
-  }, [searchQuery]);
+  }, [searchQuery, performSearch]);
 
   const handleSendRequest = async (targetUser: SearchResult) => {
     if (!user?.uid) return;
@@ -276,7 +311,13 @@ export default function Search({ onStartChat }: SearchProps) {
             >
               {/* Profile Header */}
               <div className='relative h-64'>
-                <img src={selectedUser.photo} alt={selectedUser.displayName} className='w-full h-full object-cover' />
+                {selectedUser.photo ? (
+                  <img src={selectedUser.photo} alt={selectedUser.displayName} className='w-full h-full object-cover' />
+                ) : (
+                  <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedUser.displayName)}`}>
+                    <User className='w-24 h-24 text-white/80' />
+                  </div>
+                )}
                 <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
                 <button
                   onClick={() => setSelectedUser(null)}
@@ -476,12 +517,12 @@ export default function Search({ onStartChat }: SearchProps) {
                   <CardContent className='p-3'>
                     <div className='flex items-center gap-3'>
                       <div className='relative'>
-                        <Avatar className='w-14 h-14'>
-                          <AvatarImage src={result.photo} alt={result.displayName} />
-                          <AvatarFallback className='bg-frinder-orange text-white'>
-                            {result.displayName[0]}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          src={result.photo}
+                          name={result.displayName}
+                          className='w-14 h-14'
+                          showInitial={!!result.photo}
+                        />
                         {result.isMatched && (
                           <span className='absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-frinder-orange flex items-center justify-center'>
                             <Sparkles className='w-3 h-3 text-white' />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserAvatar, getAvatarColor } from '@/components/ui/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,8 @@ import {
   Clock,
   Send,
   Check,
-  UserCheck
+  UserCheck,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -243,7 +244,13 @@ export default function Matches({ onStartChat }: MatchesProps) {
             >
               {/* Match Profile Header */}
               <div className='relative h-72 lg:h-64'>
-                <img src={selectedMatch.photo} alt={selectedMatch.name} className='w-full h-full object-cover' />
+                {selectedMatch.photo ? (
+                  <img src={selectedMatch.photo} alt={selectedMatch.name} className='w-full h-full object-cover' />
+                ) : (
+                  <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedMatch.name)}`}>
+                    <User className='w-24 h-24 text-white/80' />
+                  </div>
+                )}
                 <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
                 <button
                   onClick={() => setSelectedMatch(null)}
@@ -413,12 +420,12 @@ export default function Matches({ onStartChat }: MatchesProps) {
                   className='flex flex-col items-center gap-1.5 min-w-16'
                 >
                   <div className='relative'>
-                    <Avatar className='w-14 h-14 border-2 border-frinder-gold'>
-                      <AvatarImage src={request.photos?.[0]} alt={request.displayName} />
-                      <AvatarFallback className='bg-frinder-gold text-white'>
-                        {request.displayName?.[0] || '?'}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      src={request.photos?.[0]}
+                      name={request.displayName}
+                      className='w-14 h-14 border-2 border-frinder-gold'
+                      showInitial={!!request.photos?.[0]}
+                    />
                     <div className='absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-frinder-gold rounded-full flex items-center justify-center'>
                       <Clock className='w-3 h-3 text-white' />
                     </div>
@@ -452,11 +459,17 @@ export default function Matches({ onStartChat }: MatchesProps) {
               >
                 {/* Pending Profile Header */}
                 <div className='relative h-64'>
-                  <img
-                    src={selectedPending.photos?.[0] || ''}
-                    alt={selectedPending.displayName}
-                    className='w-full h-full object-cover'
-                  />
+                  {selectedPending.photos?.[0] ? (
+                    <img
+                      src={selectedPending.photos[0]}
+                      alt={selectedPending.displayName}
+                      className='w-full h-full object-cover'
+                    />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedPending.displayName)}`}>
+                      <User className='w-24 h-24 text-white/80' />
+                    </div>
+                  )}
                   <div className='absolute inset-0 bg-black/40' />
                   <button
                     onClick={() => setSelectedPending(null)}
@@ -581,12 +594,12 @@ export default function Matches({ onStartChat }: MatchesProps) {
                   className='flex flex-col items-center gap-1.5 min-w-16'
                 >
                   <div className='relative'>
-                    <Avatar className='w-14 h-14 border-2 border-frinder-orange'>
-                      <AvatarImage src={request.photos?.[0]} alt={request.displayName} />
-                      <AvatarFallback className='bg-frinder-orange text-white'>
-                        {request.displayName?.[0] || '?'}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      src={request.photos?.[0]}
+                      name={request.displayName}
+                      className='w-14 h-14 border-2 border-frinder-orange'
+                      showInitial={!!request.photos?.[0]}
+                    />
                     <div className='absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-frinder-orange rounded-full flex items-center justify-center'>
                       <Heart className='w-3 h-3 text-white fill-white' />
                     </div>
@@ -620,11 +633,17 @@ export default function Matches({ onStartChat }: MatchesProps) {
               >
                 {/* Incoming Profile Header */}
                 <div className='relative h-64'>
-                  <img
-                    src={selectedIncoming.photos?.[0] || ''}
-                    alt={selectedIncoming.displayName}
-                    className='w-full h-full object-cover'
-                  />
+                  {selectedIncoming.photos?.[0] ? (
+                    <img
+                      src={selectedIncoming.photos[0]}
+                      alt={selectedIncoming.displayName}
+                      className='w-full h-full object-cover'
+                    />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedIncoming.displayName)}`}>
+                      <User className='w-24 h-24 text-white/80' />
+                    </div>
+                  )}
                   <div className='absolute inset-0 bg-black/40' />
                   <button
                     onClick={() => setSelectedIncoming(null)}
@@ -774,7 +793,13 @@ export default function Matches({ onStartChat }: MatchesProps) {
                   className='cursor-pointer'
                 >
                   <div className='relative aspect-square rounded-lg overflow-hidden'>
-                    <img src={match.photo} alt={match.name} className='w-full h-full object-cover' />
+                    {match.photo ? (
+                      <img src={match.photo} alt={match.name} className='w-full h-full object-cover' />
+                    ) : (
+                      <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(match.name)}`}>
+                        <User className='w-8 h-8 text-white/80' />
+                      </div>
+                    )}
                     <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent' />
                     <div className='absolute bottom-0 left-0 right-0 p-1'>
                       <p className='text-white text-[10px] font-medium truncate'>{match.name.split(' ')[0]}</p>

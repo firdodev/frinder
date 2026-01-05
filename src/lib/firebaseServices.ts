@@ -149,7 +149,7 @@ export async function isDisplayNameTaken(displayName: string, currentUserId?: st
 }
 
 // Get users to swipe on (excludes users already interacted with)
-// Users swiped left will reappear after 7 days
+// Endless discovery: disliked users will reappear, only active matches are excluded
 export async function getUsersToSwipe(
   currentUserId: string,
   currentUserProfile?: UserProfile,
@@ -161,28 +161,56 @@ export async function getUsersToSwipe(
     const swipedQuery = query(swipesRef, where('fromUserId', '==', currentUserId));
     const swipedSnapshot = await getDocs(swipedQuery);
     
-    // Filter out swipes: exclude right/superlike swipes, and left swipes within 7 days
-    const REAPPEAR_AFTER_DAYS = 7;
-    const reappearThreshold = new Date();
-    reappearThreshold.setDate(reappearThreshold.getDate() - REAPPEAR_AFTER_DAYS);
-    
     const excludedUserIds: string[] = [currentUserId]; // Always exclude self
+    
+    // Get all matches for this user
+    const matchesRef = collection(db, 'matches');
+    const matchesQuery = query(
+      matchesRef,
+      where('users', 'array-contains', currentUserId)
+    );
+    const matchesSnapshot = await getDocs(matchesQuery);
+    
+    // Build sets for active matches and unmatched users
+    const activeMatchedUsers = new Set<string>();
+    const unmatchedUsers = new Set<string>();
+    
+    matchesSnapshot.docs.forEach(matchDoc => {
+      const matchData = matchDoc.data();
+      matchData.users.forEach((uid: string) => {
+        if (uid !== currentUserId) {
+          if (matchData.unmatched) {
+            unmatchedUsers.add(uid);
+          } else {
+            activeMatchedUsers.add(uid);
+          }
+        }
+      });
+    });
     
     swipedSnapshot.docs.forEach(swipeDoc => {
       const swipeData = swipeDoc.data();
       const direction = swipeData.direction;
-      const timestamp = swipeData.timestamp?.toDate ? swipeData.timestamp.toDate() : null;
+      const targetUserId = swipeData.toUserId;
       
-      // Always exclude users who were liked (right) or superliked
-      if (direction === 'right' || direction === 'superlike') {
-        excludedUserIds.push(swipeData.toUserId);
-      } else if (direction === 'left') {
-        // Only exclude left swipes if they were within the last 7 days
-        if (timestamp && timestamp > reappearThreshold) {
-          excludedUserIds.push(swipeData.toUserId);
-        }
-        // If timestamp is older than 7 days (or null), don't exclude - they can reappear
+      // If user was unmatched, allow them to reappear (don't exclude)
+      if (unmatchedUsers.has(targetUserId)) {
+        return; // Don't exclude, they can reappear
       }
+      
+      // Only exclude users who are in an ACTIVE match (not unmatched)
+      // This means: right swipes that resulted in a match, OR pending right swipes
+      if (direction === 'right' || direction === 'superlike') {
+        // Check if this is an active match - if so, exclude
+        if (activeMatchedUsers.has(targetUserId)) {
+          excludedUserIds.push(targetUserId);
+        }
+        // If it's a pending like (no match yet), still show them so user knows they already liked
+        // Actually, let's exclude pending likes too to avoid confusion
+        excludedUserIds.push(targetUserId);
+      }
+      // LEFT SWIPES: Don't exclude! This makes discovery endless
+      // Users you disliked will show up again in the feed
     });
 
     // Get all users with complete profiles
@@ -346,10 +374,32 @@ export async function recordSwipe(
 async function createMatch(userId1: string, userId2: string, isSuperLike: boolean = false): Promise<string> {
   const matchId = [userId1, userId2].sort().join('_');
 
-  // Check if match already exists (for super likes where they might already be matched)
+  // Check if match already exists
   const existingMatch = await getDoc(doc(db, 'matches', matchId));
   if (existingMatch.exists()) {
-    return matchId; // Already matched
+    const matchData = existingMatch.data();
+    // If the match was previously unmatched, reactivate it
+    if (matchData.unmatched) {
+      // Get fresh user profiles
+      const user1Doc = await getDoc(doc(db, 'users', userId1));
+      const user2Doc = await getDoc(doc(db, 'users', userId2));
+
+      const userProfiles: { [key: string]: DocumentData } = {};
+      if (user1Doc.exists()) userProfiles[userId1] = user1Doc.data();
+      if (user2Doc.exists()) userProfiles[userId2] = user2Doc.data();
+
+      // Reactivate the match
+      await updateDoc(doc(db, 'matches', matchId), {
+        unmatched: false,
+        unmatchedAt: null,
+        userProfiles,
+        rematchedAt: serverTimestamp(),
+        isSuperLike,
+        superLikedBy: isSuperLike ? userId1 : null
+      });
+      return matchId;
+    }
+    return matchId; // Already matched (and active)
   }
 
   // Get both user profiles
@@ -1271,21 +1321,27 @@ export async function unmatchUser(matchId: string): Promise<void> {
       const users = matchData.users as string[];
 
       if (users && users.length === 2) {
-        // Delete swipe records in both directions
+        // Delete swipe records in both directions so users can like each other again
         const swipeId1 = `${users[0]}_${users[1]}`;
         const swipeId2 = `${users[1]}_${users[0]}`;
 
         await Promise.all([
           deleteDoc(doc(db, 'swipes', swipeId1)).catch(() => {}), // Ignore if doesn't exist
-          deleteDoc(doc(db, 'swipes', swipeId2)).catch(() => {}) // Ignore if doesn't exist
+          deleteDoc(doc(db, 'swipes', swipeId2)).catch(() => {}), // Ignore if doesn't exist
+          // Also delete any super like records
+          deleteDoc(doc(db, 'superLikes', swipeId1)).catch(() => {}),
+          deleteDoc(doc(db, 'superLikes', swipeId2)).catch(() => {})
         ]);
       }
 
       // Mark the match as unmatched instead of deleting
       // This preserves chat history but prevents new messages
+      // Both users can now like each other again from discovery
       await updateDoc(doc(db, 'matches', matchId), {
         unmatched: true,
-        unmatchedAt: serverTimestamp()
+        unmatchedAt: serverTimestamp(),
+        lastMessage: '🔓 Chat ended - match again to continue',
+        lastMessageTime: serverTimestamp()
       });
     }
   } catch (error) {
@@ -1428,6 +1484,14 @@ export async function checkSwipeStatus(
   toUserId: string
 ): Promise<'none' | 'left' | 'right' | 'superlike'> {
   try {
+    // First check if there's an unmatched match - if so, treat as 'none' to allow re-swiping
+    const matchId = [fromUserId, toUserId].sort().join('_');
+    const matchDoc = await getDoc(doc(db, 'matches', matchId));
+    
+    if (matchDoc.exists() && matchDoc.data().unmatched) {
+      return 'none'; // Allow re-swiping after unmatch
+    }
+    
     const swipeId = `${fromUserId}_${toUserId}`;
     const swipeDoc = await getDoc(doc(db, 'swipes', swipeId));
 
@@ -1459,12 +1523,14 @@ export async function getPendingRequests(userId: string): Promise<(UserProfile &
       const swipeData = swipeDoc.data();
       const targetUserId = swipeData.toUserId;
 
-      // Check if there's already a match (excluding unmatched)
+      // Check if there's already a match
       const matchId = [userId, targetUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
 
-      if (matchDoc.exists() && !matchDoc.data().unmatched) {
-        // Already matched, skip
+      if (matchDoc.exists()) {
+        const matchData = matchDoc.data();
+        // If matched (active or unmatched), skip - don't show as pending
+        // Unmatched users will appear in discovery again, not in pending
         continue;
       }
 
@@ -1508,11 +1574,13 @@ export function subscribeToPendingRequests(
       const swipeData = swipeDoc.data();
       const targetUserId = swipeData.toUserId;
 
-      // Check if there's already a match (excluding unmatched)
+      // Check if there's already a match (active or unmatched)
       const matchId = [userId, targetUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
 
-      if (matchDoc.exists() && !matchDoc.data().unmatched) {
+      // If any match exists (active or unmatched), don't show as pending
+      // Unmatched users appear in discovery, not pending
+      if (matchDoc.exists()) {
         continue;
       }
 
@@ -1561,12 +1629,13 @@ export async function getIncomingRequests(userId: string): Promise<(UserProfile 
       const swipeData = swipeDoc.data();
       const fromUserId = swipeData.fromUserId;
 
-      // Check if there's already a match (excluding unmatched)
+      // Check if there's already a match (active or unmatched)
       const matchId = [userId, fromUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
 
-      if (matchDoc.exists() && !matchDoc.data().unmatched) {
-        // Already matched, skip
+      // If any match exists (active or unmatched), skip
+      // Unmatched users will show in discovery, not as incoming requests
+      if (matchDoc.exists()) {
         continue;
       }
 
@@ -1618,11 +1687,13 @@ export function subscribeToIncomingRequests(
       const swipeData = swipeDoc.data();
       const fromUserId = swipeData.fromUserId;
 
-      // Check if there's already a match (excluding unmatched)
+      // Check if there's already a match (active or unmatched)
       const matchId = [userId, fromUserId].sort().join('_');
       const matchDoc = await getDoc(doc(db, 'matches', matchId));
 
-      if (matchDoc.exists() && !matchDoc.data().unmatched) {
+      // If any match exists (active or unmatched), skip
+      // Unmatched users will show in discovery, not as incoming requests
+      if (matchDoc.exists()) {
         continue;
       }
 

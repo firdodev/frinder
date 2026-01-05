@@ -15,11 +15,13 @@ import {
   MessageCircle,
   Crown,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  User
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarColor } from '@/components/ui/user-avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -201,11 +203,15 @@ function MatchCelebration({
           <div className='flex -space-x-2'>
             <Avatar className='w-8 h-8 border-2 border-white'>
               <AvatarImage src={userPhoto} />
-              <AvatarFallback className='bg-frinder-orange text-white text-xs'>{userName[0]}</AvatarFallback>
+              <AvatarFallback className={`${getAvatarColor(userName)} text-white text-xs`}>
+                {userPhoto ? userName[0] : <User className='w-4 h-4' />}
+              </AvatarFallback>
             </Avatar>
             <Avatar className='w-8 h-8 border-2 border-white'>
               <AvatarImage src={matchPhoto} />
-              <AvatarFallback className='bg-frinder-orange text-white text-xs'>{matchName[0]}</AvatarFallback>
+              <AvatarFallback className={`${getAvatarColor(matchName)} text-white text-xs`}>
+                {matchPhoto ? matchName[0] : <User className='w-4 h-4' />}
+              </AvatarFallback>
             </Avatar>
           </div>
           <div>
@@ -290,8 +296,8 @@ function MatchCelebration({
               <motion.div animate={{ x: [0, -10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
                 <Avatar className='w-28 h-28 sm:w-36 sm:h-36 border-4 border-white shadow-2xl'>
                   <AvatarImage src={userPhoto} />
-                  <AvatarFallback className='text-3xl bg-white text-frinder-orange font-bold'>
-                    {userName[0]}
+                  <AvatarFallback className={`text-3xl ${getAvatarColor(userName)} text-white font-bold`}>
+                    {userPhoto ? userName[0] : <User className='w-12 h-12' />}
                   </AvatarFallback>
                 </Avatar>
               </motion.div>
@@ -303,8 +309,8 @@ function MatchCelebration({
               <motion.div animate={{ x: [0, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
                 <Avatar className='w-28 h-28 sm:w-36 sm:h-36 border-4 border-white shadow-2xl'>
                   <AvatarImage src={matchPhoto} />
-                  <AvatarFallback className='text-3xl bg-white text-frinder-orange font-bold'>
-                    {matchName[0]}
+                  <AvatarFallback className={`text-3xl ${getAvatarColor(matchName)} text-white font-bold`}>
+                    {matchPhoto ? matchName[0] : <User className='w-12 h-12' />}
                   </AvatarFallback>
                 </Avatar>
               </motion.div>
@@ -505,16 +511,28 @@ function SwipeCard({
         {/* Photo */}
         <div className='relative w-full h-full'>
           <AnimatePresence mode='wait'>
-            <motion.img
-              key={currentPhoto}
-              src={profile.photos[currentPhoto] || '/placeholder-avatar.png'}
-              alt={profile.name}
-              className='w-full h-full object-cover'
-              initial={{ opacity: 0, scale: 1.1 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            />
+            {profile.photos[currentPhoto] ? (
+              <motion.img
+                key={currentPhoto}
+                src={profile.photos[currentPhoto]}
+                alt={profile.name}
+                className='w-full h-full object-cover'
+                initial={{ opacity: 0, scale: 1.1 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              />
+            ) : (
+              <motion.div
+                key='placeholder'
+                className={`w-full h-full flex items-center justify-center ${getAvatarColor(profile.name)}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <User className='w-32 h-32 text-white/60' />
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {/* Photo indicators */}
@@ -701,6 +719,9 @@ export default function SwipePeople() {
   const [purchasing, setPurchasing] = useState(false);
   const [adCountdown, setAdCountdown] = useState(5);
 
+  // Check if user has super likes available
+  const hasSuperLikes = userSubscription?.unlimitedSuperLikes || (userCredits?.superLikes ?? 0) > 0;
+
   // Load settings for match notification preference
   useEffect(() => {
     const savedPreference = localStorage.getItem('frinder_fullScreenMatch');
@@ -875,8 +896,14 @@ export default function SwipePeople() {
     }
   };
 
-  const handleButtonSwipe = (direction: 'left' | 'right' | 'up') => {
+  const handleButtonSwipe = async (direction: 'left' | 'right' | 'up') => {
     if (profiles.length > 0) {
+      // Check super likes BEFORE triggering animation
+      if (direction === 'up' && !hasSuperLikes) {
+        setShowNoSuperLikesDialog(true);
+        return;
+      }
+      
       // Trigger the card animation via window reference
       const triggerSwipe = (window as any).__triggerSwipe;
       if (triggerSwipe) {
@@ -973,12 +1000,25 @@ export default function SwipePeople() {
 
             {/* Super Like */}
             <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.85 }}
-              onClick={() => handleButtonSwipe('up')}
-              className='w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border border-blue-200 dark:border-blue-900/50 transition-all hover:shadow-xl hover:border-blue-300'
+              whileHover={hasSuperLikes ? { scale: 1.15 } : {}}
+              whileTap={hasSuperLikes ? { scale: 0.85 } : {}}
+              onClick={() => {
+                if (hasSuperLikes) {
+                  handleButtonSwipe('up');
+                } else {
+                  setShowNoSuperLikesDialog(true);
+                }
+              }}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full shadow-lg flex items-center justify-center border transition-all relative ${
+                hasSuperLikes
+                  ? 'bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-900/50 hover:shadow-xl hover:border-blue-300'
+                  : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60'
+              }`}
             >
-              <Star className='w-5 h-5 sm:w-6 sm:h-6 text-blue-500' fill='currentColor' />
+              <Star className={`w-5 h-5 sm:w-6 sm:h-6 ${hasSuperLikes ? 'text-blue-500' : 'text-gray-400'}`} fill='currentColor' />
+              {!hasSuperLikes && (
+                <span className='absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[8px] font-bold'>0</span>
+              )}
             </motion.button>
 
             {/* Like */}
@@ -1008,7 +1048,7 @@ export default function SwipePeople() {
           <div className='flex justify-center mt-2'>
             <div className='flex items-center gap-1 text-xs text-muted-foreground'>
               <Star className='w-3 h-3 text-blue-500' fill='currentColor' />
-              <span>{userSubscription?.unlimitedSuperLikes ? '∞' : userCredits?.superLikes ?? 0} Super Likes</span>
+              <span>{userCredits?.superLikes ?? 0} Super Likes</span>
               {userSubscription?.isPremium && (
                 <Badge className='ml-1 bg-frinder-orange text-white text-[10px] px-1 py-0'>Premium</Badge>
               )}

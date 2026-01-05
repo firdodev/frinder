@@ -154,14 +154,14 @@ export const metadata: Metadata = {
   // Icons - Favicon and Apple Touch Icons
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' }
     ],
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
-    shortcut: '/favicon.ico'
+    shortcut: [{ url: '/favicon.ico', type: 'image/x-icon' }]
   },
 
   // Manifest
@@ -422,6 +422,12 @@ export default function RootLayout({
   return (
     <html lang='en' dir='ltr'>
       <head>
+        {/* Favicon - explicit for browser tab */}
+        <link rel='icon' href='/favicon.ico' sizes='any' />
+        <link rel='icon' href='/favicon-32x32.png' type='image/png' sizes='32x32' />
+        <link rel='icon' href='/favicon-16x16.png' type='image/png' sizes='16x16' />
+        <link rel='apple-touch-icon' href='/apple-touch-icon.png' sizes='180x180' />
+        
         {/* Preconnect to important origins */}
         <link rel='preconnect' href='https://fonts.googleapis.com' />
         <link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />
