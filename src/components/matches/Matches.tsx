@@ -244,7 +244,9 @@ export default function Matches({ onStartChat }: MatchesProps) {
             >
               {/* Match Profile Header */}
               <div className='relative h-72 lg:h-64'>
-                {selectedMatch.photo ? (
+                {selectedMatch.photo === 'solid-black' ? (
+                  <div className='w-full h-full bg-black'></div>
+                ) : selectedMatch.photo ? (
                   <img src={selectedMatch.photo} alt={selectedMatch.name} className='w-full h-full object-cover' />
                 ) : (
                   <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedMatch.name)}`}>

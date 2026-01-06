@@ -6,6 +6,9 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -89,7 +92,7 @@ function getEmailContent(data: NotificationEmailData): { subject: string; html: 
               <p style="color: #666;">
                 Like them back to start chatting and see where it goes! ✨
               </p>
-              <a href="https://frinder.al" style="${buttonStyles}">
+              <a href="https://frinder.co" style="${buttonStyles}">
                 Open Frinder
               </a>
             </div>
@@ -120,7 +123,7 @@ function getEmailContent(data: NotificationEmailData): { subject: string; html: 
               <p style="color: #666;">
                 Super Likes are rare and precious - someone really wants to connect with you! 💫
               </p>
-              <a href="https://frinder.al" style="${buttonStyles}">
+              <a href="https://frinder.co" style="${buttonStyles}">
                 Open Frinder
               </a>
             </div>
@@ -151,7 +154,7 @@ function getEmailContent(data: NotificationEmailData): { subject: string; html: 
               <p style="color: #666;">
                 Start a conversation and get to know each other. Who knows where this could lead? 💕
               </p>
-              <a href="https://frinder.al" style="${buttonStyles}">
+              <a href="https://frinder.co" style="${buttonStyles}">
                 Send a Message
               </a>
             </div>
@@ -204,7 +207,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error sending notification email:', error);
     return NextResponse.json(
-      { error: 'Failed to send notification email' },
+      { error: error?.toString() || 'Failed to send notification email' },
       { status: 500 }
     );
   }

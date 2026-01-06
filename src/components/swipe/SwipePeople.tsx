@@ -807,8 +807,8 @@ export default function SwipePeople() {
       if (!user?.uid) return;
 
       try {
-        // Check if ad should be shown (every 10 swipes for non-premium)
-        const adResult = await incrementSwipeCount(user.uid);
+        // Check if ad should be shown (every 5 swipes for non-premium)
+        const adResult = await incrementSwipeCount(user.uid, 5); // Pass 5 as the swipe interval
         if (adResult.showAd) {
           setAdCountdown(5);
           setShowAdDialog(true);

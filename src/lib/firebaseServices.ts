@@ -351,15 +351,7 @@ export async function recordSwipe(
       ) {
         // It's a match!
         const matchId = await createMatch(fromUserId, toUserId);
-        
-        // Send match email notifications to both users
-        sendNotificationEmail(toUserId, fromUserId, 'match');
-        sendNotificationEmail(fromUserId, toUserId, 'match');
-        
         return { isMatch: true, matchId };
-      } else {
-        // Send like email notification (not a match yet)
-        sendNotificationEmail(toUserId, fromUserId, 'like');
       }
     }
 
@@ -2319,7 +2311,7 @@ export async function addSuperLikes(userId: string, amount: number): Promise<voi
 }
 
 // Increment swipe count and check if ad should be shown
-export async function incrementSwipeCount(userId: string): Promise<{ showAd: boolean; swipeCount: number }> {
+export async function incrementSwipeCount(userId: string, swipeInterval: number = 10): Promise<{ showAd: boolean; swipeCount: number }> {
   const creditsRef = doc(db, 'userCredits', userId);
   const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
 
@@ -2329,7 +2321,7 @@ export async function incrementSwipeCount(userId: string): Promise<{ showAd: boo
   }
 
   const newCount = credits.swipeCount + 1;
-  const showAd = newCount % 10 === 0;
+  const showAd = newCount % swipeInterval === 0;
 
   await updateDoc(creditsRef, {
     swipeCount: newCount

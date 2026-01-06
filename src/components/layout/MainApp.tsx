@@ -41,8 +41,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SettingsSheet } from '@/components/profile/SettingsSheet';
 import { Button } from '@/components/ui/button';
+import AdminPanelTab from '@/components/admin/AdminPanelTab';
 
-type Tab = 'swipe' | 'groups' | 'search' | 'matches' | 'messages' | 'profile';
+type Tab = 'swipe' | 'groups' | 'search' | 'matches' | 'messages' | 'profile' | 'admin';
 
 // Onboarding Tutorial Component
 function OnboardingTutorial({ onComplete }: { onComplete: () => void }) {
@@ -216,6 +217,11 @@ function OnboardingTutorial({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+const ADMIN_EMAILS = [
+  'rikardo_balaj@universitetipolis.edu.al',
+  'firdeus_kasaj@universitetipolis.edu.al'
+];
+
 export default function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('swipe');
   const { darkMode } = useSettings();
@@ -272,14 +278,40 @@ export default function MainApp() {
     };
   }, [user?.uid]);
 
-  const tabs = [
-    { id: 'swipe' as Tab, icon: Heart, label: 'Discover', fillActive: true },
-    { id: 'groups' as Tab, icon: Users, label: 'Groups', fillActive: false },
-    { id: 'search' as Tab, icon: Search, label: 'Search', fillActive: false },
-    { id: 'matches' as Tab, icon: Sparkles, label: 'Matches', fillActive: false },
-    { id: 'messages' as Tab, icon: MessageCircle, label: 'Messages', fillActive: false },
-    { id: 'profile' as Tab, icon: User, label: 'Profile', fillActive: false }
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email);
+
+  // Grant admins unlimited superlikes, pro, and no ads
+  let effectiveUserSubscription = userSubscription;
+  let effectiveUserCredits = userCredits;
+  if (isAdmin) {
+    effectiveUserSubscription = {
+      isPremium: true,
+      isAdFree: true,
+      premiumExpiresAt: null,
+      adFreeExpiresAt: null,
+      unlimitedSuperLikes: true,
+      canSeeWhoLikedYou: true,
+      unlimitedRewinds: true,
+      priorityInDiscovery: true,
+      advancedFilters: true,
+    };
+    effectiveUserCredits = {
+      ...userCredits,
+      superLikes: 99999,
+    };
+  }
+
+  const tabs: { id: Tab; icon: any; label: string; fillActive: boolean }[] = [
+    { id: 'swipe', icon: Heart, label: 'Discover', fillActive: true },
+    { id: 'groups', icon: Users, label: 'Groups', fillActive: false },
+    { id: 'search', icon: Search, label: 'Search', fillActive: false },
+    { id: 'matches', icon: Sparkles, label: 'Matches', fillActive: false },
+    { id: 'messages', icon: MessageCircle, label: 'Messages', fillActive: false },
+    { id: 'profile', icon: User, label: 'Profile', fillActive: false },
   ];
+  if (isAdmin) {
+    tabs.push({ id: 'admin', icon: Crown, label: 'Admin', fillActive: false });
+  }
 
   const handleStartChat = (matchId: string, name: string, photo: string, otherUserId: string) => {
     setSelectedChatInfo({ matchId, name, photo, otherUserId });
@@ -304,7 +336,17 @@ export default function MainApp() {
       case 'messages':
         return <Messages initialGroupId={selectedGroupId} onGroupOpened={() => setSelectedGroupId(null)} />;
       case 'profile':
-        return <Profile />;
+        return <Profile onGoToShop={() => setActiveTab('profile')} />;
+      case 'admin':
+        if (!isAdmin) {
+          return (
+            <div className="flex flex-col items-center justify-center h-full p-8">
+              <h2 className="text-2xl font-bold mb-2">Unauthorized</h2>
+              <p className="text-muted-foreground">You are not authorized to view this panel.</p>
+            </div>
+          );
+        }
+        return <AdminPanelTab />;
       default:
         return <SwipePeople />;
     }
@@ -357,7 +399,7 @@ export default function MainApp() {
                 <p className='text-xs text-muted-foreground truncate'>
                   {userProfile?.city}, {userProfile?.country}
                 </p>
-                {userSubscription?.isPremium && (
+                {effectiveUserSubscription?.isPremium && (
                   <div className='flex items-center gap-1 mt-1'>
                     <Crown className='w-3 h-3 text-frinder-orange' />
                     <span className='text-[10px] font-semibold text-frinder-orange'>PRO MEMBER</span>
@@ -378,7 +420,7 @@ export default function MainApp() {
                 <span className='text-xs text-muted-foreground'>Super Likes</span>
               </div>
               <span className='text-sm font-bold text-blue-500'>
-                {userCredits?.superLikes ?? 0}
+                {effectiveUserCredits?.superLikes ?? 0}
               </span>
             </div>
           </motion.div>
@@ -395,7 +437,7 @@ export default function MainApp() {
                 transition={{ delay: index * 0.05 }}
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setActiveTab(tab.id as Tab)}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-frinder-orange to-frinder-burnt text-white shadow-lg shadow-frinder-orange/30'
@@ -469,7 +511,7 @@ export default function MainApp() {
                 {userCredits?.superLikes ?? 0}
               </span>
             </div>
-            {userSubscription?.isPremium && (
+            {effectiveUserSubscription?.isPremium && (
               <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
                 <Crown className='w-3.5 h-3.5 text-frinder-orange' />
                 <span className='text-xs font-semibold text-frinder-orange'>PRO</span>
@@ -496,7 +538,7 @@ export default function MainApp() {
             <div className='flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 dark:bg-blue-500/20'>
               <Star className='w-4 h-4 text-blue-500' fill='currentColor' />
               <span className='text-sm font-semibold text-blue-500'>
-                {userCredits?.superLikes ?? 0}
+                {effectiveUserCredits?.superLikes ?? 0}
               </span>
             </div>
             <Avatar className='w-10 h-10 border-2 border-frinder-orange shadow-lg shadow-frinder-orange/20'>
@@ -532,7 +574,7 @@ export default function MainApp() {
                 key={tab.id}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setActiveTab(tab.id as Tab)}
                 className='relative flex flex-col items-center gap-1 p-2 min-w-[50px] sm:min-w-[60px]'
               >
                 <div className='relative'>

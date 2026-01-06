@@ -221,6 +221,10 @@ export default function ProfileSetup() {
   };
 
   const handleComplete = async () => {
+    if (formData.photos.length < 1) {
+      toast.error('You must upload at least one photo to complete your profile.');
+      return;
+    }
     setLoading(true);
     try {
       await updateProfile({

@@ -64,7 +64,11 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export default function Profile() {
+type ProfileProps = {
+  onGoToShop?: () => void;
+};
+
+export default function Profile({ onGoToShop }: ProfileProps) {
   const router = useRouter();
   const { user, userProfile, updateProfile, signOut } = useAuth();
   const { darkMode, toggleDarkMode } = useSettings();
@@ -428,10 +432,14 @@ export default function Profile() {
                     <Check className='w-3 h-3 text-green-500' />
                     <span>15 Monthly Super Likes</span>
                   </div>
-                  <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+                  <button
+                    type='button'
+                    onClick={onGoToShop}
+                    className='flex items-center gap-1.5 text-xs text-frinder-orange font-semibold hover:underline bg-transparent border-0 p-0 m-0 cursor-pointer'
+                  >
                     <Check className='w-3 h-3 text-green-500' />
                     <span>No Ads</span>
-                  </div>
+                  </button>
                   <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
                     <Check className='w-3 h-3 text-green-500' />
                     <span>Priority Discovery</span>
