@@ -1384,7 +1384,14 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
         id: m.id,
         senderId: m.senderId,
         text: m.text,
-        timestamp: m.timestamp instanceof Date ? m.timestamp : m.timestamp.toDate(),
+        timestamp:
+          m.timestamp == null
+            ? new Date()
+            : m.timestamp instanceof Date
+              ? m.timestamp
+              : typeof m.timestamp.toDate === 'function'
+                ? m.timestamp.toDate()
+                : new Date(m.timestamp),
         type: (m as any).type === 'image' ? 'image' : 'text',
         imageUrl: (m as any).imageUrl,
         isRead: m.read,
