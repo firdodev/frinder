@@ -194,7 +194,7 @@ export default function AuthPage({ onBack }: AuthPageProps) {
               <div className='flex justify-center gap-3'>
                 {verificationCode.map((digit, index) => (
                   <Input
-                    key={`digit-${index}-${digit}`}
+                    key={`digit-${index}`}
                     ref={el => {
                       inputRefs.current[index] = el;
                     }}
