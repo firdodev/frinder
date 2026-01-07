@@ -2351,7 +2351,8 @@ export const VALID_REDEEM_CODES: { [code: string]: 'pro' | 'superlikes' } = {
   R3T8W5N6J2: 'pro',
   // Super likes codes (random alphanumeric)
   B4H7L9C1F6: 'superlikes',
-  Y2V5Z8D3G7: 'superlikes'
+  Y2V5Z8D3G7: 'superlikes',
+  POLIS: 'superlikes' // Special code for 10 superlikes
 };
 
 // Validate and redeem a code
@@ -2393,6 +2394,7 @@ export async function redeemCode(
     await purchasePremiumWithSuperLikes(userId);
     return { success: true, type: 'pro' };
   } else if (codeType === 'superlikes') {
+    // All superlike codes (including POLIS) give 5 superlikes
     await addSuperLikes(userId, 5);
     return { success: true, type: 'superlikes' };
   }

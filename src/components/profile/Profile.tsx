@@ -256,6 +256,10 @@ export default function Profile({ onGoToShop }: ProfileProps) {
 
   const handleDeletePhoto = async (index: number) => {
     if (!user) return;
+    if (profile.photos.length === 1) {
+      toast.error('You must have at least one photo.');
+      return;
+    }
     const photoUrl = profile.photos[index];
     if (!photoUrl) return;
 
@@ -671,12 +675,14 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                         <Loader2 className='w-6 h-6 text-white animate-spin' />
                       ) : (
                         <>
-                          <button
-                            onClick={() => handleDeletePhoto(index)}
-                            className='w-8 h-8 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors'
-                          >
-                            <X className='w-4 h-4 text-white' />
-                          </button>
+                          {profile.photos.length > 1 && (
+                            <button
+                              onClick={() => handleDeletePhoto(index)}
+                              className='w-8 h-8 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors'
+                            >
+                              <X className='w-4 h-4 text-white' />
+                            </button>
+                          )}
                           {index !== 0 && (
                             <button
                               onClick={() => handleSetMainPhoto(index)}
