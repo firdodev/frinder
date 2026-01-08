@@ -1391,7 +1391,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               ? m.timestamp
               : typeof m.timestamp.toDate === 'function'
                 ? m.timestamp.toDate()
-                : new Date(m.timestamp),
+                : new Date(m.timestamp as unknown as number),
         type: (m as any).type === 'image' ? 'image' : 'text',
         imageUrl: (m as any).imageUrl,
         isRead: m.read,
