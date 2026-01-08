@@ -5,6 +5,7 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 import { Toaster } from '@/components/ui/sonner';
+import { Analytics } from '@vercel/analytics/next';
 
 // FFF AcidGrotesk local font
 const acidGrotesk = localFont({
@@ -470,6 +471,7 @@ export default function RootLayout({
           <SettingsProvider>
             {children}
             <Toaster position='top-center' />
+            <Analytics />
           </SettingsProvider>
         </AuthProvider>
       </body>
