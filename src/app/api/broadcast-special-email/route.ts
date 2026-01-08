@@ -1,40 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import nodemailer from 'nodemailer';
-
-// Helper to send a single email
-async function sendEmail(to: string, subject: string, message: string) {
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  });
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to,
-    subject,
-    text: message
-  };
-  await transporter.sendMail(mailOptions);
-}
+import { sendBulkEmails } from '@/lib/emailService';
 
 export async function POST(req: NextRequest) {
   try {
     const { type } = await req.json();
     let subject = '';
-    let message = '';
+    let html = '';
+    
     if (type === 'thank') {
       subject = 'Thank you for using Frinder!';
-      message = `We appreciate you being part of Frinder. If you enjoy the app, please share it with your friends!`;
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #ed8c00; margin: 0;">Frinder</h1>
+            <p style="color: #666; margin-top: 5px;">Find your match</p>
+          </div>
+          <div style="background-color: #fff7ed; border-radius: 12px; padding: 30px; text-align: center;">
+            <h2 style="color: #1a1a1a; margin-bottom: 10px;">Thank You! 💛</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+              We appreciate you being part of Frinder. Your support means the world to us!
+            </p>
+            <p style="color: #666; margin-bottom: 20px;">
+              If you enjoy the app, please share it with your friends!
+            </p>
+            <a href="https://frinder.co" style="display: inline-block; background-color: #ed8c00; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold;">
+              Open Frinder
+            </a>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
+            You're receiving this because you're a member of Frinder.
+          </p>
+        </div>
+      `;
     } else if (type === 'bug') {
       subject = 'Have you found any bugs?';
-      message = `We want to make Frinder better! If you have found any bugs or issues, please reply to this email and let us know.`;
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #ed8c00; margin: 0;">Frinder</h1>
+            <p style="color: #666; margin-top: 5px;">Find your match</p>
+          </div>
+          <div style="background-color: #fff7ed; border-radius: 12px; padding: 30px; text-align: center;">
+            <h2 style="color: #1a1a1a; margin-bottom: 10px;">Help Us Improve! 🛠️</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+              We want to make Frinder better for you!
+            </p>
+            <p style="color: #666; margin-bottom: 20px;">
+              If you have found any bugs or issues, please reply to this email and let us know.
+            </p>
+            <a href="https://frinder.co" style="display: inline-block; background-color: #ed8c00; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold;">
+              Open Frinder
+            </a>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
+            You're receiving this because you're a member of Frinder.
+          </p>
+        </div>
+      `;
     } else {
       return NextResponse.json({ error: 'Invalid type.' }, { status: 400 });
     }
@@ -53,18 +77,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No users with valid emails found.' }, { status: 404 });
     }
 
-    // Send emails individually
-    let sent = 0;
-    let failed = 0;
-    for (const email of emails) {
-      try {
-        await sendEmail(email, subject, message);
-        sent++;
-      } catch (e) {
-        failed++;
-      }
-    }
-    return NextResponse.json({ success: true, sent, failed });
+    // Prepare emails for bulk send
+    const emailsToSend = emails.map(email => ({
+      to: email,
+      subject,
+      html,
+    }));
+
+    // Send with rate limiting to avoid Google restrictions
+    const result = await sendBulkEmails(emailsToSend, {
+      delayBetweenEmails: 2000,
+      batchSize: 5,
+      delayBetweenBatches: 10000,
+    });
+
+    return NextResponse.json({ success: true, ...result });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Failed to send emails.' }, { status: 500 });
   }

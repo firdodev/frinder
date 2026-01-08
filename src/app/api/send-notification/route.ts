@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+import { sendEmail } from '@/lib/emailService';
 
 type NotificationType = 'like' | 'superlike' | 'match';
 
@@ -196,12 +185,18 @@ export async function POST(request: NextRequest) {
 
     const { subject, html } = getEmailContent({ toEmail, toName, fromName, fromPhoto, type });
 
-    await transporter.sendMail({
-      from: `"Frinder" <${process.env.EMAIL_USER}>`,
+    const result = await sendEmail({
       to: toEmail,
       subject,
-      html
+      html,
     });
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || 'Failed to send notification email' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true, message: 'Notification email sent' });
   } catch (error) {

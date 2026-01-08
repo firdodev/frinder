@@ -1,19 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/emailService';
 
 // Store verification codes temporarily (in production, use Redis or database)
 const verificationCodes = new Map<string, { code: string; expires: number }>();
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false // Allow self-signed certs for dev
-  }
-});
 
 function generateCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -36,8 +25,7 @@ export async function POST(request: NextRequest) {
 
       verificationCodes.set(email, { code: verificationCode, expires });
 
-      await transporter.sendMail({
-        from: `"Frinder" <${process.env.EMAIL_USER}>`,
+      const result = await sendEmail({
         to: email,
         subject: 'Your Frinder Verification Code',
         html: `
@@ -58,8 +46,12 @@ export async function POST(request: NextRequest) {
               If you didn't request this code, please ignore this email.
             </p>
           </div>
-        `
+        `,
       });
+
+      if (!result.success) {
+        return NextResponse.json({ error: result.error || 'Failed to send verification email' }, { status: 500 });
+      }
 
       return NextResponse.json({ success: true, message: 'Verification code sent' });
     }
