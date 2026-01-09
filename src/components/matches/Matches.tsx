@@ -246,7 +246,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
               <div className='relative h-72 lg:h-64'>
                 {selectedMatch.photo === 'solid-black' ? (
                   <div className='w-full h-full bg-black'></div>
-                ) : selectedMatch.photo ? (
+                ) : selectedMatch.photo && selectedMatch.photo.trim() !== '' && !selectedMatch.photo.includes('placeholder') ? (
                   <img src={selectedMatch.photo} alt={selectedMatch.name} className='w-full h-full object-cover' />
                 ) : (
                   <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedMatch.name)}`}>
@@ -795,7 +795,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
                   className='cursor-pointer'
                 >
                   <div className='relative aspect-square rounded-lg overflow-hidden'>
-                    {match.photo ? (
+                    {match.photo && match.photo.trim() !== '' && !match.photo.includes('placeholder') ? (
                       <img src={match.photo} alt={match.name} className='w-full h-full object-cover' />
                     ) : (
                       <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(match.name)}`}>

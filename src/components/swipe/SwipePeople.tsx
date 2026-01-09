@@ -51,6 +51,7 @@ interface Profile {
   distance?: string;
   course?: string;
   relationshipGoal?: 'relationship' | 'casual' | 'friends';
+  gender?: 'male' | 'female' | 'other';
 }
 
 // Firework particle for celebration
@@ -761,19 +762,49 @@ export default function SwipePeople() {
         const users = await getUsersToSwipe(user.uid, userProfile);
 
         // Map Firebase user profiles to our Profile interface
-        const mappedProfiles: Profile[] = users.map((u: any) => ({
-          id: u.uid || u.id,
-          name: u.displayName || u.name,
-          age: u.age,
-          bio: u.bio,
-          photos: u.photos && u.photos.length > 0 ? u.photos : ['/placeholder-avatar.png'],
-          interests: u.interests || [],
-          course: u.city ? `${u.city}, ${u.country}` : '',
-          distance: u.city === userProfile.city ? 'Same city' : u.country === userProfile.country ? 'Same country' : '',
-          relationshipGoal: u.relationshipGoal
-        }));
+        // Filter out users without valid photos
+        const mappedProfiles: Profile[] = users
+          .filter((u: any) => {
+            // Check if user has at least one valid photo URL
+            const photos = u.photos || [];
+            const validPhotos = photos.filter((p: string) => p && p.trim() !== '' && !p.includes('placeholder'));
+            return validPhotos.length > 0;
+          })
+          .map((u: any) => ({
+            id: u.uid || u.id,
+            name: u.displayName || u.name,
+            age: u.age,
+            bio: u.bio,
+            photos: (u.photos || []).filter((p: string) => p && p.trim() !== ''),
+            interests: u.interests || [],
+            course: u.city ? `${u.city}, ${u.country}` : '',
+            distance: u.city === userProfile.city ? 'Same city' : u.country === userProfile.country ? 'Same country' : '',
+            relationshipGoal: u.relationshipGoal,
+            gender: u.gender
+          }));
 
-        setProfiles(mappedProfiles);
+        // Separate profiles by gender priority (opposite gender first)
+        const currentUserGender = userProfile.gender;
+        const oppositeGender = currentUserGender === 'male' ? 'female' : currentUserGender === 'female' ? 'male' : null;
+        
+        // Split into opposite gender and same gender groups
+        const oppositeGenderProfiles = mappedProfiles.filter(p => p.gender === oppositeGender);
+        const sameGenderProfiles = mappedProfiles.filter(p => p.gender !== oppositeGender);
+        
+        // Shuffle each group separately using Fisher-Yates algorithm
+        const shuffleArray = (arr: Profile[]) => {
+          const shuffled = [...arr];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+        
+        // Combine: opposite gender first (shuffled), then same gender (shuffled)
+        const sortedProfiles = [...shuffleArray(oppositeGenderProfiles), ...shuffleArray(sameGenderProfiles)];
+
+        setProfiles(sortedProfiles);
       } catch (error) {
         console.error('Error loading profiles:', error);
       } finally {
@@ -801,8 +832,16 @@ export default function SwipePeople() {
 
       setLastAction({ profile: currentProfile, direction });
 
-      // Remove the swiped profile from UI immediately
-      setProfiles(prev => prev.slice(1));
+      // Remove the swiped profile and recycle if disliked (left swipe)
+      // For left swipes, add the profile back to the end to create infinite loop
+      setProfiles(prev => {
+        const remaining = prev.slice(1);
+        if (direction === 'left') {
+          // Add disliked profile back to the end for infinite loop
+          return [...remaining, currentProfile];
+        }
+        return remaining;
+      });
 
       if (!user?.uid) return;
 

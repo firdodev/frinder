@@ -1547,7 +1547,7 @@ export async function getPendingRequests(userId: string): Promise<(UserProfile &
   }
 }
 
-// Subscribe to pending requests in real-time
+// Subscribe to pending requests in real-time (optimized with parallel fetches)
 export function subscribeToPendingRequests(
   userId: string,
   callback: (requests: (UserProfile & { swipedAt: Date })[]) => void
@@ -1560,33 +1560,39 @@ export function subscribeToPendingRequests(
   );
 
   return onSnapshot(swipesQuery, async snapshot => {
-    const pendingRequests: (UserProfile & { swipedAt: Date })[] = [];
+    // Fetch all data in parallel for better performance
+    const swipeDocs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
+    
+    // Get all match checks and user profiles in parallel
+    const results = await Promise.all(
+      swipeDocs.map(async ({ data: swipeData }) => {
+        const targetUserId = swipeData.toUserId;
+        const matchId = [userId, targetUserId].sort().join('_');
+        
+        // Parallel fetch of match doc and user doc
+        const [matchDoc, userDoc] = await Promise.all([
+          getDoc(doc(db, 'matches', matchId)),
+          getDoc(doc(db, 'users', targetUserId))
+        ]);
 
-    for (const swipeDoc of snapshot.docs) {
-      const swipeData = swipeDoc.data();
-      const targetUserId = swipeData.toUserId;
+        // If match exists, skip this request
+        if (matchDoc.exists()) {
+          return null;
+        }
 
-      // Check if there's already a match (active or unmatched)
-      const matchId = [userId, targetUserId].sort().join('_');
-      const matchDoc = await getDoc(doc(db, 'matches', matchId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserProfile;
+          return {
+            ...userData,
+            swipedAt: swipeData.timestamp?.toDate() || new Date()
+          };
+        }
+        return null;
+      })
+    );
 
-      // If any match exists (active or unmatched), don't show as pending
-      // Unmatched users appear in discovery, not pending
-      if (matchDoc.exists()) {
-        continue;
-      }
-
-      // Get the target user's profile
-      const userDoc = await getDoc(doc(db, 'users', targetUserId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserProfile;
-        pendingRequests.push({
-          ...userData,
-          swipedAt: swipeData.timestamp?.toDate() || new Date()
-        });
-      }
-    }
-
+    // Filter out nulls and sort by date
+    const pendingRequests = results.filter((r): r is (UserProfile & { swipedAt: Date }) => r !== null);
     pendingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
     callback(pendingRequests);
   });
@@ -1661,6 +1667,7 @@ export async function getIncomingRequests(userId: string): Promise<(UserProfile 
 }
 
 // Subscribe to incoming requests in real-time
+// Subscribe to incoming requests (optimized with parallel fetches)
 export function subscribeToIncomingRequests(
   userId: string,
   callback: (requests: (UserProfile & { swipedAt: Date })[]) => void
@@ -1673,39 +1680,41 @@ export function subscribeToIncomingRequests(
   );
 
   return onSnapshot(swipesQuery, async snapshot => {
-    const incomingRequests: (UserProfile & { swipedAt: Date })[] = [];
+    // Fetch all data in parallel for better performance
+    const swipeDocs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
+    
+    // Get all checks and user profiles in parallel
+    const results = await Promise.all(
+      swipeDocs.map(async ({ data: swipeData }) => {
+        const fromUserId = swipeData.fromUserId;
+        const matchId = [userId, fromUserId].sort().join('_');
+        const reverseSwipeId = `${userId}_${fromUserId}`;
+        
+        // Parallel fetch of match doc, reverse swipe doc, and user doc
+        const [matchDoc, reverseSwipeDoc, userDoc] = await Promise.all([
+          getDoc(doc(db, 'matches', matchId)),
+          getDoc(doc(db, 'swipes', reverseSwipeId)),
+          getDoc(doc(db, 'users', fromUserId))
+        ]);
 
-    for (const swipeDoc of snapshot.docs) {
-      const swipeData = swipeDoc.data();
-      const fromUserId = swipeData.fromUserId;
+        // If match exists or user already swiped, skip
+        if (matchDoc.exists() || reverseSwipeDoc.exists()) {
+          return null;
+        }
 
-      // Check if there's already a match (active or unmatched)
-      const matchId = [userId, fromUserId].sort().join('_');
-      const matchDoc = await getDoc(doc(db, 'matches', matchId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserProfile;
+          return {
+            ...userData,
+            swipedAt: swipeData.timestamp?.toDate() || new Date()
+          };
+        }
+        return null;
+      })
+    );
 
-      // If any match exists (active or unmatched), skip
-      // Unmatched users will show in discovery, not as incoming requests
-      if (matchDoc.exists()) {
-        continue;
-      }
-
-      // Check if current user already swiped on this person
-      const reverseSwipeId = `${userId}_${fromUserId}`;
-      const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
-      if (reverseSwipeDoc.exists()) {
-        continue;
-      }
-
-      const userDoc = await getDoc(doc(db, 'users', fromUserId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserProfile;
-        incomingRequests.push({
-          ...userData,
-          swipedAt: swipeData.timestamp?.toDate() || new Date()
-        });
-      }
-    }
-
+    // Filter out nulls and sort by date
+    const incomingRequests = results.filter((r): r is (UserProfile & { swipedAt: Date }) => r !== null);
     incomingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
     callback(incomingRequests);
   });

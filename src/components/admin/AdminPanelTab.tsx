@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,7 +11,6 @@ import {
   Send,
   Heart,
   Shield,
-  AlertTriangle,
   RefreshCw,
   Search,
   Ban,
@@ -25,19 +24,18 @@ import {
   Bell,
   Download,
   UserPlus,
-  Zap,
   Bug,
   Gift,
   TrendingUp,
-  Eye,
   Image as ImageIcon,
-  MoreHorizontal
+  MessageSquare,
+  ArrowLeft,
+  ChevronLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 
 const ADMIN_EMAILS = [
   "rikardo_balaj@universitetipolis.edu.al",
@@ -76,7 +74,26 @@ interface DashboardStats {
   avgPhotosPerUser: number;
 }
 
-// Metric Card - Shopify style
+interface MatchData {
+  id: string;
+  users: string[];
+  userProfiles: { [key: string]: { name: string; photos?: string[] } };
+  lastMessage?: string;
+  lastMessageTime?: any;
+  createdAt?: any;
+}
+
+interface MessageData {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: any;
+  read: boolean;
+  type?: string;
+  imageUrl?: string;
+}
+
+// Metric Card
 function MetricCard({ 
   title, 
   value, 
@@ -123,18 +140,8 @@ function MetricCard({
   );
 }
 
-// Donut Progress Component - Visual stat without traditional charts
-function DonutStat({ 
-  label, 
-  value, 
-  total, 
-  color 
-}: { 
-  label: string; 
-  value: number; 
-  total: number; 
-  color: string;
-}) {
+// Donut Progress
+function DonutStat({ label, value, total, color }: { label: string; value: number; total: number; color: string; }) {
   const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
   const circumference = 2 * Math.PI * 18;
   const offset = circumference - (percentage / 100) * circumference;
@@ -143,22 +150,9 @@ function DonutStat({
     <div className="flex items-center gap-3">
       <div className="relative w-12 h-12">
         <svg className="w-12 h-12 -rotate-90">
-          <circle
-            cx="24"
-            cy="24"
-            r="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="4"
-            className="text-muted/30"
-          />
+          <circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" strokeWidth="4" className="text-muted/30" />
           <motion.circle
-            cx="24"
-            cy="24"
-            r="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="4"
+            cx="24" cy="24" r="18" fill="none" stroke="currentColor" strokeWidth="4"
             strokeDasharray={circumference}
             initial={{ strokeDashoffset: circumference }}
             animate={{ strokeDashoffset: offset }}
@@ -174,22 +168,13 @@ function DonutStat({
         <div className="text-sm font-medium text-foreground">{label}</div>
         <div className="text-xs text-muted-foreground">{value} of {total}</div>
       </div>
-    </div>
+      </div>
   );
 }
 
 // Action Button
-function ActionButton({ 
-  label, 
-  icon: Icon, 
-  onClick, 
-  loading,
-  variant = "default"
-}: { 
-  label: string; 
-  icon: any; 
-  onClick: () => void;
-  loading?: boolean;
+function ActionButton({ label, icon: Icon, onClick, loading, variant = "default" }: { 
+  label: string; icon: any; onClick: () => void; loading?: boolean;
   variant?: "default" | "success" | "warning" | "danger";
 }) {
   const variants = {
@@ -200,11 +185,7 @@ function ActionButton({
   };
 
   return (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      className={`${variants[variant]} w-full justify-start gap-3 h-12 rounded-xl font-medium`}
-    >
+    <Button onClick={onClick} disabled={loading} className={`${variants[variant]} w-full justify-start gap-3 h-12 rounded-xl font-medium`}>
       {loading ? <RefreshCw className="animate-spin" size={18} /> : <Icon size={18} />}
       {label}
     </Button>
@@ -212,32 +193,16 @@ function ActionButton({
 }
 
 // User Row
-function UserRow({ 
-  user, 
-  onBan, 
-  onDelete, 
-  loading 
-}: { 
-  user: UserData; 
-  onBan: () => void; 
-  onDelete: () => void;
-  loading: boolean;
-}) {
+function UserRow({ user, onBan, onDelete, loading }: { user: UserData; onBan: () => void; onDelete: () => void; loading: boolean; }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="border-b border-border last:border-0">
-      <div 
-        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
+      <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setExpanded(!expanded)}>
         <Avatar className="w-10 h-10">
           <AvatarImage src={user.photos?.[0]} />
-          <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-            {user.name?.[0] || '?'}
-          </AvatarFallback>
+          <AvatarFallback className="bg-primary/20 text-primary font-semibold">{user.name?.[0] || '?'}</AvatarFallback>
         </Avatar>
-        
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground truncate">{user.name || 'Unknown'}</span>
@@ -246,7 +211,6 @@ function UserRow({
           </div>
           <span className="text-xs text-muted-foreground truncate block">{user.email}</span>
         </div>
-
         <div className="flex items-center gap-2">
           {user.isOnline && <div className="w-2 h-2 rounded-full bg-green-500" />}
           {expanded ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
@@ -255,52 +219,28 @@ function UserRow({
 
       <AnimatePresence>
         {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="px-3 pb-3 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="bg-muted/50 rounded-xl p-2 text-center">
-                  <div className="text-xs text-muted-foreground">Gender</div>
-                  <div className="text-sm font-medium text-foreground capitalize">{user.gender || '-'}</div>
-                </div>
-                <div className="bg-muted/50 rounded-xl p-2 text-center">
-                  <div className="text-xs text-muted-foreground">Photos</div>
-                  <div className="text-sm font-medium text-foreground">{user.photos?.length || 0}</div>
-                </div>
-                <div className="bg-muted/50 rounded-xl p-2 text-center">
-                  <div className="text-xs text-muted-foreground">Email</div>
-                  <div className="text-sm font-medium text-foreground">{user.isEmailVerified ? '✓ Verified' : 'Unverified'}</div>
-                </div>
-                <div className="bg-muted/50 rounded-xl p-2 text-center">
-                  <div className="text-xs text-muted-foreground">Joined</div>
-                  <div className="text-sm font-medium text-foreground">
-                    {user.createdAt?.toDate?.().toLocaleDateString() || '-'}
+                {[
+                  { label: 'Gender', value: user.gender || '-' },
+                  { label: 'Photos', value: user.photos?.length || 0 },
+                  { label: 'Email', value: user.isEmailVerified ? '✓ Verified' : 'Unverified' },
+                  { label: 'Joined', value: user.createdAt?.toDate?.().toLocaleDateString() || '-' }
+                ].map(item => (
+                  <div key={item.label} className="bg-muted/50 rounded-xl p-2 text-center">
+                    <div className="text-xs text-muted-foreground">{item.label}</div>
+                    <div className="text-sm font-medium text-foreground capitalize">{item.value}</div>
                   </div>
-                </div>
+                ))}
               </div>
-              
               <div className="flex gap-2">
-                <Button
-                  onClick={(e) => { e.stopPropagation(); onBan(); }}
-                  disabled={loading}
-                  variant="outline"
-                  size="sm"
-                  className={`flex-1 rounded-xl ${user.isBanned ? 'text-green-500 border-green-500' : 'text-red-500 border-red-500'}`}
-                >
+                <Button onClick={(e) => { e.stopPropagation(); onBan(); }} disabled={loading} variant="outline" size="sm"
+                  className={`flex-1 rounded-xl ${user.isBanned ? 'text-green-500 border-green-500' : 'text-red-500 border-red-500'}`}>
                   {loading ? <RefreshCw className="animate-spin mr-2" size={14} /> : null}
                   {user.isBanned ? 'Unban' : 'Ban'}
                 </Button>
-                <Button
-                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                  disabled={loading}
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl text-red-500 border-red-500"
-                >
+                <Button onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={loading} variant="outline" size="sm" className="rounded-xl text-red-500 border-red-500">
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -312,17 +252,164 @@ function UserRow({
   );
 }
 
+// Chat Conversation View
+function ChatConversation({ 
+  match, 
+  messages, 
+  onBack 
+}: { 
+  match: MatchData; 
+  messages: MessageData[]; 
+  onBack: () => void;
+}) {
+  const users = Object.values(match.userProfiles);
+  const user1 = users[0];
+  const user2 = users[1];
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 p-3 border-b border-border bg-card rounded-t-2xl">
+        <Button variant="ghost" size="icon" onClick={onBack} className="rounded-xl shrink-0">
+          <ChevronLeft size={20} />
+        </Button>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex -space-x-2">
+            <Avatar className="w-8 h-8 border-2 border-background">
+              <AvatarImage src={user1?.photos?.[0]} />
+              <AvatarFallback className="bg-primary/20 text-primary text-xs">{user1?.name?.[0] || '?'}</AvatarFallback>
+            </Avatar>
+            <Avatar className="w-8 h-8 border-2 border-background">
+              <AvatarImage src={user2?.photos?.[0]} />
+              <AvatarFallback className="bg-pink-500/20 text-pink-500 text-xs">{user2?.name?.[0] || '?'}</AvatarFallback>
+            </Avatar>
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground truncate">
+              {user1?.name || 'User 1'} & {user2?.name || 'User 2'}
+            </div>
+            <div className="text-xs text-muted-foreground">{messages.length} messages</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-muted/30">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            No messages yet
+          </div>
+        ) : (
+          messages.map((msg, idx) => {
+            const sender = match.userProfiles[msg.senderId];
+            const isFirstUser = match.users[0] === msg.senderId;
+            
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.02 }}
+                className={`flex gap-2 ${isFirstUser ? '' : 'flex-row-reverse'}`}
+              >
+                <Avatar className="w-6 h-6 shrink-0">
+                  <AvatarImage src={sender?.photos?.[0]} />
+                  <AvatarFallback className={`text-xs ${isFirstUser ? 'bg-primary/20 text-primary' : 'bg-pink-500/20 text-pink-500'}`}>
+                    {sender?.name?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={`max-w-[75%] ${isFirstUser ? '' : 'text-right'}`}>
+                  <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${
+                    isFirstUser 
+                      ? 'bg-card border border-border text-foreground' 
+                      : 'bg-primary text-primary-foreground'
+                  }`}>
+                    {msg.type === 'image' && msg.imageUrl ? (
+                      <img src={msg.imageUrl} alt="Image" className="max-w-full rounded-lg max-h-48 object-cover" />
+                    ) : (
+                      msg.text
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 px-1">
+                    {msg.timestamp?.toDate?.().toLocaleString() || ''}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="p-3 border-t border-border bg-card rounded-b-2xl">
+        <div className="text-xs text-muted-foreground text-center">
+          View only mode • Admin cannot send messages
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Chat List Item
+function ChatListItem({ 
+  match, 
+  onClick 
+}: { 
+  match: MatchData; 
+  onClick: () => void;
+}) {
+  const users = Object.values(match.userProfiles);
+  const user1 = users[0];
+  const user2 = users[1];
+
+  return (
+    <div 
+      className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors border-b border-border last:border-0"
+      onClick={onClick}
+    >
+      <div className="flex -space-x-2 shrink-0">
+        <Avatar className="w-10 h-10 border-2 border-background">
+          <AvatarImage src={user1?.photos?.[0]} />
+          <AvatarFallback className="bg-primary/20 text-primary">{user1?.name?.[0] || '?'}</AvatarFallback>
+        </Avatar>
+        <Avatar className="w-10 h-10 border-2 border-background">
+          <AvatarImage src={user2?.photos?.[0]} />
+          <AvatarFallback className="bg-pink-500/20 text-pink-500">{user2?.name?.[0] || '?'}</AvatarFallback>
+        </Avatar>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-foreground truncate">
+          {user1?.name || 'User 1'} & {user2?.name || 'User 2'}
+        </div>
+        <div className="text-xs text-muted-foreground truncate">
+          {match.lastMessage || 'No messages yet'}
+        </div>
+      </div>
+      <div className="text-xs text-muted-foreground shrink-0">
+        {match.lastMessageTime?.toDate?.().toLocaleDateString() || match.createdAt?.toDate?.().toLocaleDateString() || ''}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanelTab() {
   const { user, loading } = useAuth();
   const [authorized, setAuthorized] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
+  const [matches, setMatches] = useState<MatchData[]>([]);
   const [fetchingStats, setFetchingStats] = useState(true);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'email'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'chats' | 'email'>('dashboard');
   const [actionResults, setActionResults] = useState<{ [key: string]: { loading: boolean; result?: string } }>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [userFilter, setUserFilter] = useState<'all' | 'banned' | 'premium'>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  // Chat state
+  const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<MessageData[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   
   // Email form state
   const [emailSubject, setEmailSubject] = useState("");
@@ -336,8 +423,8 @@ export default function AdminPanelTab() {
     }
   }, [user, loading]);
 
-  const fetchStats = async () => {
-    setFetchingStats(true);
+    const fetchStats = async () => {
+      setFetchingStats(true);
     try {
       const [usersSnap, matchesSnap] = await Promise.all([
         getDocs(collection(db, "users")),
@@ -356,6 +443,7 @@ export default function AdminPanelTab() {
       let todaySignups = 0, weeklySignups = 0, totalPhotos = 0;
       
       const usersList: UserData[] = [];
+      const matchesList: MatchData[] = [];
 
       usersSnap.forEach(docSnap => {
         totalUsers++;
@@ -400,7 +488,27 @@ export default function AdminPanelTab() {
         }
       });
 
+      matchesSnap.forEach(docSnap => {
+        const data = docSnap.data();
+        matchesList.push({
+          id: docSnap.id,
+          users: data.users,
+          userProfiles: data.userProfiles,
+          lastMessage: data.lastMessage,
+          lastMessageTime: data.lastMessageTime,
+          createdAt: data.createdAt
+        });
+      });
+
+      // Sort matches by last message time
+      matchesList.sort((a, b) => {
+        const timeA = a.lastMessageTime?.toDate?.().getTime() || a.createdAt?.toDate?.().getTime() || 0;
+        const timeB = b.lastMessageTime?.toDate?.().getTime() || b.createdAt?.toDate?.().getTime() || 0;
+        return timeB - timeA;
+      });
+
       setUsers(usersList);
+      setMatches(matchesList);
       setStats({
         totalUsers, activeUsers, verifiedUsers, maleUsers, femaleUsers, otherGender,
         completeProfiles, incompleteProfiles, premiumUsers, bannedUsers,
@@ -410,7 +518,42 @@ export default function AdminPanelTab() {
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
-    setFetchingStats(false);
+      setFetchingStats(false);
+    };
+
+  const fetchMessages = async (matchId: string) => {
+    setLoadingMessages(true);
+    try {
+      const messagesQuery = query(
+        collection(db, "matches", matchId, "messages"),
+        orderBy("timestamp", "asc")
+      );
+      const messagesSnap = await getDocs(messagesQuery);
+      const messagesList: MessageData[] = [];
+      
+      messagesSnap.forEach(docSnap => {
+        const data = docSnap.data();
+        messagesList.push({
+          id: docSnap.id,
+          senderId: data.senderId,
+          text: data.text,
+          timestamp: data.timestamp,
+          read: data.read,
+          type: data.type,
+          imageUrl: data.imageUrl
+        });
+      });
+      
+      setSelectedMessages(messagesList);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+    setLoadingMessages(false);
+  };
+
+  const handleSelectMatch = async (match: MatchData) => {
+    setSelectedMatch(match);
+    await fetchMessages(match.id);
   };
 
   useEffect(() => {
@@ -499,6 +642,14 @@ export default function AdminPanelTab() {
     return matchesSearch;
   });
 
+  const filteredMatches = matches.filter(m => {
+    // Only show matches that have messages
+    if (!m.lastMessage) return false;
+    if (!chatSearchQuery) return true;
+    const names = Object.values(m.userProfiles).map(p => p.name?.toLowerCase() || '');
+    return names.some(n => n.includes(chatSearchQuery.toLowerCase()));
+  });
+
   if (!authorized) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
@@ -525,30 +676,25 @@ export default function AdminPanelTab() {
               <p className="text-xs text-muted-foreground">Dashboard</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchStats}
-            disabled={fetchingStats}
-            className="rounded-xl"
-          >
+          <Button variant="ghost" size="icon" onClick={fetchStats} disabled={fetchingStats} className="rounded-xl">
             <RefreshCw className={`text-muted-foreground ${fetchingStats ? 'animate-spin' : ''}`} size={18} />
           </Button>
         </div>
 
         {/* Section Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-1 overflow-x-auto">
           {[
-            { id: 'dashboard', label: 'Dashboard' },
+            { id: 'dashboard', label: 'Home' },
             { id: 'users', label: 'Users' },
+            { id: 'chats', label: 'Chats' },
             { id: 'email', label: 'Email' }
           ].map(tab => (
             <Button
               key={tab.id}
               variant={activeSection === tab.id ? "default" : "ghost"}
               size="sm"
-              onClick={() => setActiveSection(tab.id as any)}
-              className={`rounded-xl flex-1 ${activeSection === tab.id ? '' : 'text-muted-foreground'}`}
+              onClick={() => { setActiveSection(tab.id as any); if (tab.id !== 'chats') setSelectedMatch(null); }}
+              className={`rounded-xl flex-1 text-xs sm:text-sm ${activeSection === tab.id ? '' : 'text-muted-foreground'}`}
             >
               {tab.label}
             </Button>
@@ -566,14 +712,7 @@ export default function AdminPanelTab() {
           <AnimatePresence mode="wait">
             {/* DASHBOARD */}
             {activeSection === 'dashboard' && stats && (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                {/* Key Metrics */}
+              <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <MetricCard title="Total Users" value={stats.totalUsers} icon={Users} color="primary" />
                   <MetricCard title="Active Now" value={stats.activeUsers} icon={Activity} color="success" subtitle="Last 30 min" />
@@ -581,7 +720,6 @@ export default function AdminPanelTab() {
                   <MetricCard title="Matches" value={stats.totalMatches} icon={Heart} color="danger" />
                 </div>
 
-                {/* User Breakdown */}
                 <div className="bg-card rounded-2xl p-4 border border-border">
                   <h3 className="font-semibold text-foreground mb-4">User Breakdown</h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -592,7 +730,6 @@ export default function AdminPanelTab() {
                   </div>
                 </div>
 
-                {/* Quick Stats Row */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-card rounded-2xl p-3 border border-border text-center">
                     <Crown className="mx-auto text-yellow-500 mb-1" size={20} />
@@ -611,75 +748,35 @@ export default function AdminPanelTab() {
                   </div>
                 </div>
 
-                {/* Quick Actions */}
                 <div className="bg-card rounded-2xl p-4 border border-border">
                   <h3 className="font-semibold text-foreground mb-3">Quick Actions</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    <ActionButton
-                      label="Thank Users"
-                      icon={Gift}
-                      variant="success"
-                      onClick={() => handleQuickAction('thank')}
-                      loading={actionResults.thank?.loading}
-                    />
-                    <ActionButton
-                      label="Ask for Bugs"
-                      icon={Bug}
-                      variant="warning"
-                      onClick={() => handleQuickAction('bug')}
-                      loading={actionResults.bug?.loading}
-                    />
-                    <ActionButton
-                      label="Remind Profiles"
-                      icon={Bell}
-                      variant="default"
-                      onClick={() => handleQuickAction('remind')}
-                      loading={actionResults.remind?.loading}
-                    />
-                    <ActionButton
-                      label="Export CSV"
-                      icon={Download}
-                      variant="default"
-                      onClick={exportCSV}
-                    />
+                    <ActionButton label="Thank Users" icon={Gift} variant="success" onClick={() => handleQuickAction('thank')} loading={actionResults.thank?.loading} />
+                    <ActionButton label="Ask for Bugs" icon={Bug} variant="warning" onClick={() => handleQuickAction('bug')} loading={actionResults.bug?.loading} />
+                    <ActionButton label="Remind Profiles" icon={Bell} variant="default" onClick={() => handleQuickAction('remind')} loading={actionResults.remind?.loading} />
+                    <ActionButton label="Export CSV" icon={Download} variant="default" onClick={exportCSV} />
                   </div>
                   {Object.entries(actionResults).map(([key, val]) => val.result && (
-                    <motion.div
-                      key={key}
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-3 p-2 bg-muted rounded-xl text-sm text-muted-foreground"
-                    >
-                      {val.result}
-                    </motion.div>
+                    <motion.div key={key} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="mt-3 p-2 bg-muted rounded-xl text-sm text-muted-foreground">{val.result}</motion.div>
                   ))}
                 </div>
 
-                {/* Recent Signups */}
                 <div className="bg-card rounded-2xl p-4 border border-border">
                   <h3 className="font-semibold text-foreground mb-3">Recent Signups</h3>
                   <div className="space-y-2">
-                    {users
-                      .filter(u => u.createdAt?.toDate)
-                      .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())
-                      .slice(0, 5)
-                      .map(user => (
-                        <div key={user.id} className="flex items-center gap-3 p-2 rounded-xl bg-muted/50">
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={user.photos?.[0]} />
-                            <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                              {user.name?.[0] || '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-foreground truncate">{user.name || 'New User'}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {user.createdAt?.toDate?.().toLocaleDateString()}
-                            </div>
-                          </div>
-                          {user.isPremium && <Crown size={14} className="text-yellow-500" />}
+                    {users.filter(u => u.createdAt?.toDate).sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime()).slice(0, 5).map(user => (
+                      <div key={user.id} className="flex items-center gap-3 p-2 rounded-xl bg-muted/50">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={user.photos?.[0]} />
+                          <AvatarFallback className="bg-primary/20 text-primary text-xs">{user.name?.[0] || '?'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-foreground truncate">{user.name || 'New User'}</div>
+                          <div className="text-xs text-muted-foreground">{user.createdAt?.toDate?.().toLocaleDateString()}</div>
                         </div>
-                      ))}
+                        {user.isPremium && <Crown size={14} className="text-yellow-500" />}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </motion.div>
@@ -687,118 +784,103 @@ export default function AdminPanelTab() {
 
             {/* USERS */}
             {activeSection === 'users' && (
-              <motion.div
-                key="users"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                {/* Search & Filter */}
+              <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                    <Input
-                      placeholder="Search users..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="pl-9 rounded-xl bg-card"
-                    />
+                    <Input placeholder="Search users..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 rounded-xl bg-card" />
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   {(['all', 'premium', 'banned'] as const).map(f => (
-                    <Button
-                      key={f}
-                      variant={userFilter === f ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setUserFilter(f)}
-                      className="rounded-xl capitalize"
-                    >
-                      {f}
-                    </Button>
+                    <Button key={f} variant={userFilter === f ? "default" : "outline"} size="sm" onClick={() => setUserFilter(f)} className="rounded-xl capitalize">{f}</Button>
                   ))}
                 </div>
 
-                {/* User List */}
                 <div className="bg-card rounded-2xl border border-border overflow-hidden">
                   <div className="max-h-[60vh] overflow-y-auto">
                     {filteredUsers.length === 0 ? (
-                      <div className="p-8 text-center text-muted-foreground">
-                        No users found
-                      </div>
+                      <div className="p-8 text-center text-muted-foreground">No users found</div>
                     ) : (
                       filteredUsers.slice(0, 50).map(user => (
-                        <UserRow
-                          key={user.id}
-                          user={user}
-                          onBan={() => handleBanUser(user.id, user.isBanned || false)}
-                          onDelete={() => handleDeleteUser(user.id)}
-                          loading={actionLoading === user.id}
-                        />
+                        <UserRow key={user.id} user={user} onBan={() => handleBanUser(user.id, user.isBanned || false)} onDelete={() => handleDeleteUser(user.id)} loading={actionLoading === user.id} />
                       ))
                     )}
                   </div>
                 </div>
 
-                <p className="text-center text-xs text-muted-foreground">
-                  Showing {Math.min(filteredUsers.length, 50)} of {filteredUsers.length} users
-                </p>
+                <p className="text-center text-xs text-muted-foreground">Showing {Math.min(filteredUsers.length, 50)} of {filteredUsers.length} users</p>
+              </motion.div>
+            )}
+
+            {/* CHATS */}
+            {activeSection === 'chats' && (
+              <motion.div key="chats" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                {selectedMatch ? (
+                  loadingMessages ? (
+                    <div className="flex items-center justify-center h-48">
+                      <RefreshCw className="animate-spin text-primary" size={24} />
+                    </div>
+                  ) : (
+                    <div className="bg-card rounded-2xl border border-border h-[70vh] flex flex-col">
+                      <ChatConversation 
+                        match={selectedMatch} 
+                        messages={selectedMessages} 
+                        onBack={() => setSelectedMatch(null)} 
+                      />
+                    </div>
+                  )
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                      <Input 
+                        placeholder="Search conversations..." 
+                        value={chatSearchQuery} 
+                        onChange={e => setChatSearchQuery(e.target.value)} 
+                        className="pl-9 rounded-xl bg-card" 
+                      />
+                    </div>
+
+                    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                      <div className="p-3 border-b border-border">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          <MessageSquare size={16} className="text-primary" />
+                          All Conversations ({filteredMatches.length})
+                        </div>
+                      </div>
+                      <div className="max-h-[60vh] overflow-y-auto">
+                        {filteredMatches.length === 0 ? (
+                          <div className="p-8 text-center text-muted-foreground">No conversations found</div>
+                        ) : (
+                          filteredMatches.map(match => (
+                            <ChatListItem key={match.id} match={match} onClick={() => handleSelectMatch(match)} />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 
             {/* EMAIL */}
             {activeSection === 'email' && (
-              <motion.div
-                key="email"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                {/* Custom Email */}
+              <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                 <div className="bg-card rounded-2xl p-4 border border-border">
                   <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
                     <Mail size={18} className="text-primary" />
                     Broadcast Email
                   </h3>
                   <form onSubmit={handleSendEmail} className="space-y-3">
-                    <Input
-                      placeholder="Subject"
-                      value={emailSubject}
-                      onChange={e => setEmailSubject(e.target.value)}
-                      className="rounded-xl bg-background"
-                      required
-                    />
-                    <Textarea
-                      placeholder="Message..."
-                      value={emailMessage}
-                      onChange={e => setEmailMessage(e.target.value)}
-                      className="rounded-xl bg-background min-h-[100px] resize-none"
-                      required
-                    />
-                    <Button
-                      type="submit"
-                      disabled={sendingEmail}
-                      className="w-full rounded-xl"
-                    >
-                      {sendingEmail ? (
-                        <>
-                          <RefreshCw className="animate-spin mr-2" size={16} />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send size={16} className="mr-2" />
-                          Send to All Users
-                        </>
-                      )}
+                    <Input placeholder="Subject" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="rounded-xl bg-background" required />
+                    <Textarea placeholder="Message..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="rounded-xl bg-background min-h-[100px] resize-none" required />
+                    <Button type="submit" disabled={sendingEmail} className="w-full rounded-xl">
+                      {sendingEmail ? <><RefreshCw className="animate-spin mr-2" size={16} />Sending...</> : <><Send size={16} className="mr-2" />Send to All Users</>}
                     </Button>
                     {emailResult && (
-                      <div className={`p-3 rounded-xl text-sm flex items-center gap-2 ${
-                        emailResult.success ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                      }`}>
+                      <div className={`p-3 rounded-xl text-sm flex items-center gap-2 ${emailResult.success ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                         {emailResult.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
                         {emailResult.message}
                       </div>
@@ -806,41 +888,15 @@ export default function AdminPanelTab() {
                   </form>
                 </div>
 
-                {/* Template Emails */}
                 <div className="bg-card rounded-2xl p-4 border border-border">
                   <h3 className="font-semibold text-foreground mb-3">Quick Templates</h3>
                   <div className="space-y-2">
-                    <ActionButton
-                      label="Thank Users"
-                      icon={Gift}
-                      variant="success"
-                      onClick={() => handleQuickAction('thank')}
-                      loading={actionResults.thank?.loading}
-                    />
-                    <ActionButton
-                      label="Report Bugs"
-                      icon={Bug}
-                      variant="warning"
-                      onClick={() => handleQuickAction('bug')}
-                      loading={actionResults.bug?.loading}
-                    />
-                    <ActionButton
-                      label="Complete Profile Reminder"
-                      icon={Bell}
-                      variant="default"
-                      onClick={() => handleQuickAction('remind')}
-                      loading={actionResults.remind?.loading}
-                    />
+                    <ActionButton label="Thank Users" icon={Gift} variant="success" onClick={() => handleQuickAction('thank')} loading={actionResults.thank?.loading} />
+                    <ActionButton label="Report Bugs" icon={Bug} variant="warning" onClick={() => handleQuickAction('bug')} loading={actionResults.bug?.loading} />
+                    <ActionButton label="Complete Profile Reminder" icon={Bell} variant="default" onClick={() => handleQuickAction('remind')} loading={actionResults.remind?.loading} />
                   </div>
                   {Object.entries(actionResults).map(([key, val]) => val.result && (
-                    <motion.div
-                      key={key}
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-3 p-2 bg-muted rounded-xl text-sm text-muted-foreground"
-                    >
-                      {val.result}
-                    </motion.div>
+                    <motion.div key={key} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="mt-3 p-2 bg-muted rounded-xl text-sm text-muted-foreground">{val.result}</motion.div>
                   ))}
                 </div>
               </motion.div>
@@ -848,6 +904,6 @@ export default function AdminPanelTab() {
           </AnimatePresence>
         )}
       </div>
-    </div>
+      </div>
   );
 }
