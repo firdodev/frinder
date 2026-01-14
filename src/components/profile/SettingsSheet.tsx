@@ -136,7 +136,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className='w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-gray-800'>
+      <SheetContent className='w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-frinder-orange/20'>
         <SheetHeader>
           <SheetTitle className='dark:text-white'>Settings</SheetTitle>
         </SheetHeader>
@@ -148,7 +148,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               Appearance
             </h3>
 
-            <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+            <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
               <div className='flex items-center gap-3'>
                 {darkMode ? (
                   <Moon className='w-5 h-5 text-frinder-orange' />
@@ -170,7 +170,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             </div>
           </div>
 
-          <Separator className='dark:bg-gray-800' />
+          <Separator className='dark:bg-black' />
 
           {/* Match Notifications */}
           <div className='space-y-4'>
@@ -178,7 +178,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               Match Notifications
             </h3>
 
-            <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+            <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
               <div className='flex items-center gap-3'>
                 <Sparkles className='w-5 h-5 text-frinder-orange' />
                 <div>
@@ -198,7 +198,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             </div>
           </div>
 
-          <Separator className='dark:bg-gray-800' />
+          <Separator className='dark:bg-black' />
 
           {/* Language & Region */}
           <div className='space-y-4'>
@@ -206,7 +206,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               Language & Region
             </h3>
 
-            <button className='w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'>
+            <button className='w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'>
               <div className='flex items-center gap-3'>
                 <Globe className='w-5 h-5 text-frinder-orange' />
                 <div className='text-left'>
@@ -218,7 +218,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             </button>
           </div>
 
-          <Separator className='dark:bg-gray-800' />
+          <Separator className='dark:bg-black' />
 
           {/* Safety */}
           <div className='space-y-4'>
@@ -226,7 +226,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
             <button
               onClick={() => setShowPasswordDialog(true)}
-              className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'
+              className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-black rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'
             >
               <Key className='w-5 h-5 text-frinder-orange' />
               <div>
@@ -235,7 +235,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               </div>
             </button>
 
-            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
+            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-black rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
               <UserX className='w-5 h-5 text-frinder-orange' />
               <div>
                 <p className='text-sm font-medium dark:text-white'>Blocked Users</p>
@@ -243,7 +243,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               </div>
             </button>
 
-            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
+            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-black rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
               <Ban className='w-5 h-5 text-frinder-orange' />
               <div>
                 <p className='text-sm font-medium dark:text-white'>Hidden Profiles</p>
@@ -251,7 +251,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               </div>
             </button>
 
-            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
+            <button className='w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-black rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left'>
               <Shield className='w-5 h-5 text-frinder-orange' />
               <div>
                 <p className='text-sm font-medium dark:text-white'>Safety Tips</p>
@@ -260,7 +260,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             </button>
           </div>
 
-          <Separator className='dark:bg-gray-800' />
+          <Separator className='dark:bg-black' />
 
           {/* Account Actions */}
           <div className='space-y-4'>
@@ -280,7 +280,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
             <Button
               variant='outline'
-              className='w-full justify-start gap-3 h-14 dark:border-gray-800 dark:hover:bg-gray-900'
+              className='w-full justify-start gap-3 h-14 dark:border-frinder-orange/20 dark:hover:bg-gray-900'
               onClick={handleLogout}
             >
               <LogOut className='w-5 h-5 text-gray-600 dark:text-gray-400' />
@@ -301,7 +301,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
       {/* Delete Account Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-black dark:border-gray-800'>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='flex items-center gap-2 text-red-600'>
               <AlertTriangle className='w-5 h-5' />
@@ -321,7 +321,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
                 value={deletePassword}
                 onChange={e => setDeletePassword(e.target.value)}
                 placeholder='Your password'
-                className='dark:bg-gray-900 dark:border-gray-800'
+                className='dark:bg-black dark:border-frinder-orange/20'
               />
             </div>
           </div>
@@ -352,7 +352,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
 
       {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={handleClosePasswordDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-black dark:border-gray-800'>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Change Password</DialogTitle>
             <DialogDescription>
@@ -370,7 +370,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder='Enter current password'
-                  className='dark:bg-gray-900 dark:border-gray-800 pr-10'
+                  className='dark:bg-black dark:border-frinder-orange/20 pr-10'
                 />
                 <button
                   type='button'
@@ -391,7 +391,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder='Enter new password'
-                  className='dark:bg-gray-900 dark:border-gray-800 pr-10'
+                  className='dark:bg-black dark:border-frinder-orange/20 pr-10'
                 />
                 <button
                   type='button'
@@ -411,7 +411,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder='Confirm new password'
-                className='dark:bg-gray-900 dark:border-gray-800'
+                className='dark:bg-black dark:border-frinder-orange/20'
               />
             </div>
           </div>

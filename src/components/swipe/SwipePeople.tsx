@@ -1027,7 +1027,7 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
               whileTap={{ scale: 0.9 }}
               onClick={handleUndo}
               disabled={!lastAction}
-              className='w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center disabled:opacity-30 border border-muted dark:border-gray-800 transition-shadow hover:shadow-xl'
+              className='w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-black shadow-lg flex items-center justify-center disabled:opacity-30 border border-muted dark:border-frinder-orange/20 transition-shadow hover:shadow-xl'
             >
               <RotateCcw className='w-4 h-4 sm:w-5 sm:h-5 text-frinder-amber' />
             </motion.button>
@@ -1037,7 +1037,7 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.85 }}
               onClick={() => handleButtonSwipe('left')}
-              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border-2 border-red-200 dark:border-red-900/50 transition-all hover:shadow-xl hover:border-red-300'
+              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-black shadow-lg flex items-center justify-center border-2 border-red-200 dark:border-red-900/50 transition-all hover:shadow-xl hover:border-red-300'
             >
               <X className='w-7 h-7 sm:w-8 sm:h-8 text-red-500' strokeWidth={2.5} />
             </motion.button>
@@ -1055,8 +1055,8 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
               }}
               className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full shadow-lg flex items-center justify-center border transition-all relative ${
                 hasSuperLikes
-                  ? 'bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-900/50 hover:shadow-xl hover:border-blue-300'
-                  : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60'
+                  ? 'bg-white dark:bg-black border-blue-200 dark:border-blue-900/50 hover:shadow-xl hover:border-blue-300'
+                  : 'bg-gray-100 dark:bg-black border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60'
               }`}
             >
               <Star className={`w-5 h-5 sm:w-6 sm:h-6 ${hasSuperLikes ? 'text-blue-500' : 'text-gray-400'}`} fill='currentColor' />
@@ -1070,7 +1070,7 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.85 }}
               onClick={() => handleButtonSwipe('right')}
-              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-gray-900 shadow-lg flex items-center justify-center border-2 border-green-200 dark:border-green-900/50 transition-all hover:shadow-xl hover:border-green-300'
+              className='w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-black shadow-lg flex items-center justify-center border-2 border-green-200 dark:border-green-900/50 transition-all hover:shadow-xl hover:border-green-300'
             >
               <Heart className='w-7 h-7 sm:w-8 sm:h-8 text-green-500' fill='currentColor' />
             </motion.button>
@@ -1091,7 +1091,7 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
 
       {/* No Super Likes Dialog */}
       <Dialog open={showNoSuperLikesDialog} onOpenChange={setShowNoSuperLikesDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900'>
+        <DialogContent className='sm:max-w-md dark:bg-black'>
           <DialogHeader>
             <DialogTitle className='text-center flex flex-col items-center gap-2'>
               <div className='w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center'>
@@ -1123,14 +1123,14 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
 
       {/* Ad Dialog */}
       <Dialog open={showAdDialog} onOpenChange={setShowAdDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900'>
+        <DialogContent className='sm:max-w-md dark:bg-black'>
           <DialogHeader>
             <DialogTitle className='text-center'>Quick Break!</DialogTitle>
             <DialogDescription className='text-center'>
               Support Frinder by watching this quick ad, or go ad-free!
             </DialogDescription>
           </DialogHeader>
-          <div className='py-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center'>
+          <div className='py-8 bg-gray-100 dark:bg-black rounded-lg flex items-center justify-center'>
             <div className='text-center text-muted-foreground'>
               <div className='w-16 h-16 mx-auto mb-2 bg-gray-300 dark:bg-gray-700 rounded flex items-center justify-center'>
                 <Zap className='w-8 h-8' />
@@ -1155,7 +1155,7 @@ export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
 
       {/* Upgrade Shop Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
-        <DialogContent className='sm:max-w-lg dark:bg-gray-900'>
+        <DialogContent className='sm:max-w-lg dark:bg-black'>
           <DialogHeader>
             <DialogTitle className='text-center flex flex-col items-center gap-2'>
               <div className='w-16 h-16 rounded-full bg-frinder-orange/10 flex items-center justify-center'>

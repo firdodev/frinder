@@ -395,37 +395,122 @@ function ChatListItem({
 export default function AdminPanelTab() {
     // Remove unused/deleted accounts (no matches and no profile pictures)
     const [fullScreenLoading, setFullScreenLoading] = useState(false);
+    const [cleanupStatus, setCleanupStatus] = useState<{ step: string; details: string } | null>(null);
+    const [cleanupStats, setCleanupStats] = useState<{
+      authUsersDeleted: number;
+      firestoreUsersDeleted: number;
+      matchesDeleted: number;
+      swipesDeleted: number;
+      creditsDeleted: number;
+      subscriptionsDeleted: number;
+      messagesDeleted: number;
+      inactiveUsersDeleted: number;
+    } | null>(null);
+
     const handleRemoveUnusedAccounts = async () => {
       if (!window.confirm('Remove all unused, orphaned, and unlinked accounts from Firestore and Auth, and clean up all references? This cannot be undone.')) return;
       setFullScreenLoading(true);
       setActionLoading('remove-unused');
+      setCleanupStatus({ step: '0/8', details: 'Starting cleanup...' });
+      setCleanupStats(null);
+
       try {
         const res = await fetch('/api/admin-full-cleanup', { method: 'POST' });
         const data = await res.json();
+
         if (res.ok) {
+          setCleanupStats(data.stats);
+          setCleanupStatus({ step: 'Done', details: 'Cleanup complete!' });
           fetchStats();
-          alert('Cleanup complete! Deleted UIDs: ' + (data.deletedUids?.length || 0));
+          setTimeout(() => {
+            setFullScreenLoading(false);
+            setCleanupStatus(null);
+            setCleanupStats(null);
+          }, 3000);
         } else {
-          alert('Cleanup failed: ' + (data.error || 'Unknown error'));
+          setCleanupStatus({ step: 'Error', details: data.error || 'Unknown error' });
+          setTimeout(() => {
+            setFullScreenLoading(false);
+            setCleanupStatus(null);
+          }, 3000);
         }
       } catch (error) {
-        alert('Error removing unused accounts.');
+        setCleanupStatus({ step: 'Error', details: 'Network error occurred' });
         console.error(error);
+        setTimeout(() => {
+          setFullScreenLoading(false);
+          setCleanupStatus(null);
+        }, 3000);
       }
       setActionLoading(null);
-      setFullScreenLoading(false);
     };
-    // Full screen loading overlay
+
+    // Full screen loading overlay with progress
     function FullScreenLoader() {
+      const stepNumber = cleanupStatus?.step?.split('/')[0] || '0';
+      const totalSteps = 8;
+      const progress = cleanupStatus?.step === 'Done' ? 100 : cleanupStatus?.step === 'Error' ? 0 : (parseInt(stepNumber) / totalSteps) * 100;
+
       return (
-        <div style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(255,255,255,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <div style={{textAlign:'center'}}>
-            <svg width="60" height="60" viewBox="0 0 50 50">
-              <circle cx="25" cy="25" r="20" fill="none" stroke="#ed8c00" strokeWidth="5" strokeDasharray="31.4 31.4" strokeLinecap="round">
-                <animateTransform attributeName="transform" type="rotate" repeatCount="indefinite" dur="1s" from="0 25 25" to="360 25 25"/>
-              </circle>
-            </svg>
-            <div style={{marginTop:16,fontWeight:'bold',color:'#ed8c00',fontSize:18}}>Cleaning up users...</div>
+        <div className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl p-6 max-w-md w-full border border-border">
+            <div className="text-center mb-6">
+              {cleanupStatus?.step === 'Error' ? (
+                <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                  <XCircle className="text-red-500" size={32} />
+                </div>
+              ) : cleanupStatus?.step === 'Done' ? (
+                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="text-green-500" size={32} />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <RefreshCw className="text-primary animate-spin" size={32} />
+                </div>
+              )}
+              <h3 className="text-lg font-bold text-foreground mb-2">
+                {cleanupStatus?.step === 'Error' ? 'Cleanup Failed' : cleanupStatus?.step === 'Done' ? 'Cleanup Complete!' : 'Cleaning Up...'}
+              </h3>
+              <p className="text-sm text-muted-foreground">{cleanupStatus?.details}</p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>Progress</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  className={`h-full ${cleanupStatus?.step === 'Error' ? 'bg-red-500' : cleanupStatus?.step === 'Done' ? 'bg-green-500' : 'bg-primary'}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            </div>
+
+            {/* Stats */}
+            {cleanupStats && (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-muted/50 rounded-xl p-2 text-center">
+                  <div className="font-bold text-foreground">{cleanupStats.firestoreUsersDeleted}</div>
+                  <div className="text-muted-foreground">Users Deleted</div>
+                </div>
+                <div className="bg-muted/50 rounded-xl p-2 text-center">
+                  <div className="font-bold text-foreground">{cleanupStats.matchesDeleted}</div>
+                  <div className="text-muted-foreground">Matches Deleted</div>
+                </div>
+                <div className="bg-muted/50 rounded-xl p-2 text-center">
+                  <div className="font-bold text-foreground">{cleanupStats.swipesDeleted}</div>
+                  <div className="text-muted-foreground">Swipes Deleted</div>
+                </div>
+                <div className="bg-muted/50 rounded-xl p-2 text-center">
+                  <div className="font-bold text-foreground">{cleanupStats.messagesDeleted}</div>
+                  <div className="text-muted-foreground">Messages Deleted</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );

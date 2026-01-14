@@ -140,7 +140,7 @@ function OnboardingTutorial({ onComplete }: { onComplete: () => void }) {
         </div>
 
         {/* Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="bg-white dark:bg-black rounded-3xl overflow-hidden shadow-2xl">
           {/* Icon header */}
           <div className={`bg-gradient-to-br ${currentStep.color} p-8 flex justify-center`}>
             <motion.div
@@ -167,7 +167,7 @@ function OnboardingTutorial({ onComplete }: { onComplete: () => void }) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 text-left bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3"
+                  className="flex items-center gap-3 text-left bg-gray-50 dark:bg-black rounded-xl px-4 py-3"
                 >
                   <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${currentStep.color} flex items-center justify-center text-white text-xs font-bold`}>
                     {i + 1}
@@ -363,9 +363,9 @@ export default function MainApp() {
       </AnimatePresence>
 
       {/* Desktop Sidebar - hidden on mobile */}
-      <aside className='hidden lg:flex flex-col w-80 bg-white dark:bg-gray-950 m-3 rounded-2xl shadow-xl dark:shadow-none dark:border dark:border-gray-800'>
+      <aside className='hidden lg:flex flex-col w-80 bg-white dark:bg-black m-3 rounded-2xl shadow-xl dark:shadow-none dark:border dark:border-frinder-orange/20'>
         {/* Logo */}
-        <div className='p-6 border-b dark:border-gray-800'>
+        <div className='p-6 border-b dark:border-frinder-orange/20'>
           <motion.button
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -423,7 +423,7 @@ export default function MainApp() {
                 <span className='text-xs text-muted-foreground'>Super Likes</span>
               </div>
               <span className='text-sm font-bold text-blue-500'>
-                {effectiveUserCredits?.superLikes ?? 0}
+                {isAdmin ? '∞' : (userCredits?.superLikes ?? 0)}
               </span>
             </div>
           </motion.div>
@@ -444,7 +444,7 @@ export default function MainApp() {
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-frinder-orange to-frinder-burnt text-white shadow-lg shadow-frinder-orange/30'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-muted-foreground hover:text-foreground dark:hover:text-white'
+                    : 'hover:bg-gray-100 dark:hover:bg-frinder-orange/10 text-muted-foreground hover:text-foreground dark:hover:text-white'
                 }`}
               >
                 <div className='relative'>
@@ -472,10 +472,10 @@ export default function MainApp() {
         </nav>
 
         {/* Bottom Actions */}
-        <div className='p-4 border-t dark:border-gray-800 space-y-2'>
+        <div className='p-4 border-t dark:border-frinder-orange/20 space-y-2'>
           <button
             onClick={() => setSettingsOpen(true)}
-            className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 text-muted-foreground hover:text-foreground dark:hover:text-white transition-all'
+            className='w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-frinder-orange/10 text-muted-foreground hover:text-foreground dark:hover:text-white transition-all'
           >
             <Settings className='w-5 h-5' />
             <span className='font-medium'>Settings</span>
@@ -492,8 +492,11 @@ export default function MainApp() {
 
       {/* Main Content Area */}
       <div className='flex-1 flex flex-col min-w-0 lg:my-3 lg:mr-3'>
+        {/* Status bar background - extends behind notch on mobile */}
+        <div className='lg:hidden status-bar-bg status-bar-bg-white' />
+        
         {/* Mobile Header - hidden on desktop */}
-        <div className='lg:hidden mobile-header-safe py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
+        <div className='lg:hidden mobile-header-safe pb-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-frinder-orange/20'>
           <motion.button
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -511,7 +514,7 @@ export default function MainApp() {
             <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10'>
               <Star className='w-3 h-3 text-blue-500' fill='currentColor' />
               <span className='text-xs font-semibold text-blue-500'>
-                {userCredits?.superLikes ?? 0}
+                {isAdmin ? '∞' : (userCredits?.superLikes ?? 0)}
               </span>
             </div>
             {effectiveUserSubscription?.isPremium && (
@@ -524,7 +527,7 @@ export default function MainApp() {
         </div>
 
         {/* Desktop Header */}
-        <div className='hidden lg:flex px-6 py-5 items-center justify-between bg-white dark:bg-gray-950 rounded-t-2xl border-b dark:border-gray-800'>
+        <div className='hidden lg:flex px-6 py-5 items-center justify-between bg-white dark:bg-black rounded-t-2xl border-b dark:border-frinder-orange/20'>
           <div>
             <h1 className='text-2xl font-bold dark:text-white'>{tabs.find(t => t.id === activeTab)?.label}</h1>
             <p className='text-sm text-muted-foreground'>
@@ -541,7 +544,7 @@ export default function MainApp() {
             <div className='flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 dark:bg-blue-500/20'>
               <Star className='w-4 h-4 text-blue-500' fill='currentColor' />
               <span className='text-sm font-semibold text-blue-500'>
-                {effectiveUserCredits?.superLikes ?? 0}
+                {isAdmin ? '∞' : (userCredits?.superLikes ?? 0)}
               </span>
             </div>
             <Avatar className='w-10 h-10 border-2 border-frinder-orange shadow-lg shadow-frinder-orange/20'>
@@ -554,7 +557,7 @@ export default function MainApp() {
         </div>
 
         {/* Content */}
-        <div className='flex-1 overflow-hidden pb-20 lg:pb-0 lg:bg-white lg:dark:bg-gray-950 lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-gray-800'>
+        <div className='flex-1 overflow-hidden pb-20 lg:pb-0 lg:bg-white lg:dark:bg-black lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-frinder-orange/20'>
           <AnimatePresence mode='wait'>
             <motion.div
               key={activeTab}
@@ -571,7 +574,7 @@ export default function MainApp() {
 
         {/* Mobile Bottom Navigation - hidden on desktop */}
         <div className='lg:hidden fixed bottom-0 left-0 right-0 pl-safe pr-safe' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <div className='mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-gray-800 shadow-lg'>
+          <div className='mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-frinder-orange/20 shadow-lg'>
           <div className='flex items-center justify-around py-2'>
             {tabs.map(tab => (
               <motion.button

@@ -103,7 +103,11 @@ export default function Matches({ onStartChat }: MatchesProps) {
               ? `${otherUserProfile.city}${otherUserProfile.country ? `, ${otherUserProfile.country}` : ''}`
               : undefined,
             interests: otherUserProfile?.interests || [],
-            matchedAt: m.createdAt instanceof Date ? m.createdAt : m.createdAt?.toDate() || new Date(),
+            matchedAt: m.createdAt instanceof Date 
+              ? m.createdAt 
+              : (m.createdAt && typeof (m.createdAt as any).toDate === 'function') 
+                ? (m.createdAt as any).toDate() 
+                : new Date(),
             isOnline: false,
             relationshipGoal: otherUserProfile?.relationshipGoal,
             lookingFor: otherUserProfile?.lookingFor
@@ -204,7 +208,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
     <div className='h-full flex flex-col dark:bg-black'>
       {/* Unmatch Confirmation Dialog */}
       <Dialog open={showUnmatchDialog} onOpenChange={setShowUnmatchDialog}>
-        <DialogContent className='dark:bg-black dark:border-gray-800'>
+        <DialogContent className='dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Unmatch {matchToUnmatch?.name}?</DialogTitle>
             <DialogDescription>
@@ -240,7 +244,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
               exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className='w-full max-h-[90vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
+              className='w-full max-h-[90vh] bg-white dark:bg-black rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
             >
               {/* Match Profile Header */}
               <div className='relative h-72 lg:h-64'>
@@ -375,7 +379,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
       </AnimatePresence>
 
       {/* Header */}
-      <div className='px-4 pt-4 pb-3 border-b dark:border-gray-800 bg-white dark:bg-black'>
+      <div className='px-4 pt-4 pb-3 border-b dark:border-frinder-orange/20 bg-white dark:bg-black'>
         <div className='flex items-center justify-between mb-4'>
           <div className='flex items-center gap-2'>
             <Heart className='w-6 h-6 text-frinder-orange' fill='currentColor' />
@@ -393,7 +397,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder='Search matches...'
-            className='pl-10 dark:bg-gray-900 dark:border-gray-800'
+            className='pl-10 dark:bg-black dark:border-frinder-orange/20'
           />
         </div>
       </div>
@@ -402,7 +406,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
       <div className='flex-1 overflow-y-auto'>
         {/* Pending Requests Section */}
         {pendingRequests.length > 0 && (
-          <div className='px-4 py-3 border-b dark:border-gray-800'>
+          <div className='px-4 py-3 border-b dark:border-frinder-orange/20'>
             <div className='flex items-center gap-2 mb-3'>
               <Send className='w-4 h-4 text-frinder-gold' />
               <h2 className='text-sm font-semibold dark:text-white'>Pending Requests</h2>
@@ -457,7 +461,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
                 exit={{ y: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 onClick={e => e.stopPropagation()}
-                className='w-full max-h-[80vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
+                className='w-full max-h-[80vh] bg-white dark:bg-black rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
               >
                 {/* Pending Profile Header */}
                 <div className='relative h-64'>
@@ -576,7 +580,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
 
         {/* Incoming Requests Section (People who liked you) */}
         {incomingRequests.length > 0 && (
-          <div className='px-4 py-3 border-b dark:border-gray-800 bg-frinder-orange/5'>
+          <div className='px-4 py-3 border-b dark:border-frinder-orange/20 bg-frinder-orange/5'>
             <div className='flex items-center gap-2 mb-3'>
               <Heart className='w-4 h-4 text-frinder-orange fill-frinder-orange' />
               <h2 className='text-sm font-semibold dark:text-white'>Likes You</h2>
@@ -631,7 +635,7 @@ export default function Matches({ onStartChat }: MatchesProps) {
                 exit={{ y: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 onClick={e => e.stopPropagation()}
-                className='w-full max-h-[80vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
+                className='w-full max-h-[80vh] bg-white dark:bg-black rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
               >
                 {/* Incoming Profile Header */}
                 <div className='relative h-64'>

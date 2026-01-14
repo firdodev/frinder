@@ -307,7 +307,7 @@ export default function Search({ onStartChat }: SearchProps) {
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className='absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden'
+              className='absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white dark:bg-black rounded-t-3xl overflow-hidden'
             >
               {/* Profile Header */}
               <div className='relative h-64'>
@@ -474,7 +474,7 @@ export default function Search({ onStartChat }: SearchProps) {
       </AnimatePresence>
 
       {/* Header */}
-      <div className='px-4 pt-4 pb-3 border-b dark:border-gray-800 bg-white dark:bg-black'>
+      <div className='px-4 pt-4 pb-3 border-b dark:border-frinder-orange/20 bg-white dark:bg-black'>
         <div className='flex items-center gap-2 mb-4'>
           <SearchIcon className='w-6 h-6 text-frinder-orange' />
           <h1 className='text-xl font-bold dark:text-white'>Find People</h1>
@@ -487,7 +487,7 @@ export default function Search({ onStartChat }: SearchProps) {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder='Search by name or city...'
-            className='pl-10 dark:bg-gray-900 dark:border-gray-800'
+            className='pl-10 dark:bg-black dark:border-frinder-orange/20'
           />
           {searchQuery && (
             <button
@@ -511,7 +511,7 @@ export default function Search({ onStartChat }: SearchProps) {
             {results.map(result => (
               <motion.div key={result.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                 <Card
-                  className='overflow-hidden cursor-pointer hover:shadow-lg transition-shadow dark:bg-gray-900 dark:border-gray-800'
+                  className='overflow-hidden cursor-pointer hover:shadow-lg transition-shadow dark:bg-black dark:border-frinder-orange/20'
                   onClick={() => setSelectedUser(result)}
                 >
                   <CardContent className='p-3'>

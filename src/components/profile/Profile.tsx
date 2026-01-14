@@ -68,9 +68,15 @@ type ProfileProps = {
   onGoToShop?: () => void;
 };
 
+const ADMIN_EMAILS = [
+  'rikardo_balaj@universitetipolis.edu.al',
+  'firdeus_kasaj@universitetipolis.edu.al'
+];
+
 export default function Profile({ onGoToShop }: ProfileProps) {
   const router = useRouter();
   const { user, userProfile, updateProfile, signOut } = useAuth();
+  const isAdmin = user && user.email && ADMIN_EMAILS.includes(user.email);
   const { darkMode, toggleDarkMode } = useSettings();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
@@ -345,7 +351,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
       </div>
 
       <div className='px-3 sm:px-4 -mt-6 relative z-10'>
-        <Card className='border-0 shadow-lg dark:bg-gray-900 dark:border-gray-800'>
+        <Card className='border-0 shadow-lg dark:bg-black dark:border-frinder-orange/20'>
           <CardContent className='p-3 sm:p-4'>
             <div className='grid grid-cols-3 gap-3 sm:gap-4 text-center'>
               <div>
@@ -379,7 +385,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
 
       {/* Premium/Credits Shop Section */}
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
-        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800 overflow-hidden'>
+        <Card className='border-0 shadow-md dark:bg-black dark:border-frinder-orange/20 overflow-hidden'>
           <div className='bg-frinder-orange p-3 sm:p-4'>
             <div className='flex items-center justify-between'>
               <div className='flex items-center gap-2'>
@@ -422,14 +428,14 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                 </div>
               </div>
               <div className='text-right'>
-                <div className='text-xl font-bold text-blue-500'>{userCredits?.superLikes ?? 0}</div>
-                {userSubscription?.isPremium && <Badge className='bg-frinder-orange text-white text-[10px]'>Pro</Badge>}
+                <div className='text-xl font-bold text-blue-500'>{isAdmin ? '∞' : (userCredits?.superLikes ?? 0)}</div>
+                {(userSubscription?.isPremium || isAdmin) && <Badge className='bg-frinder-orange text-white text-[10px]'>Pro</Badge>}
               </div>
             </div>
 
             {/* Quick benefits preview */}
             {!userSubscription?.isPremium && (
-              <div className='mt-3 pt-3 border-t dark:border-gray-800'>
+              <div className='mt-3 pt-3 border-t dark:border-frinder-orange/20'>
                 <div className='text-xs text-muted-foreground mb-2'>Pro Benefits:</div>
                 <div className='grid grid-cols-2 gap-2'>
                   <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
@@ -460,7 +466,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
       </div>
 
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
-        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
+        <Card className='border-0 shadow-md dark:bg-black dark:border-frinder-orange/20'>
           <CardContent className='p-3 sm:p-4'>
             <div className='flex items-center justify-between mb-2 sm:mb-3'>
               <h2 className='font-semibold text-sm sm:text-base dark:text-white'>About Me</h2>
@@ -470,7 +476,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                     <Edit className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground' />
                   </button>
                 </DialogTrigger>
-                <DialogContent className='sm:max-w-md mx-4 dark:bg-black dark:border-gray-800 max-h-[90vh] overflow-y-auto'>
+                <DialogContent className='sm:max-w-md mx-4 dark:bg-black dark:border-frinder-orange/20 max-h-[90vh] overflow-y-auto'>
                   <DialogHeader>
                     <DialogTitle className='dark:text-white'>Edit Profile</DialogTitle>
                     <DialogDescription className='text-muted-foreground'>
@@ -487,10 +493,10 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                           setEditData(prev => ({ ...prev, relationshipGoal: value }))
                         }
                       >
-                        <SelectTrigger className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'>
+                        <SelectTrigger className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'>
                           <SelectValue placeholder='Select what you are looking for' />
                         </SelectTrigger>
-                        <SelectContent className='dark:bg-gray-900 dark:border-gray-800'>
+                        <SelectContent className='dark:bg-black dark:border-frinder-orange/20'>
                           <SelectItem value='relationship'>💕 Relationship</SelectItem>
                           <SelectItem value='casual'>😎 Casual</SelectItem>
                           <SelectItem value='friends'>🤝 Just Friends</SelectItem>
@@ -507,7 +513,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                           id='name'
                           value={editData.displayName}
                           onChange={e => handleDisplayNameChange(e.target.value)}
-                          className={`dark:bg-gray-900 dark:border-gray-800 dark:text-white pr-10 ${
+                          className={`dark:bg-black dark:border-frinder-orange/20 dark:text-white pr-10 ${
                             displayNameError ? 'border-red-500 focus-visible:ring-red-500' : 
                             displayNameValid ? 'border-green-500 focus-visible:ring-green-500' : ''
                           }`}
@@ -542,7 +548,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                           type='number'
                           value={editData.age}
                           onChange={e => setEditData(prev => ({ ...prev, age: parseInt(e.target.value) || 18 }))}
-                          className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                          className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                         />
                       </div>
                       <div className='space-y-1.5 sm:space-y-2'>
@@ -553,10 +559,10 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                             setEditData(prev => ({ ...prev, gender: value }))
                           }
                         >
-                          <SelectTrigger className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'>
+                          <SelectTrigger className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'>
                             <SelectValue placeholder='Select gender' />
                           </SelectTrigger>
-                          <SelectContent className='dark:bg-gray-900 dark:border-gray-800'>
+                          <SelectContent className='dark:bg-black dark:border-frinder-orange/20'>
                             <SelectItem value='male'>Male</SelectItem>
                             <SelectItem value='female'>Female</SelectItem>
                             <SelectItem value='other'>Other</SelectItem>
@@ -575,7 +581,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                           value={editData.city}
                           onChange={e => setEditData(prev => ({ ...prev, city: e.target.value }))}
                           placeholder='Your city'
-                          className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                          className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                         />
                       </div>
                       <div className='space-y-1.5 sm:space-y-2'>
@@ -587,7 +593,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                           value={editData.country}
                           onChange={e => setEditData(prev => ({ ...prev, country: e.target.value }))}
                           placeholder='Your country'
-                          className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                          className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                         />
                       </div>
                     </div>
@@ -600,7 +606,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
                         id='bio'
                         value={editData.bio}
                         onChange={e => setEditData(prev => ({ ...prev, bio: e.target.value }))}
-                        className='min-h-25 dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                        className='min-h-25 dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                         placeholder='Tell others about yourself...'
                       />
                     </div>
@@ -645,7 +651,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
       </div>
 
       <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
-        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
+        <Card className='border-0 shadow-md dark:bg-black dark:border-frinder-orange/20'>
           <CardContent className='p-3 sm:p-4'>
             <div className='flex items-center justify-between mb-2 sm:mb-3'>
               <h2 className='font-semibold text-sm sm:text-base dark:text-white'>My Photos</h2>
@@ -718,7 +724,7 @@ export default function Profile({ onGoToShop }: ProfileProps) {
       </div>
 
       <div className='px-3 sm:px-4 mt-3 sm:mt-4 pb-6'>
-        <Card className='border-0 shadow-md dark:bg-gray-900 dark:border-gray-800'>
+        <Card className='border-0 shadow-md dark:bg-black dark:border-frinder-orange/20'>
           <CardContent className='p-0 divide-y dark:divide-gray-800'>
             <button
               onClick={() => setSettingsOpen(true)}

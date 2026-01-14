@@ -1532,7 +1532,7 @@ export async function getPendingRequests(userId: string): Promise<(UserProfile &
         const userData = userDoc.data() as UserProfile;
         pendingRequests.push({
           ...userData,
-          swipedAt: swipeData.timestamp?.toDate() || new Date()
+          swipedAt: (swipeData.timestamp && typeof swipeData.timestamp.toDate === 'function') ? swipeData.timestamp.toDate() : new Date()
         });
       }
     }
@@ -1584,7 +1584,7 @@ export function subscribeToPendingRequests(
           const userData = userDoc.data() as UserProfile;
           return {
             ...userData,
-            swipedAt: swipeData.timestamp?.toDate() || new Date()
+            swipedAt: (swipeData.timestamp && typeof swipeData.timestamp.toDate === 'function') ? swipeData.timestamp.toDate() : new Date()
           };
         }
         return null;
@@ -1651,7 +1651,7 @@ export async function getIncomingRequests(userId: string): Promise<(UserProfile 
         const userData = userDoc.data() as UserProfile;
         incomingRequests.push({
           ...userData,
-          swipedAt: swipeData.timestamp?.toDate() || new Date()
+          swipedAt: (swipeData.timestamp && typeof swipeData.timestamp.toDate === 'function') ? swipeData.timestamp.toDate() : new Date()
         });
       }
     }
@@ -1706,7 +1706,7 @@ export function subscribeToIncomingRequests(
           const userData = userDoc.data() as UserProfile;
           return {
             ...userData,
-            swipedAt: swipeData.timestamp?.toDate() || new Date()
+            swipedAt: (swipeData.timestamp && typeof swipeData.timestamp.toDate === 'function') ? swipeData.timestamp.toDate() : new Date()
           };
         }
         return null;

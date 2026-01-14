@@ -471,11 +471,29 @@ html, body {
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Mobile header with safe area */
+/* Mobile header with safe area - extends behind status bar */
 .mobile-header-safe {
-  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   padding-left: max(1rem, env(safe-area-inset-left, 0px));
   padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+/* Full bleed background that extends behind status bar */
+.status-bar-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 50;
+}
+
+.status-bar-bg-white {
+  background-color: white;
+}
+
+.dark .status-bar-bg-white {
+  background-color: black;
 }
 
 /* Mobile bottom nav with safe area */

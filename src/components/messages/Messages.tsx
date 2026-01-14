@@ -666,7 +666,7 @@ function MessageBubble({
         {!message.deleted && (
           <button
             onClick={onReply}
-            className={`hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 ${
+            className={`hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-black items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 ${
               isOwn ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]'
             }`}
           >
@@ -678,7 +678,7 @@ function MessageBubble({
         {isOwn && !message.deleted && (
           <button
             onClick={() => setShowOptionsMenu(true)}
-            className='hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 left-[calc(100%-44px)]'
+            className='hidden sm:flex absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted dark:bg-black items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 left-[calc(100%-44px)]'
           >
             <MoreVertical className='w-4 h-4 text-muted-foreground' />
           </button>
@@ -705,7 +705,7 @@ function MessageBubble({
               className={`mb-1 px-2 py-1 rounded-lg text-xs overflow-hidden cursor-pointer transition-opacity hover:opacity-80 active:opacity-60 ${
                 isOwn
                   ? 'bg-frinder-burnt/30 border-l-2 border-white/50'
-                  : 'bg-muted/50 dark:bg-gray-800/50 border-l-2 border-frinder-orange'
+                  : 'bg-muted/50 dark:bg-black/50 border-l-2 border-frinder-orange'
               }`}
             >
               <span className='font-medium text-[10px] block truncate'>
@@ -718,10 +718,10 @@ function MessageBubble({
           <div
             className={`rounded-2xl overflow-hidden ${
               message.deleted
-                ? 'bg-muted/50 dark:bg-gray-800/50 text-muted-foreground italic'
+                ? 'bg-muted/50 dark:bg-black/50 text-muted-foreground italic'
                 : isOwn
                 ? 'bg-frinder-orange text-white rounded-br-sm'
-                : 'bg-muted dark:bg-gray-900 text-foreground dark:text-white rounded-bl-sm'
+                : 'bg-muted dark:bg-black text-foreground dark:text-white rounded-bl-sm'
             } ${message.type === 'image' && !message.deleted ? 'p-1' : 'px-3 sm:px-4 py-2'}`}
           >
             {/* Deleted message */}
@@ -777,7 +777,7 @@ function MessageBubble({
 
       {/* Options menu dialog */}
       <Dialog open={showOptionsMenu} onOpenChange={setShowOptionsMenu}>
-        <DialogContent className='sm:max-w-[280px] dark:bg-gray-900 dark:border-gray-800'>
+        <DialogContent className='sm:max-w-[280px] dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Message Options</DialogTitle>
           </DialogHeader>
@@ -1676,7 +1676,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
       {/* Unmatch Dialog */}
       <Dialog open={showUnmatchDialog} onOpenChange={setShowUnmatchDialog}>
-        <DialogContent className='dark:bg-black dark:border-gray-800'>
+        <DialogContent className='dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Unmatch {match.name}?</DialogTitle>
             <DialogDescription>
@@ -1710,7 +1710,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className='w-full max-h-[90vh] bg-white dark:bg-gray-950 rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
+              className='w-full max-h-[90vh] bg-white dark:bg-black rounded-t-3xl overflow-hidden lg:rounded-2xl lg:max-w-md lg:max-h-[85vh] lg:shadow-2xl'
             >
               {/* Profile Header */}
               <div className='relative h-72 lg:h-64'>
@@ -1796,7 +1796,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
       </AnimatePresence>
 
       {/* Chat header */}
-      <div className='px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 border-b bg-white dark:bg-black dark:border-gray-800'>
+      <div className='px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 border-b bg-white dark:bg-black dark:border-frinder-orange/20'>
         <button onClick={onBack} className='p-1 hover:bg-muted dark:hover:bg-gray-800 rounded-full'>
           <ChevronLeft className='w-5 h-5 sm:w-6 sm:h-6 dark:text-white' />
         </button>
@@ -1847,7 +1847,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 <MoreVertical className='w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground' />
               </button>
               {showMenu && (
-                <div className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[150px] z-50'>
+                <div className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-frinder-orange/20 py-1 min-w-[150px] z-50'>
                   <button
                     onClick={() => {
                       setShowMenu(false);
@@ -1976,7 +1976,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                     <AvatarImage src={match.photo} alt={match.name} />
                     <AvatarFallback className='bg-frinder-orange text-white text-xs'>{match.name[0]}</AvatarFallback>
                   </Avatar>
-                  <div className='bg-muted dark:bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5'>
+                  <div className='bg-muted dark:bg-black rounded-2xl rounded-bl-sm px-4 py-2.5'>
                     <div className='flex items-center gap-1'>
                       <motion.span
                         className='w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500'
@@ -2055,14 +2055,14 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
       {/* Input or Unmatched Notice */}
       {match.isUnmatched ? (
-        <div className='p-3 sm:p-4 border-t bg-gray-100 dark:bg-gray-900 dark:border-gray-800 safe-bottom'>
+        <div className='p-3 sm:p-4 border-t bg-gray-100 dark:bg-black dark:border-frinder-orange/20 safe-bottom'>
           <div className='flex items-center justify-center gap-2 py-2 text-gray-500 dark:text-gray-400'>
             <UserX className='w-4 h-4' />
             <span className='text-sm'>This conversation has ended. You can no longer send messages.</span>
           </div>
         </div>
       ) : (
-        <div className='p-3 sm:p-4 border-t bg-white dark:bg-black dark:border-gray-800 safe-bottom'>
+        <div className='p-3 sm:p-4 border-t bg-white dark:bg-black dark:border-frinder-orange/20 safe-bottom'>
           {/* Reply Preview */}
           <AnimatePresence>
             {replyingTo && (
@@ -2072,7 +2072,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 exit={{ opacity: 0, height: 0 }}
                 className='mb-3'
               >
-                <div className='flex items-center gap-2 px-3 py-2 bg-muted dark:bg-gray-900 rounded-lg border-l-4 border-frinder-orange'>
+                <div className='flex items-center gap-2 px-3 py-2 bg-muted dark:bg-black rounded-lg border-l-4 border-frinder-orange'>
                   <CornerDownLeft className='w-4 h-4 text-frinder-orange shrink-0' />
                   <div className='flex-1 min-w-0'>
                     <span className='text-xs font-medium text-frinder-orange block'>
@@ -2152,7 +2152,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                   ? 'Add a caption...'
                   : 'Type a message...'
               }
-              className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+              className='flex-1 rounded-full text-sm dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               disabled={sending || uploadingImage}
             />
             <motion.button
@@ -2174,7 +2174,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
       {/* Date Request Dialog */}
       <Dialog open={showDateRequestDialog} onOpenChange={setShowDateRequestDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900'>
+        <DialogContent className='sm:max-w-md dark:bg-black'>
           <DialogHeader>
             <DialogTitle className='text-center flex flex-col items-center gap-2'>
               <div className='w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center'>
@@ -2194,7 +2194,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 placeholder='e.g., Coffee Date, Dinner at the Beach'
                 value={dateRequestData.title}
                 onChange={e => setDateRequestData(prev => ({ ...prev, title: e.target.value }))}
-                className='dark:bg-gray-800 dark:border-gray-700'
+                className='dark:bg-black dark:border-gray-700'
               />
             </div>
             <div className='grid grid-cols-2 gap-3'>
@@ -2205,7 +2205,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                   type='date'
                   value={dateRequestData.date}
                   onChange={e => setDateRequestData(prev => ({ ...prev, date: e.target.value }))}
-                  className='dark:bg-gray-800 dark:border-gray-700'
+                  className='dark:bg-black dark:border-gray-700'
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
@@ -2216,7 +2216,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                   type='time'
                   value={dateRequestData.time}
                   onChange={e => setDateRequestData(prev => ({ ...prev, time: e.target.value }))}
-                  className='dark:bg-gray-800 dark:border-gray-700'
+                  className='dark:bg-black dark:border-gray-700'
                 />
               </div>
             </div>
@@ -2227,7 +2227,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 placeholder='Where do you want to meet?'
                 value={dateRequestData.location}
                 onChange={e => setDateRequestData(prev => ({ ...prev, location: e.target.value }))}
-                className='dark:bg-gray-800 dark:border-gray-700'
+                className='dark:bg-black dark:border-gray-700'
               />
             </div>
             <div className='space-y-2'>
@@ -2237,7 +2237,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
                 placeholder='Add a personal message...'
                 value={dateRequestData.description}
                 onChange={e => setDateRequestData(prev => ({ ...prev, description: e.target.value }))}
-                className='dark:bg-gray-800 dark:border-gray-700 resize-none'
+                className='dark:bg-black dark:border-gray-700 resize-none'
                 rows={2}
               />
             </div>
@@ -2282,7 +2282,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
       {/* Edit Message Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Edit Message</DialogTitle>
           </DialogHeader>
@@ -2291,7 +2291,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
               value={editText}
               onChange={e => setEditText(e.target.value)}
               placeholder='Enter your message...'
-              className='dark:bg-gray-800 dark:border-gray-700 dark:text-white min-h-[100px]'
+              className='dark:bg-black dark:border-gray-700 dark:text-white min-h-[100px]'
             />
             <div className='flex gap-2 justify-end'>
               <Button
@@ -2325,7 +2325,7 @@ function ChatView({ match, currentUserId, currentUserName, currentUserPhoto, onB
 
       {/* Delete Message Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Delete Message</DialogTitle>
             <DialogDescription>
@@ -2659,7 +2659,7 @@ function GroupChatView({
   return (
     <div className='flex flex-col h-full bg-white dark:bg-black'>
       {/* Header */}
-      <div className='flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-b dark:border-gray-800'>
+      <div className='flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-b dark:border-frinder-orange/20'>
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -2699,7 +2699,7 @@ function GroupChatView({
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-gray-800 py-1 min-w-[180px] z-50'
+                className='absolute right-0 top-full mt-1 bg-white dark:bg-black rounded-lg shadow-lg border dark:border-frinder-orange/20 py-1 min-w-[180px] z-50'
               >
                 <button
                   onClick={() => {
@@ -2743,7 +2743,7 @@ function GroupChatView({
 
       {/* Members Dialog */}
       <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
-        <DialogContent className='dark:bg-gray-950 dark:border-gray-800 max-w-md'>
+        <DialogContent className='dark:bg-black dark:border-frinder-orange/20 max-w-md'>
           <DialogHeader>
             <DialogTitle className='dark:text-white flex items-center gap-2'>
               <Users className='w-5 h-5 text-frinder-orange' />
@@ -2764,7 +2764,7 @@ function GroupChatView({
               groupMembers.map(member => (
                 <div
                   key={member.uid}
-                  className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
+                  className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-black/50'
                 >
                   <Avatar className='w-10 h-10'>
                     <AvatarImage src={member.photos?.[0]} alt={member.displayName} />
@@ -2812,7 +2812,7 @@ function GroupChatView({
 
       {/* Delete Group Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className='dark:bg-gray-950 dark:border-gray-800 max-w-md'>
+        <DialogContent className='dark:bg-black dark:border-frinder-orange/20 max-w-md'>
           <DialogHeader>
             <DialogTitle className='dark:text-white flex items-center gap-2 text-red-500'>
               <Trash2 className='w-5 h-5' />
@@ -2848,7 +2848,7 @@ function GroupChatView({
 
       {/* Edit Group Dialog */}
       <Dialog open={showEditGroupDialog} onOpenChange={setShowEditGroupDialog}>
-        <DialogContent className='dark:bg-black dark:border-gray-800 sm:max-w-lg max-h-[90vh] overflow-y-auto'>
+        <DialogContent className='dark:bg-black dark:border-frinder-orange/20 sm:max-w-lg max-h-[90vh] overflow-y-auto'>
           <DialogHeader>
             <DialogTitle className='dark:text-white flex items-center gap-2'>
               <Pencil className='w-5 h-5 text-frinder-orange' />
@@ -2862,7 +2862,7 @@ function GroupChatView({
               <Label className='dark:text-white'>Group Photo</Label>
               <div className='mt-2 flex items-center gap-4'>
                 <div className='relative'>
-                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700'>
+                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-black border-2 border-dashed border-gray-300 dark:border-gray-700'>
                     {selectedGroupPhoto ? (
                       <img 
                         src={URL.createObjectURL(selectedGroupPhoto)} 
@@ -2920,7 +2920,7 @@ function GroupChatView({
                 value={editGroupData.name}
                 onChange={e => setEditGroupData({ ...editGroupData, name: e.target.value })}
                 placeholder='Weekend Hikers'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
 
@@ -2933,12 +2933,12 @@ function GroupChatView({
                 value={editGroupData.description}
                 onChange={e => setEditGroupData({ ...editGroupData, description: e.target.value })}
                 placeholder='What is your group about?'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
 
             {/* Privacy Toggle */}
-            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-gray-900'>
+            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-black'>
               <div className='flex items-center gap-3'>
                 {editGroupData.isPrivate ? (
                   <div className='w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center'>
@@ -2975,7 +2975,7 @@ function GroupChatView({
                 value={editGroupData.activity}
                 onChange={e => setEditGroupData({ ...editGroupData, activity: e.target.value })}
                 placeholder='Weekend trips'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
 
@@ -2988,7 +2988,7 @@ function GroupChatView({
                 value={editGroupData.location}
                 onChange={e => setEditGroupData({ ...editGroupData, location: e.target.value })}
                 placeholder='Campus or City'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
 
@@ -3012,7 +3012,7 @@ function GroupChatView({
 
       {/* Edit Message Dialog */}
       <Dialog open={showEditGroupMessageDialog} onOpenChange={setShowEditGroupMessageDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white flex items-center gap-2'>
               <Pencil className='w-5 h-5 text-frinder-orange' />
@@ -3024,7 +3024,7 @@ function GroupChatView({
               value={editGroupMessageText}
               onChange={(e) => setEditGroupMessageText(e.target.value)}
               placeholder='Edit your message...'
-              className='min-h-[100px] dark:bg-gray-800 dark:border-gray-700 dark:text-white'
+              className='min-h-[100px] dark:bg-black dark:border-gray-700 dark:text-white'
             />
             <div className='flex gap-2'>
               <Button
@@ -3060,7 +3060,7 @@ function GroupChatView({
 
       {/* Delete Message Confirmation Dialog */}
       <Dialog open={showDeleteGroupMessageDialog} onOpenChange={setShowDeleteGroupMessageDialog}>
-        <DialogContent className='sm:max-w-md dark:bg-gray-900 dark:border-gray-800'>
+        <DialogContent className='sm:max-w-md dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white flex items-center gap-2 text-red-500'>
               <Trash2 className='w-5 h-5' />
@@ -3164,7 +3164,7 @@ function GroupChatView({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className='px-3 sm:px-4 py-2 border-t dark:border-gray-800 bg-muted/50 dark:bg-gray-900/50'
+            className='px-3 sm:px-4 py-2 border-t dark:border-frinder-orange/20 bg-muted/50 dark:bg-black/50'
           >
             <div className='flex items-center gap-2'>
               <Reply className='w-4 h-4 text-frinder-orange' />
@@ -3182,7 +3182,7 @@ function GroupChatView({
 
       {/* Selected Image Preview */}
       {selectedImage && (
-        <div className='px-3 sm:px-4 py-2 border-t dark:border-gray-800'>
+        <div className='px-3 sm:px-4 py-2 border-t dark:border-frinder-orange/20'>
           <div className='relative inline-block'>
             <img src={URL.createObjectURL(selectedImage)} alt='Selected' className='h-20 rounded-lg object-cover' />
             <button
@@ -3196,7 +3196,7 @@ function GroupChatView({
       )}
 
       {/* Input Area */}
-      <div className='p-3 sm:p-4 border-t dark:border-gray-800'>
+      <div className='p-3 sm:p-4 border-t dark:border-frinder-orange/20'>
         <div className='flex items-center gap-2'>
           <input type='file' ref={fileInputRef} onChange={handleImageSelect} accept='image/*' className='hidden' />
           <motion.button
@@ -3213,7 +3213,7 @@ function GroupChatView({
             onChange={e => setNewMessage(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder='Message group...'
-            className='flex-1 rounded-full text-sm dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+            className='flex-1 rounded-full text-sm dark:bg-black dark:border-frinder-orange/20 dark:text-white'
             disabled={sending || uploadingImage}
           />
           <motion.button
@@ -3317,7 +3317,7 @@ function GroupMessageBubble({
         {isOwn && !message.deleted && (
           <button
             onClick={() => setShowOptionsMenu(true)}
-            className='hidden sm:flex w-7 h-7 rounded-full bg-muted dark:bg-gray-800 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 self-center'
+            className='hidden sm:flex w-7 h-7 rounded-full bg-muted dark:bg-black items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/80 dark:hover:bg-gray-700 z-10 self-center'
           >
             <MoreVertical className='w-4 h-4 text-muted-foreground' />
           </button>
@@ -3340,10 +3340,10 @@ function GroupMessageBubble({
           <div
             className={`rounded-2xl px-3 py-2 ${
               message.deleted
-                ? 'bg-muted/50 dark:bg-gray-800/50 text-muted-foreground italic'
+                ? 'bg-muted/50 dark:bg-black/50 text-muted-foreground italic'
                 : isOwn
                 ? 'bg-frinder-orange text-white rounded-br-md'
-                : 'bg-muted dark:bg-gray-800 rounded-bl-md'
+                : 'bg-muted dark:bg-black rounded-bl-md'
             }`}
           >
             {/* Deleted message */}
@@ -3403,7 +3403,7 @@ function GroupMessageBubble({
 
       {/* Options menu dialog */}
       <Dialog open={showOptionsMenu} onOpenChange={setShowOptionsMenu}>
-        <DialogContent className='sm:max-w-[280px] dark:bg-gray-900 dark:border-gray-800'>
+        <DialogContent className='sm:max-w-[280px] dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Message Options</DialogTitle>
           </DialogHeader>
@@ -3973,7 +3973,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
 
         {/* Conversations */}
         {conversations.length > 0 && (
-          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-frinder-orange/20'>
             <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-3 sm:mb-4'>Messages</h2>
             <div className='px-4 sm:px-5 space-y-1'>
               <AnimatePresence>
@@ -4053,7 +4053,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
 
         {/* Unmatched Conversations - Chat history with disabled messaging */}
         {unmatchedConversations.length > 0 && (
-          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-frinder-orange/20'>
             <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2'>
               <UserX className='w-3.5 h-3.5' />
               Past Conversations
@@ -4096,7 +4096,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
 
         {/* User's Groups */}
         {userGroups.length > 0 && (
-          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-frinder-orange/20'>
             <h2 className='px-4 sm:px-5 text-xs sm:text-sm font-semibold text-muted-foreground mb-3 sm:mb-4 flex items-center gap-2'>
               <Users className='w-3.5 h-3.5 text-frinder-orange' />
               Your Groups
@@ -4169,7 +4169,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
 
         {/* Dates Section with Toggle */}
         {acceptedDates.length > 0 && (
-          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800'>
+          <div className='py-4 sm:py-5 border-t border-gray-100 dark:border-frinder-orange/20'>
             {/* Toggle Button */}
             <button
               onClick={() => {
@@ -4256,7 +4256,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
                                     className={`w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl transition-colors text-left ${
                                       isToday
                                         ? 'bg-frinder-orange/10 dark:bg-frinder-orange/20 border border-frinder-orange/30'
-                                        : 'bg-muted/50 dark:bg-gray-800/50 hover:bg-muted dark:hover:bg-gray-700/50'
+                                        : 'bg-muted/50 dark:bg-black/50 hover:bg-muted dark:hover:bg-gray-700/50'
                                     }`}
                                   >
                                     <div className='relative'>
@@ -4330,7 +4330,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     onClick={() => setSelectedMatch(match)}
-                                    className='w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-muted/30 dark:bg-gray-800/30 hover:bg-muted/50 dark:hover:bg-gray-700/30 transition-colors text-left opacity-70'
+                                    className='w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-muted/30 dark:bg-black/30 hover:bg-muted/50 dark:hover:bg-gray-700/30 transition-colors text-left opacity-70'
                                   >
                                     <div className='relative'>
                                       <Avatar className='w-12 h-12 sm:w-14 sm:h-14 shadow-sm border border-gray-200 dark:border-gray-700'>
@@ -4385,7 +4385,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
 
         {/* Group Members Dialog (Admin Only) */}
         <Dialog open={showGroupMembersDialog} onOpenChange={setShowGroupMembersDialog}>
-          <DialogContent className='dark:bg-gray-950 dark:border-gray-800 max-w-md'>
+          <DialogContent className='dark:bg-black dark:border-frinder-orange/20 max-w-md'>
             <DialogHeader>
               <DialogTitle className='dark:text-white flex items-center gap-2'>
                 <Users className='w-5 h-5 text-frinder-orange' />
@@ -4399,7 +4399,7 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
               {groupMembers.map(member => (
                 <div
                   key={member.uid}
-                  className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-gray-800/50'
+                  className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 dark:bg-black/50'
                 >
                   <Avatar className='w-10 h-10'>
                     <AvatarImage src={member.photos?.[0]} alt={member.displayName} />

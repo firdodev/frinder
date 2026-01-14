@@ -594,7 +594,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
     <div className='h-full flex flex-col'>
       {/* Create Group Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-gray-800'>
+        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Create a Group</DialogTitle>
             <DialogDescription>Start a new group and invite others to join!</DialogDescription>
@@ -609,7 +609,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={newGroup.name}
                 onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
                 placeholder='Weekend Hikers'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
             <div>
@@ -621,12 +621,12 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={newGroup.description}
                 onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
                 placeholder='What is your group about?'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
 
             {/* Privacy Toggle */}
-            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-gray-900'>
+            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-black'>
               <div className='flex items-center gap-3'>
                 {newGroup.isPrivate ? (
                   <div className='w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center'>
@@ -663,7 +663,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
 
               {/* Selected Tags */}
               {newGroup.interests.length > 0 && (
-                <div className='flex flex-wrap gap-2 mb-3 p-3 rounded-lg bg-frinder-orange/5 dark:bg-gray-900 border border-frinder-orange/20 dark:border-gray-800'>
+                <div className='flex flex-wrap gap-2 mb-3 p-3 rounded-lg bg-frinder-orange/5 dark:bg-black border border-frinder-orange/20 dark:border-frinder-orange/20'>
                   {newGroup.interests.map((interest, index) => (
                     <Badge
                       key={`selected-${interest}-${index}`}
@@ -678,7 +678,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
               )}
 
               {/* Available Tags Grid */}
-              <div className='max-h-32 overflow-y-auto border rounded-lg p-3 dark:border-gray-800'>
+              <div className='max-h-32 overflow-y-auto border rounded-lg p-3 dark:border-frinder-orange/20'>
                 <div className='flex flex-wrap gap-2'>
                   {availableTags
                     .filter(tag => !newGroup.interests.includes(tag))
@@ -702,7 +702,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                   onChange={e => setCustomInterest(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomInterest())}
                   placeholder='Add custom interest...'
-                  className='flex-1 dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                  className='flex-1 dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                 />
                 <Button
                   type='button'
@@ -726,7 +726,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={newGroup.activity}
                 onChange={e => setNewGroup({ ...newGroup, activity: e.target.value })}
                 placeholder='Weekend trips'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
             <div>
@@ -738,7 +738,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={newGroup.location}
                 onChange={e => setNewGroup({ ...newGroup, location: e.target.value })}
                 placeholder='Campus or City'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
             <Button
@@ -758,7 +758,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
         setShowEditDialog(open);
         if (!open) setShowDeleteConfirm(false);
       }}>
-        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-gray-800'>
+        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Edit Group</DialogTitle>
             <DialogDescription>Customize your group settings and appearance</DialogDescription>
@@ -769,7 +769,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
               <Label className='dark:text-white'>Group Photo</Label>
               <div className='mt-2 flex items-center gap-4'>
                 <div className='relative'>
-                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700'>
+                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-black border-2 border-dashed border-gray-300 dark:border-gray-700'>
                     {selectedPhoto ? (
                       <img 
                         src={URL.createObjectURL(selectedPhoto)} 
@@ -827,7 +827,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={editGroup.name}
                 onChange={e => setEditGroup({ ...editGroup, name: e.target.value })}
                 placeholder='Weekend Hikers'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
             <div>
@@ -839,12 +839,12 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={editGroup.description}
                 onChange={e => setEditGroup({ ...editGroup, description: e.target.value })}
                 placeholder='What is your group about?'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
 
             {/* Privacy Toggle */}
-            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-gray-900'>
+            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-black'>
               <div className='flex items-center gap-3'>
                 {editGroup.isPrivate ? (
                   <div className='w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center'>
@@ -881,7 +881,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
 
               {/* Selected Tags */}
               {editGroup.interests.length > 0 && (
-                <div className='flex flex-wrap gap-2 mb-3 p-3 rounded-lg bg-frinder-orange/5 dark:bg-gray-900 border border-frinder-orange/20 dark:border-gray-800'>
+                <div className='flex flex-wrap gap-2 mb-3 p-3 rounded-lg bg-frinder-orange/5 dark:bg-black border border-frinder-orange/20 dark:border-frinder-orange/20'>
                   {editGroup.interests.map((interest, index) => (
                     <Badge
                       key={`edit-selected-${interest}-${index}`}
@@ -896,7 +896,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
               )}
 
               {/* Available Tags Grid */}
-              <div className='max-h-32 overflow-y-auto border rounded-lg p-3 dark:border-gray-800'>
+              <div className='max-h-32 overflow-y-auto border rounded-lg p-3 dark:border-frinder-orange/20'>
                 <div className='flex flex-wrap gap-2'>
                   {availableTags
                     .filter(tag => !editGroup.interests.includes(tag))
@@ -920,7 +920,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                   onChange={e => setEditCustomInterest(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEditCustomInterest())}
                   placeholder='Add custom interest...'
-                  className='flex-1 dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                  className='flex-1 dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                 />
                 <Button
                   type='button'
@@ -944,7 +944,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={editGroup.activity}
                 onChange={e => setEditGroup({ ...editGroup, activity: e.target.value })}
                 placeholder='Weekend trips'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
             <div>
@@ -956,7 +956,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 value={editGroup.location}
                 onChange={e => setEditGroup({ ...editGroup, location: e.target.value })}
                 placeholder='Campus or City'
-                className='dark:bg-gray-900 dark:border-gray-800 dark:text-white'
+                className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
             <Button
@@ -975,7 +975,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
             </Button>
 
             {/* Delete Group Section */}
-            <div className='pt-4 mt-4 border-t border-gray-200 dark:border-gray-800'>
+            <div className='pt-4 mt-4 border-t border-gray-200 dark:border-frinder-orange/20'>
               {!showDeleteConfirm ? (
                 <Button
                   variant='outline'
@@ -1035,7 +1035,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
         <div className='px-4 mb-4'>
           <button 
             onClick={() => setShowMyGroups(!showMyGroups)}
-            className='w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 dark:bg-gray-900 hover:bg-muted dark:hover:bg-gray-800 transition-colors'
+            className='w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 dark:bg-black hover:bg-muted dark:hover:bg-gray-800 transition-colors'
           >
             <div className='flex items-center gap-2'>
               <Crown className='w-5 h-5 text-[#ed8c00]' />
@@ -1064,7 +1064,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                   {myGroups.map(group => (
                     <div 
                       key={group.id} 
-                      className='p-3 rounded-lg bg-card border dark:border-gray-800'
+                      className='p-3 rounded-lg bg-card border dark:border-frinder-orange/20'
                     >
                       <div className='flex items-start gap-3'>
                         <button
@@ -1078,7 +1078,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                               className='w-14 h-14 rounded-lg object-cover'
                             />
                           ) : (
-                            <div className='w-14 h-14 rounded-lg bg-muted dark:bg-gray-800 flex items-center justify-center'>
+                            <div className='w-14 h-14 rounded-lg bg-muted dark:bg-black flex items-center justify-center'>
                               <Users className='w-6 h-6 text-muted-foreground' />
                             </div>
                           )}
@@ -1124,7 +1124,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
 
                       {/* Pending Requests Section */}
                       {group.isPrivate && group.pendingMembers && group.pendingMembers.length > 0 && (
-                        <div className='mt-3 pt-3 border-t dark:border-gray-800'>
+                        <div className='mt-3 pt-3 border-t dark:border-frinder-orange/20'>
                           <div className='flex items-center gap-2 mb-2'>
                             <Clock className='w-4 h-4 text-amber-500' />
                             <span className='text-sm font-medium dark:text-white'>
@@ -1135,7 +1135,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                             {group.pendingMembers.map(member => (
                               <div 
                                 key={member.id} 
-                                className='flex items-center justify-between p-2 rounded-lg bg-muted/50 dark:bg-gray-800'
+                                className='flex items-center justify-between p-2 rounded-lg bg-muted/50 dark:bg-black'
                               >
                                 <div className='flex items-center gap-2'>
                                   <Avatar className='w-8 h-8'>

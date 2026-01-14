@@ -314,38 +314,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const photosList = await listAll(photosRef);
         await Promise.all(photosList.items.map(item => deleteObject(item)));
       } catch (e) {
-        // Photos folder might not exist
         console.log('No photos to delete or error:', e);
       }
 
-      // Delete user's swipes
-      const swipesQuery = query(collection(db, 'swipes'), where('fromUserId', '==', userId));
-      const swipesSnapshot = await getDocs(swipesQuery);
-      const batch = writeBatch(db);
-      swipesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
+      // Delete swipes where user is fromUserId
+      const swipesFromQuery = query(collection(db, 'swipes'), where('fromUserId', '==', userId));
+      const swipesFromSnapshot = await getDocs(swipesFromQuery);
+      for (const docSnap of swipesFromSnapshot.docs) {
+        await deleteDoc(docSnap.ref);
+      }
 
-      // Instead of deleting the user profile, mark as deleted and set photo to black
-      await setDoc(doc(db, 'users', userId), {
-        isDeleted: true,
-        photos: [
-          'solid-black'
-        ],
-        displayName: 'Deleted User',
-        bio: '',
-        age: null,
-        gender: 'other',
-        city: '',
-        country: '',
-        interests: [],
-        lookingFor: 'both',
-        relationshipGoal: 'friends',
-        createdAt: new Date(),
-        isProfileComplete: false,
-        isEmailVerified: false,
-        email: '',
-        uid: userId
-      }, { merge: true });
+      // Delete swipes where user is toUserId
+      const swipesToQuery = query(collection(db, 'swipes'), where('toUserId', '==', userId));
+      const swipesToSnapshot = await getDocs(swipesToQuery);
+      for (const docSnap of swipesToSnapshot.docs) {
+        await deleteDoc(docSnap.ref);
+      }
+
+      // Delete matches where user is involved
+      const matchesQuery = query(collection(db, 'matches'), where('users', 'array-contains', userId));
+      const matchesSnapshot = await getDocs(matchesQuery);
+      for (const matchDoc of matchesSnapshot.docs) {
+        // Delete all messages in the match
+        const messagesRef = collection(db, 'matches', matchDoc.id, 'messages');
+        const messagesSnapshot = await getDocs(messagesRef);
+        for (const msgDoc of messagesSnapshot.docs) {
+          await deleteDoc(msgDoc.ref);
+        }
+        // Delete the match itself
+        await deleteDoc(matchDoc.ref);
+      }
+
+      // Delete userCredits
+      try {
+        await deleteDoc(doc(db, 'userCredits', userId));
+      } catch (e) {
+        console.log('No userCredits to delete:', e);
+      }
+
+      // Delete userSubscriptions  
+      try {
+        await deleteDoc(doc(db, 'userSubscriptions', userId));
+      } catch (e) {
+        console.log('No userSubscriptions to delete:', e);
+      }
+
+      // Delete proSuperLikes
+      try {
+        await deleteDoc(doc(db, 'proSuperLikes', userId));
+      } catch (e) {
+        console.log('No proSuperLikes to delete:', e);
+      }
+
+      // Delete purchases
+      const purchasesQuery = query(collection(db, 'purchases'), where('userId', '==', userId));
+      const purchasesSnapshot = await getDocs(purchasesQuery);
+      for (const purchaseDoc of purchasesSnapshot.docs) {
+        await deleteDoc(purchaseDoc.ref);
+      }
+
+      // Delete the user document from Firestore
+      await deleteDoc(doc(db, 'users', userId));
 
       // Delete Firebase Auth user
       await deleteUser(user);

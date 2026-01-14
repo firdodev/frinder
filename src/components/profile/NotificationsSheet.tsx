@@ -28,7 +28,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className='w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-gray-800'>
+      <SheetContent className='w-full sm:max-w-md overflow-y-auto dark:bg-black dark:border-frinder-orange/20'>
         <SheetHeader>
           <SheetTitle className='dark:text-white'>Notifications</SheetTitle>
         </SheetHeader>
@@ -39,7 +39,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
             <h3 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>Activity</h3>
 
             <div className='space-y-3'>
-              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
                 <div className='flex items-center gap-3'>
                   <Heart className='w-5 h-5 text-[#ed8c00]' />
                   <div>
@@ -54,7 +54,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                 />
               </div>
 
-              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
                 <div className='flex items-center gap-3'>
                   <MessageCircle className='w-5 h-5 text-[#ed8c00]' />
                   <div>
@@ -69,7 +69,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                 />
               </div>
 
-              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
                 <div className='flex items-center gap-3'>
                   <ThumbsUp className='w-5 h-5 text-[#ed8c00]' />
                   <div>
@@ -86,13 +86,13 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
             </div>
           </div>
 
-          <Separator className='dark:bg-gray-800' />
+          <Separator className='dark:bg-black' />
 
           {/* Marketing */}
           <div className='space-y-4'>
             <h3 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>Marketing</h3>
 
-            <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+            <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
               <div className='flex items-center gap-3'>
                 <Gift className='w-5 h-5 text-[#ed8c00]' />
                 <div>
@@ -108,7 +108,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
             </div>
           </div>
 
-          <Separator className='dark:bg-gray-800' />
+          <Separator className='dark:bg-black' />
 
           {/* Notification Channels */}
           <div className='space-y-4'>
@@ -117,7 +117,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
             </h3>
 
             <div className='space-y-3'>
-              <div className='flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+              <div className='flex items-center gap-3 p-4 bg-gray-50 dark:bg-black rounded-xl'>
                 <Bell className='w-5 h-5 text-[#ed8c00]' />
                 <div>
                   <p className='text-sm font-medium dark:text-white'>Push Notifications</p>
@@ -125,7 +125,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                 </div>
               </div>
 
-              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+              <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-black rounded-xl'>
                 <div className='flex items-center gap-3'>
                   <Mail className='w-5 h-5 text-[#ed8c00]' />
                   <div>
@@ -140,7 +140,7 @@ export function NotificationsSheet({ open, onOpenChange }: NotificationsSheetPro
                 />
               </div>
 
-              <div className='flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl'>
+              <div className='flex items-center gap-3 p-4 bg-gray-50 dark:bg-black rounded-xl'>
                 <Smartphone className='w-5 h-5 text-[#ed8c00]' />
                 <div>
                   <p className='text-sm font-medium dark:text-white'>SMS</p>
