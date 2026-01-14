@@ -6,7 +6,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 import { Toaster } from '@/components/ui/sonner';
 import { Analytics } from '@vercel/analytics/next';
-
 // FFF AcidGrotesk local font
 const acidGrotesk = localFont({
   src: [
@@ -429,7 +428,7 @@ export default function RootLayout({
         <link rel='icon' href='/favicon-32x32.png' type='image/png' sizes='32x32' />
         <link rel='icon' href='/favicon-16x16.png' type='image/png' sizes='16x16' />
         <link rel='apple-touch-icon' href='/apple-touch-icon.png' sizes='180x180' />
-        
+
         {/* Preconnect to important origins */}
         <link rel='preconnect' href='https://fonts.googleapis.com' />
         <link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />
