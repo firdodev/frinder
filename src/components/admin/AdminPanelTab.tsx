@@ -393,6 +393,43 @@ function ChatListItem({
 }
 
 export default function AdminPanelTab() {
+    // Remove unused/deleted accounts (no matches and no profile pictures)
+    const [fullScreenLoading, setFullScreenLoading] = useState(false);
+    const handleRemoveUnusedAccounts = async () => {
+      if (!window.confirm('Remove all unused, orphaned, and unlinked accounts from Firestore and Auth, and clean up all references? This cannot be undone.')) return;
+      setFullScreenLoading(true);
+      setActionLoading('remove-unused');
+      try {
+        const res = await fetch('/api/admin-full-cleanup', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          fetchStats();
+          alert('Cleanup complete! Deleted UIDs: ' + (data.deletedUids?.length || 0));
+        } else {
+          alert('Cleanup failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Error removing unused accounts.');
+        console.error(error);
+      }
+      setActionLoading(null);
+      setFullScreenLoading(false);
+    };
+    // Full screen loading overlay
+    function FullScreenLoader() {
+      return (
+        <div style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(255,255,255,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{textAlign:'center'}}>
+            <svg width="60" height="60" viewBox="0 0 50 50">
+              <circle cx="25" cy="25" r="20" fill="none" stroke="#ed8c00" strokeWidth="5" strokeDasharray="31.4 31.4" strokeLinecap="round">
+                <animateTransform attributeName="transform" type="rotate" repeatCount="indefinite" dur="1s" from="0 25 25" to="360 25 25"/>
+              </circle>
+            </svg>
+            <div style={{marginTop:16,fontWeight:'bold',color:'#ed8c00',fontSize:18}}>Cleaning up users...</div>
+          </div>
+        </div>
+      );
+    }
   const { user, loading } = useAuth();
   const [authorized, setAuthorized] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -785,11 +822,21 @@ export default function AdminPanelTab() {
             {/* USERS */}
             {activeSection === 'users' && (
               <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                <div className="flex gap-2">
+                {fullScreenLoading && <FullScreenLoader />}
+                <div className="flex gap-2 items-center">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                     <Input placeholder="Search users..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 rounded-xl bg-card" />
                   </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleRemoveUnusedAccounts}
+                    disabled={actionLoading === 'remove-unused'}
+                    className="rounded-xl whitespace-nowrap"
+                  >
+                    {actionLoading === 'remove-unused' ? 'Removing...' : 'Remove Unused Accounts'}
+                  </Button>
                 </div>
 
                 <div className="flex gap-2">
