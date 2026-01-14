@@ -456,7 +456,7 @@ export default function AdminPanelTab() {
 
   useEffect(() => {
     if (!loading) {
-      setAuthorized(!!(user && ADMIN_EMAILS.includes(user.email)));
+      setAuthorized(!!(user && user.email && ADMIN_EMAILS.includes(user.email)));
     }
   }, [user, loading]);
 
