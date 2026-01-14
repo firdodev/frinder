@@ -128,11 +128,7 @@ export async function sendBulkEmails(
     parallelInBatch?: number; // how many to send in parallel within a batch (default: 5)
   }
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
-  const { 
-    batchSize = 20, 
-    delayBetweenBatches = 2000,
-    parallelInBatch = 5
-  } = options || {};
+  const { batchSize = 20, delayBetweenBatches = 2000, parallelInBatch = 5 } = options || {};
 
   let sent = 0;
   let failed = 0;
@@ -145,11 +141,9 @@ export async function sendBulkEmails(
     // Process batch in parallel chunks
     for (let j = 0; j < batch.length; j += parallelInBatch) {
       const chunk = batch.slice(j, j + parallelInBatch);
-      
+
       // Send chunk in parallel
-      const results = await Promise.all(
-        chunk.map(email => sendEmail(email))
-      );
+      const results = await Promise.all(chunk.map(email => sendEmail(email)));
 
       // Count results
       results.forEach((result, idx) => {
