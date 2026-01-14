@@ -3727,17 +3727,30 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
         };
       });
 
-      // Sort by last message time
+      // Helper to get timestamp for sorting
+      const getTime = (match: Match): number => {
+        const time = match.lastMessageTime;
+        if (!time) return 0;
+        if (time instanceof Date) return time.getTime() || 0;
+        if (typeof (time as any).toDate === 'function') {
+          try { return (time as any).toDate().getTime() || 0; } catch { return 0; }
+        }
+        if (typeof time === 'number') return time;
+        if (typeof time === 'object' && 'seconds' in time) return (time as any).seconds * 1000;
+        return 0;
+      };
+
+      // Sort: new matches first, then by most recent message time (descending)
       mappedMatches.sort((a, b) => {
+        // New matches always come first
         if (a.isNewMatch && !b.isNewMatch) return -1;
         if (!a.isNewMatch && b.isNewMatch) return 1;
-        if (!a.lastMessageTime) return 1;
-        if (!b.lastMessageTime) return -1;
-        const aTime = a.lastMessageTime instanceof Date ? a.lastMessageTime.getTime() : NaN;
-        const bTime = b.lastMessageTime instanceof Date ? b.lastMessageTime.getTime() : NaN;
-        if (isNaN(bTime) && isNaN(aTime)) return 0;
-        if (isNaN(bTime)) return 1;
-        if (isNaN(aTime)) return -1;
+        
+        // Both are new matches or both are conversations - sort by time
+        const aTime = getTime(a);
+        const bTime = getTime(b);
+        
+        // Higher timestamp (more recent) comes first
         return bTime - aTime;
       });
 
@@ -3838,23 +3851,69 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
     );
   }
 
-  // Helper function to get timestamp value for sorting
+  // Helper function to get timestamp value for sorting - returns milliseconds since epoch
   const getMessageTime = (m: Match): number => {
-    if (!m.lastMessageTime) return 0;
-    if (m.lastMessageTime instanceof Date) return m.lastMessageTime.getTime();
-    if (typeof (m.lastMessageTime as any).toDate === 'function') return (m.lastMessageTime as any).toDate().getTime();
-    if (typeof m.lastMessageTime === 'number') return m.lastMessageTime;
+    const time = m.lastMessageTime;
+    if (!time) return 0;
+    
+    // Handle Date object
+    if (time instanceof Date) {
+      const timestamp = time.getTime();
+      return isNaN(timestamp) ? 0 : timestamp;
+    }
+    
+    // Handle Firestore Timestamp with toDate()
+    if (typeof (time as any).toDate === 'function') {
+      try {
+        const date = (time as any).toDate();
+        const timestamp = date.getTime();
+        return isNaN(timestamp) ? 0 : timestamp;
+      } catch {
+        return 0;
+      }
+    }
+    
+    // Handle raw number (milliseconds)
+    if (typeof time === 'number') {
+      return isNaN(time) ? 0 : time;
+    }
+    
+    // Handle string timestamp
+    if (typeof time === 'string') {
+      const timestamp = new Date(time).getTime();
+      return isNaN(timestamp) ? 0 : timestamp;
+    }
+    
+    // Handle object with seconds (Firestore Timestamp serialized)
+    if (typeof time === 'object' && 'seconds' in time) {
+      const timestamp = (time as any).seconds * 1000;
+      return isNaN(timestamp) ? 0 : timestamp;
+    }
+    
     return 0;
   };
 
   // Get new matches, conversations, and unmatched conversations - sorted by most recent first
   const newMatches = matches.filter(m => m.isNewMatch && !m.isUnmatched);
+  
+  // Sort conversations by most recent message first (descending order: highest timestamp first)
   const conversations = matches
     .filter(m => !m.isNewMatch && m.lastMessage && !m.isUnmatched)
-    .sort((a, b) => getMessageTime(b) - getMessageTime(a));
+    .sort((a, b) => {
+      const timeA = getMessageTime(a);
+      const timeB = getMessageTime(b);
+      // Sort descending - most recent (higher timestamp) first
+      return timeB - timeA;
+    });
+  
   const unmatchedConversations = matches
     .filter(m => m.isUnmatched)
-    .sort((a, b) => getMessageTime(b) - getMessageTime(a));
+    .sort((a, b) => {
+      const timeA = getMessageTime(a);
+      const timeB = getMessageTime(b);
+      // Sort descending - most recent first
+      return timeB - timeA;
+    });
 
   if (loading) {
     return (

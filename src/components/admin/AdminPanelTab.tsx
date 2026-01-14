@@ -399,19 +399,21 @@ export default function AdminPanelTab() {
     const [cleanupStats, setCleanupStats] = useState<{
       authUsersDeleted: number;
       firestoreUsersDeleted: number;
+      orphanedMatchesDeleted: number;
       matchesDeleted: number;
       swipesDeleted: number;
       creditsDeleted: number;
       subscriptionsDeleted: number;
       messagesDeleted: number;
       inactiveUsersDeleted: number;
+      superLikesDeleted: number;
     } | null>(null);
 
     const handleRemoveUnusedAccounts = async () => {
       if (!window.confirm('Remove all unused, orphaned, and unlinked accounts from Firestore and Auth, and clean up all references? This cannot be undone.')) return;
       setFullScreenLoading(true);
       setActionLoading('remove-unused');
-      setCleanupStatus({ step: '0/8', details: 'Starting cleanup...' });
+      setCleanupStatus({ step: '0/9', details: 'Starting cleanup...' });
       setCleanupStats(null);
 
       try {
@@ -448,7 +450,7 @@ export default function AdminPanelTab() {
     // Full screen loading overlay with progress
     function FullScreenLoader() {
       const stepNumber = cleanupStatus?.step?.split('/')[0] || '0';
-      const totalSteps = 8;
+      const totalSteps = 9;
       const progress = cleanupStatus?.step === 'Done' ? 100 : cleanupStatus?.step === 'Error' ? 0 : (parseInt(stepNumber) / totalSteps) * 100;
 
       return (
@@ -498,8 +500,8 @@ export default function AdminPanelTab() {
                   <div className="text-muted-foreground">Users Deleted</div>
                 </div>
                 <div className="bg-muted/50 rounded-xl p-2 text-center">
-                  <div className="font-bold text-foreground">{cleanupStats.matchesDeleted}</div>
-                  <div className="text-muted-foreground">Matches Deleted</div>
+                  <div className="font-bold text-foreground">{cleanupStats.orphanedMatchesDeleted + cleanupStats.matchesDeleted}</div>
+                  <div className="text-muted-foreground">Matches Cleaned</div>
                 </div>
                 <div className="bg-muted/50 rounded-xl p-2 text-center">
                   <div className="font-bold text-foreground">{cleanupStats.swipesDeleted}</div>
@@ -508,6 +510,14 @@ export default function AdminPanelTab() {
                 <div className="bg-muted/50 rounded-xl p-2 text-center">
                   <div className="font-bold text-foreground">{cleanupStats.messagesDeleted}</div>
                   <div className="text-muted-foreground">Messages Deleted</div>
+                </div>
+                <div className="bg-muted/50 rounded-xl p-2 text-center">
+                  <div className="font-bold text-foreground">{cleanupStats.superLikesDeleted}</div>
+                  <div className="text-muted-foreground">SuperLikes Cleaned</div>
+                </div>
+                <div className="bg-muted/50 rounded-xl p-2 text-center">
+                  <div className="font-bold text-foreground">{cleanupStats.authUsersDeleted}</div>
+                  <div className="text-muted-foreground">Auth Accounts</div>
                 </div>
               </div>
             )}

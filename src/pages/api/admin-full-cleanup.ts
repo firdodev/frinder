@@ -33,17 +33,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const stats = {
     authUsersDeleted: 0,
     firestoreUsersDeleted: 0,
+    orphanedMatchesDeleted: 0,
     matchesDeleted: 0,
     swipesDeleted: 0,
     creditsDeleted: 0,
     subscriptionsDeleted: 0,
     messagesDeleted: 0,
-    inactiveUsersDeleted: 0
+    inactiveUsersDeleted: 0,
+    superLikesDeleted: 0
   };
 
   try {
     // Step 1: Get all Auth users
-    progress.push({ step: '1/8', details: 'Fetching Auth users...' });
+    progress.push({ step: '1/9', details: 'Fetching Auth users...' });
     const authUsers: { uid: string; email: string | undefined }[] = [];
     let nextPageToken: string | undefined = undefined;
     do {
@@ -51,24 +53,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       authUsers.push(...result.users.map(u => ({ uid: u.uid, email: u.email })));
       nextPageToken = result.pageToken;
     } while (nextPageToken);
+    const authUidSet = new Set(authUsers.map(u => u.uid));
 
     // Step 2: Get all Firestore users with their data
-    progress.push({ step: '2/8', details: 'Fetching Firestore users...' });
+    progress.push({ step: '2/9', details: 'Fetching Firestore users...' });
     const usersSnap = await db.collection('users').get();
     const firestoreUsers = usersSnap.docs.map(doc => ({ id: doc.id, data: doc.data() }));
     const firestoreUserIds = new Set(firestoreUsers.map(u => u.id));
-    const authUidSet = new Set(authUsers.map(u => u.uid));
+
+    // Create a set of ALL valid users (must exist in BOTH Auth and Firestore)
+    const validUserIds = new Set<string>();
+    for (const uid of firestoreUserIds) {
+      if (authUidSet.has(uid)) {
+        validUserIds.add(uid);
+      }
+    }
 
     // Step 3: Find orphaned Auth users (in Auth but not in Firestore)
-    progress.push({ step: '3/8', details: 'Finding orphaned Auth accounts...' });
+    progress.push({ step: '3/9', details: 'Finding orphaned Auth accounts...' });
     const orphanedAuthUsers = authUsers.filter(u => !firestoreUserIds.has(u.uid));
     
     // Step 4: Find orphaned Firestore users (in Firestore but not in Auth)
-    progress.push({ step: '4/8', details: 'Finding orphaned Firestore users...' });
+    progress.push({ step: '4/9', details: 'Finding orphaned Firestore users...' });
     const orphanedFirestoreUsers = firestoreUsers.filter(u => !authUidSet.has(u.id));
 
     // Step 5: Find inactive users (no photos, no matches, profile incomplete)
-    progress.push({ step: '5/8', details: 'Finding inactive users...' });
+    progress.push({ step: '5/9', details: 'Finding inactive users...' });
     const matchesSnap = await db.collection('matches').get();
     const usersWithMatches = new Set<string>();
     matchesSnap.docs.forEach(doc => {
@@ -94,48 +104,89 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...inactiveUsers.map(u => u.id)
     ]);
 
-    // Step 6: Delete related data in parallel batches
-    progress.push({ step: '6/8', details: `Cleaning up data for ${uidsToDelete.size} users...` });
-
-    // Delete matches where user is involved
-    const matchesToDelete: admin.firestore.DocumentReference[] = [];
+    // Step 6: Clean up ALL orphaned matches (where one or both users don't exist)
+    progress.push({ step: '6/9', details: 'Finding and cleaning orphaned matches...' });
+    const orphanedMatchesToDelete: admin.firestore.DocumentReference[] = [];
+    const matchesToDeleteFromUserCleanup: admin.firestore.DocumentReference[] = [];
+    
     for (const matchDoc of matchesSnap.docs) {
-      const users = matchDoc.data().users || [];
-      if (users.some((uid: string) => uidsToDelete.has(uid))) {
-        // Delete messages in the match first
+      const matchData = matchDoc.data();
+      const users = matchData.users || [];
+      
+      // Check if ANY user in this match doesn't exist (orphaned match)
+      const hasOrphanedUser = users.some((uid: string) => !validUserIds.has(uid));
+      // Check if any user is being deleted in this cleanup
+      const hasUserBeingDeleted = users.some((uid: string) => uidsToDelete.has(uid));
+      
+      if (hasOrphanedUser || hasUserBeingDeleted) {
+        // Delete all messages in this match first
         const messagesSnap = await db.collection('matches').doc(matchDoc.id).collection('messages').get();
         stats.messagesDeleted += messagesSnap.size;
         await batchDelete(messagesSnap.docs.map(d => d.ref));
-        matchesToDelete.push(matchDoc.ref);
+        
+        if (hasOrphanedUser && !hasUserBeingDeleted) {
+          orphanedMatchesToDelete.push(matchDoc.ref);
+        } else {
+          matchesToDeleteFromUserCleanup.push(matchDoc.ref);
+        }
       }
     }
-    await batchDelete(matchesToDelete);
-    stats.matchesDeleted = matchesToDelete.length;
+    
+    await batchDelete(orphanedMatchesToDelete);
+    stats.orphanedMatchesDeleted = orphanedMatchesToDelete.length;
+    
+    await batchDelete(matchesToDeleteFromUserCleanup);
+    stats.matchesDeleted = matchesToDeleteFromUserCleanup.length;
 
-    // Delete swipes involving these users (batch queries)
+    // Step 7: Delete swipes involving deleted users or non-existent users
+    progress.push({ step: '7/9', details: 'Cleaning up orphaned swipes...' });
+    const swipesSnap = await db.collection('swipes').get();
     const swipesToDelete: admin.firestore.DocumentReference[] = [];
-    for (const uid of uidsToDelete) {
-      const fromSwipes = await db.collection('swipes').where('fromUserId', '==', uid).get();
-      const toSwipes = await db.collection('swipes').where('toUserId', '==', uid).get();
-      swipesToDelete.push(...fromSwipes.docs.map(d => d.ref));
-      swipesToDelete.push(...toSwipes.docs.map(d => d.ref));
+    
+    for (const swipeDoc of swipesSnap.docs) {
+      const data = swipeDoc.data();
+      const fromUserId = data.fromUserId;
+      const toUserId = data.toUserId;
+      
+      // Delete if either user doesn't exist OR is being deleted
+      if (!validUserIds.has(fromUserId) || !validUserIds.has(toUserId) || 
+          uidsToDelete.has(fromUserId) || uidsToDelete.has(toUserId)) {
+        swipesToDelete.push(swipeDoc.ref);
+      }
     }
     await batchDelete(swipesToDelete);
     stats.swipesDeleted = swipesToDelete.length;
 
-    // Step 7: Delete user-related collections
-    progress.push({ step: '7/8', details: 'Deleting user accounts and subscriptions...' });
+    // Step 7.5: Clean up orphaned superLikes
+    const superLikesSnap = await db.collection('superLikes').get();
+    const superLikesToDelete: admin.firestore.DocumentReference[] = [];
+    
+    for (const slDoc of superLikesSnap.docs) {
+      const data = slDoc.data();
+      const fromUserId = data.fromUserId;
+      const toUserId = data.toUserId;
+      
+      if (!validUserIds.has(fromUserId) || !validUserIds.has(toUserId) || 
+          uidsToDelete.has(fromUserId) || uidsToDelete.has(toUserId)) {
+        superLikesToDelete.push(slDoc.ref);
+      }
+    }
+    await batchDelete(superLikesToDelete);
+    stats.superLikesDeleted = superLikesToDelete.length;
+
+    // Step 8: Delete user-related collections
+    progress.push({ step: '8/9', details: 'Deleting user accounts and subscriptions...' });
     
     const creditsToDelete: admin.firestore.DocumentReference[] = [];
     const subsToDelete: admin.firestore.DocumentReference[] = [];
     const proSuperLikesToDelete: admin.firestore.DocumentReference[] = [];
-    const usersToDelete: admin.firestore.DocumentReference[] = [];
+    const usersToDeleteRefs: admin.firestore.DocumentReference[] = [];
 
     for (const uid of uidsToDelete) {
       creditsToDelete.push(db.collection('userCredits').doc(uid));
       subsToDelete.push(db.collection('userSubscriptions').doc(uid));
       proSuperLikesToDelete.push(db.collection('proSuperLikes').doc(uid));
-      usersToDelete.push(db.collection('users').doc(uid));
+      usersToDeleteRefs.push(db.collection('users').doc(uid));
     }
 
     await batchDelete(creditsToDelete);
@@ -145,11 +196,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     stats.subscriptionsDeleted = subsToDelete.length;
     
     await batchDelete(proSuperLikesToDelete);
-    await batchDelete(usersToDelete);
-    stats.firestoreUsersDeleted = usersToDelete.length;
+    await batchDelete(usersToDeleteRefs);
+    stats.firestoreUsersDeleted = usersToDeleteRefs.length;
 
-    // Step 8: Delete from Firebase Auth
-    progress.push({ step: '8/8', details: 'Deleting Auth accounts...' });
+    // Step 9: Delete from Firebase Auth
+    progress.push({ step: '9/9', details: 'Deleting Auth accounts...' });
     const authUidsToDelete = [...uidsToDelete].filter(uid => authUidSet.has(uid));
     
     // Delete auth users in smaller batches to avoid rate limits
@@ -166,6 +217,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true, 
       stats,
       deletedCount: uidsToDelete.size,
+      totalMatchesCleaned: stats.orphanedMatchesDeleted + stats.matchesDeleted,
       progress
     });
 

@@ -29,13 +29,13 @@ async function createTransporter() {
         refreshToken: process.env.GMAIL_REFRESH_TOKEN,
         accessToken: accessToken.token || undefined
       },
-      // Pool connections to avoid opening too many
+      // Pool connections for faster sending
       pool: true,
-      maxConnections: 3,
-      maxMessages: 100,
-      // Rate limiting built into the transport
-      rateDelta: 1000, // 1 second between messages
-      rateLimit: 3 // Max 3 messages per rateDelta
+      maxConnections: 5, // Increased from 3
+      maxMessages: 200, // Increased from 100
+      // Faster rate limiting
+      rateDelta: 500, // Reduced from 1000ms
+      rateLimit: 5 // Increased from 3
     });
   } catch (error) {
     console.error('OAuth2 transporter creation failed, falling back to basic auth:', error);
@@ -47,10 +47,10 @@ async function createTransporter() {
         pass: process.env.EMAIL_PASSWORD
       },
       pool: true,
-      maxConnections: 1,
-      maxMessages: 50,
-      rateDelta: 2000,
-      rateLimit: 1,
+      maxConnections: 2,
+      maxMessages: 100,
+      rateDelta: 1000,
+      rateLimit: 2,
       tls: {
         rejectUnauthorized: false
       }
@@ -113,7 +113,7 @@ export async function sendEmail(options: {
   }
 }
 
-// Send bulk emails with proper rate limiting to avoid Google restrictions
+// Send bulk emails in parallel with rate limiting
 export async function sendBulkEmails(
   emails: Array<{
     to: string;
@@ -123,12 +123,16 @@ export async function sendBulkEmails(
     fromName?: string;
   }>,
   options?: {
-    delayBetweenEmails?: number; // ms between each email (default: 1500ms)
-    batchSize?: number; // emails per batch (default: 10)
-    delayBetweenBatches?: number; // ms between batches (default: 5000ms)
+    batchSize?: number; // emails per batch (default: 20)
+    delayBetweenBatches?: number; // ms between batches (default: 2000ms)
+    parallelInBatch?: number; // how many to send in parallel within a batch (default: 5)
   }
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
-  const { delayBetweenEmails = 1500, batchSize = 10, delayBetweenBatches = 5000 } = options || {};
+  const { 
+    batchSize = 20, 
+    delayBetweenBatches = 2000,
+    parallelInBatch = 5
+  } = options || {};
 
   let sent = 0;
   let failed = 0;
@@ -138,31 +142,53 @@ export async function sendBulkEmails(
   for (let i = 0; i < emails.length; i += batchSize) {
     const batch = emails.slice(i, i + batchSize);
 
-    // Process each email in the batch with delays
-    for (const email of batch) {
-      const result = await sendEmail(email);
+    // Process batch in parallel chunks
+    for (let j = 0; j < batch.length; j += parallelInBatch) {
+      const chunk = batch.slice(j, j + parallelInBatch);
+      
+      // Send chunk in parallel
+      const results = await Promise.all(
+        chunk.map(email => sendEmail(email))
+      );
 
-      if (result.success) {
-        sent++;
-      } else {
-        failed++;
-        if (result.error) errors.push(`${email.to}: ${result.error}`);
-      }
+      // Count results
+      results.forEach((result, idx) => {
+        if (result.success) {
+          sent++;
+        } else {
+          failed++;
+          if (result.error) errors.push(`${chunk[idx].to}: ${result.error}`);
+        }
+      });
 
-      // Delay between emails to avoid rate limiting
-      if (batch.indexOf(email) < batch.length - 1) {
-        await delay(delayBetweenEmails);
+      // Small delay between parallel chunks within a batch
+      if (j + parallelInBatch < batch.length) {
+        await delay(300);
       }
     }
 
-    // Longer delay between batches
+    // Log progress
+    console.log(`Email batch ${Math.floor(i / batchSize) + 1} complete: ${sent} sent, ${failed} failed`);
+
+    // Delay between batches (but not after the last batch)
     if (i + batchSize < emails.length) {
-      console.log(`Batch complete (${sent} sent, ${failed} failed). Waiting before next batch...`);
       await delay(delayBetweenBatches);
     }
   }
 
   return { sent, failed, errors };
+}
+
+// Fast single email - use for transactional emails (verification, notifications)
+export async function sendFastEmail(options: {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  fromName?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  // No delays, just send immediately
+  return sendEmail(options);
 }
 
 // Verify transporter connection
@@ -176,5 +202,3 @@ export async function verifyConnection(): Promise<boolean> {
     return false;
   }
 }
-
-
