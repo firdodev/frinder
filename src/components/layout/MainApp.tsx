@@ -278,7 +278,7 @@ export default function MainApp() {
     };
   }, [user?.uid]);
 
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email);
+  const isAdmin = user && user.email && ADMIN_EMAILS.includes(user.email);
 
   // Grant admins unlimited superlikes, pro, and no ads
   let effectiveUserSubscription = userSubscription;
@@ -296,8 +296,11 @@ export default function MainApp() {
       advancedFilters: true,
     };
     effectiveUserCredits = {
-      ...userCredits,
       superLikes: 99999,
+      lastFreeSuperLike: userCredits?.lastFreeSuperLike ?? null,
+      totalSuperLikesPurchased: userCredits?.totalSuperLikesPurchased ?? 0,
+      swipeCount: userCredits?.swipeCount ?? 0,
+      lastSwipeCountReset: userCredits?.lastSwipeCountReset ?? null,
     };
   }
 

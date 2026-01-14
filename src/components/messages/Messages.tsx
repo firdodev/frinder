@@ -3717,9 +3717,9 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
           lastMessageTime:
             m.lastMessageTime instanceof Date
               ? m.lastMessageTime
-              : (m.lastMessageTime && typeof m.lastMessageTime.toDate === 'function')
-                ? m.lastMessageTime.toDate()
-                : m.lastMessageTime,
+              : (m.lastMessageTime && typeof (m.lastMessageTime as any).toDate === 'function')
+                ? (m.lastMessageTime as any).toDate()
+                : m.lastMessageTime ? new Date(m.lastMessageTime as any) : undefined,
           unreadCount: (m as any).unreadCount?.[user.uid] || 0,
           isOnline: false,
           isNewMatch: !m.lastMessage,
@@ -3780,9 +3780,9 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
           lastMessage: m.lastMessage,
           lastMessageTime: m.lastMessageTime instanceof Date 
             ? m.lastMessageTime 
-            : (m.lastMessageTime && typeof m.lastMessageTime.toDate === 'function')
-              ? m.lastMessageTime.toDate()
-              : m.lastMessageTime ? new Date(m.lastMessageTime) : undefined,
+            : (m.lastMessageTime && typeof (m.lastMessageTime as any).toDate === 'function')
+              ? (m.lastMessageTime as any).toDate()
+              : m.lastMessageTime ? new Date(m.lastMessageTime as any) : undefined,
           unreadCount: 0,
           isOnline: false,
           isNewMatch: false,

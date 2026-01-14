@@ -15,8 +15,8 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 async function getAllAuthUsers() {
-  let users = [];
-  let nextPageToken = undefined;
+  const users: { uid: string; email: string | undefined }[] = [];
+  let nextPageToken: string | undefined = undefined;
   do {
     const result = await admin.auth().listUsers(1000, nextPageToken);
     users.push(...result.users.map(u => ({ uid: u.uid, email: u.email })));
@@ -30,25 +30,25 @@ async function getAllFirestoreUserIds() {
   return snap.docs.map(doc => doc.id);
 }
 
-async function recursiveScanAndClean(uidsToDelete) {
+async function recursiveScanAndClean(uidsToDelete: string[]) {
   const collections = await db.listCollections();
   for (const col of collections) {
     const docs = await col.listDocuments();
     for (const docRef of docs) {
       const docSnap = await docRef.get();
       if (!docSnap.exists) continue;
-      let data = docSnap.data();
+      const data = docSnap.data();
       let changed = false;
-      function removeUidRecursive(obj) {
+      function removeUidRecursive(obj: any): any {
         if (!obj) return obj;
         if (typeof obj === 'string' && uidsToDelete.includes(obj)) return undefined;
         if (Array.isArray(obj)) {
-          const filtered = obj.map(removeUidRecursive).filter(v => v !== undefined);
+          const filtered = obj.map(removeUidRecursive).filter((v: any) => v !== undefined);
           if (filtered.length !== obj.length) changed = true;
           return filtered;
         }
         if (typeof obj === 'object') {
-          let newObj = {};
+          const newObj: Record<string, any> = {};
           let anyChange = false;
           for (const k in obj) {
             const v = removeUidRecursive(obj[k]);
