@@ -2169,7 +2169,11 @@ export async function getUserSubscription(userId: string): Promise<UserSubscript
   let needsUpdate = false;
   const updates: Partial<UserSubscription> = {};
 
-  if (sub.premiumExpiresAt && sub.premiumExpiresAt.toDate() < now) {
+  if (
+    sub.premiumExpiresAt &&
+    typeof sub.premiumExpiresAt.toDate === 'function' &&
+    sub.premiumExpiresAt.toDate() < now
+  ) {
     updates.isPremium = false;
     updates.unlimitedSuperLikes = false;
     updates.canSeeWhoLikedYou = false;
@@ -2179,7 +2183,11 @@ export async function getUserSubscription(userId: string): Promise<UserSubscript
     needsUpdate = true;
   }
 
-  if (sub.adFreeExpiresAt && sub.adFreeExpiresAt.toDate() < now) {
+  if (
+    sub.adFreeExpiresAt &&
+    typeof sub.adFreeExpiresAt.toDate === 'function' &&
+    sub.adFreeExpiresAt.toDate() < now
+  ) {
     updates.isAdFree = false;
     needsUpdate = true;
   }

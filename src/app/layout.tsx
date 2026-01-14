@@ -465,8 +465,19 @@ export default function RootLayout({
 
         {/* JSON-LD Structured Data */}
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        {/* Viewport for mobile safe area */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
-      <body className={`${acidGrotesk.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body
+        className={`${acidGrotesk.variable} ${geistMono.variable} font-sans antialiased`}
+        style={{
+          minHeight: '100vh',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)'
+        }}
+      >
         <AuthProvider>
           <SettingsProvider>
             {children}

@@ -3696,7 +3696,12 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
           interests: otherUserProfile?.interests || [],
           relationshipGoal: otherUserProfile?.relationshipGoal,
           lastMessage: m.lastMessage,
-          lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
+          lastMessageTime:
+            m.lastMessageTime instanceof Date
+              ? m.lastMessageTime
+              : (m.lastMessageTime && typeof m.lastMessageTime.toDate === 'function')
+                ? m.lastMessageTime.toDate()
+                : m.lastMessageTime,
           unreadCount: (m as any).unreadCount?.[user.uid] || 0,
           isOnline: false,
           isNewMatch: !m.lastMessage,
@@ -3710,7 +3715,12 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
         if (!a.isNewMatch && b.isNewMatch) return 1;
         if (!a.lastMessageTime) return 1;
         if (!b.lastMessageTime) return -1;
-        return b.lastMessageTime.getTime() - a.lastMessageTime.getTime();
+        const aTime = a.lastMessageTime instanceof Date ? a.lastMessageTime.getTime() : NaN;
+        const bTime = b.lastMessageTime instanceof Date ? b.lastMessageTime.getTime() : NaN;
+        if (isNaN(bTime) && isNaN(aTime)) return 0;
+        if (isNaN(bTime)) return 1;
+        if (isNaN(aTime)) return -1;
+        return bTime - aTime;
       });
 
       setMatches(prev => {
