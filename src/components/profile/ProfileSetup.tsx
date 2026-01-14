@@ -259,7 +259,7 @@ export default function ProfileSetup() {
   };
 
   return (
-    <div className='min-h-screen bg-[#fff7ed] flex flex-col'>
+    <div className='min-h-dvh bg-[#fff7ed] flex flex-col pt-safe mobile-fullscreen'>
       {/* Hidden file input */}
       <input ref={fileInputRef} type='file' accept='image/*' onChange={handlePhotoUpload} className='hidden' />
 

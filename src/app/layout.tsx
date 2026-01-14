@@ -171,7 +171,7 @@ export const metadata: Metadata = {
   // Apple Web App
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Frinder',
     startupImage: ['/frinder-logo.png']
   },
@@ -188,7 +188,7 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
     'msapplication-TileColor': '#ed8c00',
     'msapplication-TileImage': '/frinder-logo.png',
     'msapplication-config': '/browserconfig.xml',
@@ -201,6 +201,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ed8c00' },
     { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' }
@@ -421,7 +422,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en' dir='ltr'>
+    <html lang='en' dir='ltr' suppressHydrationWarning>
       <head>
         {/* Favicon - explicit for browser tab */}
         <link rel='icon' href='/favicon.ico' sizes='any' />
@@ -465,18 +466,14 @@ export default function RootLayout({
 
         {/* JSON-LD Structured Data */}
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-        {/* Viewport for mobile safe area */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
       <body
         className={`${acidGrotesk.variable} ${geistMono.variable} font-sans antialiased`}
         style={{
-          minHeight: '100vh',
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          paddingLeft: 'env(safe-area-inset-left)',
-          paddingRight: 'env(safe-area-inset-right)'
+          minHeight: '100dvh',
+          minHeight: '-webkit-fill-available'
         }}
+        suppressHydrationWarning
       >
         <AuthProvider>
           <SettingsProvider>

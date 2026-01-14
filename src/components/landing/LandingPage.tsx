@@ -80,7 +80,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
   }, []);
 
   return (
-    <div className='min-h-screen bg-white overflow-x-hidden'>
+    <div className='min-h-dvh bg-white overflow-x-hidden mobile-fullscreen'>
       {/* Animated background gradient */}
       <div
         className='fixed inset-0 pointer-events-none opacity-30'

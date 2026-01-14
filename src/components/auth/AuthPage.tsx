@@ -171,7 +171,7 @@ export default function AuthPage({ onBack }: AuthPageProps) {
 
   if (authStep === 'verify') {
     return (
-      <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+      <div className='min-h-dvh bg-[#fff7ed] flex flex-col items-center justify-center p-4 pt-safe mobile-fullscreen'>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className='w-full max-w-md'>
           <Card className='shadow-xl border-0'>
             <CardHeader className='text-center'>
@@ -238,7 +238,7 @@ export default function AuthPage({ onBack }: AuthPageProps) {
 
   if (authStep === 'success') {
     return (
-      <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+      <div className='min-h-dvh bg-[#fff7ed] flex flex-col items-center justify-center p-4 pt-safe mobile-fullscreen'>
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -257,7 +257,7 @@ export default function AuthPage({ onBack }: AuthPageProps) {
 
   if (authStep === 'forgot-password') {
     return (
-      <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+      <div className='min-h-dvh bg-[#fff7ed] flex flex-col items-center justify-center p-4 pt-safe mobile-fullscreen'>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className='w-full max-w-md'>
           <Card className='shadow-xl border-0'>
             <CardHeader className='text-center relative'>
@@ -337,7 +337,7 @@ export default function AuthPage({ onBack }: AuthPageProps) {
 
   if (authStep === 'reset-sent') {
     return (
-      <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+      <div className='min-h-dvh bg-[#fff7ed] flex flex-col items-center justify-center p-4 pt-safe mobile-fullscreen'>
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -371,7 +371,7 @@ export default function AuthPage({ onBack }: AuthPageProps) {
   }
 
   return (
-    <div className='min-h-screen bg-[#fff7ed] flex flex-col items-center justify-center p-4'>
+    <div className='min-h-dvh bg-[#fff7ed] flex flex-col items-center justify-center p-4 pt-safe mobile-fullscreen'>
       {/* Back button */}
       {onBack && (
         <motion.button

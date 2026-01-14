@@ -2231,8 +2231,33 @@ export function subscribeToUserSubscription(
   });
 }
 
+// Admin emails with unlimited privileges
+const ADMIN_EMAILS = [
+  'rikardo_balaj@universitetipolis.edu.al',
+  'firdeus_kasaj@universitetipolis.edu.al'
+];
+
+// Check if a user is an admin based on their email
+async function isAdminUser(userId: string): Promise<boolean> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const email = userDoc.data()?.email;
+      return email && ADMIN_EMAILS.includes(email);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 // Check if user can use a super like (has credits, daily free, or Pro)
 export async function canUseSuperLike(userId: string): Promise<{ canUse: boolean; reason?: string }> {
+  // Admin users always have unlimited super likes
+  if (await isAdminUser(userId)) {
+    return { canUse: true };
+  }
+
   const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
 
   // Pro users use the Pro super like system (15/month, 1/day)
@@ -2274,6 +2299,11 @@ export async function canUseSuperLike(userId: string): Promise<{ canUse: boolean
 
 // Use a super like
 export async function useSuperLike(userId: string): Promise<boolean> {
+  // Admin users have unlimited super likes - no deduction needed
+  if (await isAdminUser(userId)) {
+    return true;
+  }
+
   const creditsRef = doc(db, 'userCredits', userId);
   const [credits, subscription] = await Promise.all([getUserCredits(userId), getUserSubscription(userId)]);
 

@@ -326,7 +326,7 @@ export default function MainApp() {
   const renderContent = () => {
     switch (activeTab) {
       case 'swipe':
-        return <SwipePeople />;
+        return <SwipePeople onGoToShop={() => setActiveTab('profile')} />;
       case 'groups':
         return <SwipeGroups onOpenGroupChat={handleOpenGroupChat} />;
       case 'search':
@@ -348,12 +348,12 @@ export default function MainApp() {
         }
         return <AdminPanelTab />;
       default:
-        return <SwipePeople />;
+        return <SwipePeople onGoToShop={() => setActiveTab('profile')} />;
     }
   };
 
   return (
-    <div className='h-screen flex bg-gray-100 dark:bg-black'>
+    <div className='h-dvh flex bg-gray-100 dark:bg-black mobile-fullscreen'>
       {/* Onboarding Tutorial */}
       <AnimatePresence>
         {showOnboarding && <OnboardingTutorial onComplete={handleOnboardingComplete} />}
@@ -490,7 +490,7 @@ export default function MainApp() {
       {/* Main Content Area */}
       <div className='flex-1 flex flex-col min-w-0 lg:my-3 lg:mr-3'>
         {/* Mobile Header - hidden on desktop */}
-        <div className='lg:hidden px-4 py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
+        <div className='lg:hidden mobile-header-safe py-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-gray-800'>
           <motion.button
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -567,8 +567,9 @@ export default function MainApp() {
         </div>
 
         {/* Mobile Bottom Navigation - hidden on desktop */}
-        <div className='lg:hidden fixed bottom-0 left-0 right-0 mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-gray-800 shadow-lg safe-bottom'>
-          <div className='flex items-center justify-around py-2 pb-safe'>
+        <div className='lg:hidden fixed bottom-0 left-0 right-0 pl-safe pr-safe' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className='mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-gray-800 shadow-lg'>
+          <div className='flex items-center justify-around py-2'>
             {tabs.map(tab => (
               <motion.button
                 key={tab.id}
@@ -625,6 +626,7 @@ export default function MainApp() {
                 )}
               </motion.button>
             ))}
+          </div>
           </div>
         </div>
       </div>

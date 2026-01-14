@@ -134,9 +134,27 @@ interface Match {
   isUnmatched?: boolean;
 }
 
-function formatTime(date: Date): string {
+function formatTime(date: Date | any): string {
+  if (!date) return '';
+  
+  // Convert to Date if needed
+  let dateObj: Date;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date.toDate === 'function') {
+    // Firestore Timestamp
+    dateObj = date.toDate();
+  } else if (typeof date === 'number' || typeof date === 'string') {
+    dateObj = new Date(date);
+  } else {
+    return '';
+  }
+  
+  // Check if valid date
+  if (isNaN(dateObj.getTime())) return '';
+  
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
+  const diff = now.getTime() - dateObj.getTime();
 
   if (diff < 1000 * 60 * 60) {
     const minutes = Math.floor(diff / (1000 * 60));
@@ -145,7 +163,7 @@ function formatTime(date: Date): string {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     return `${hours}h ago`;
   } else {
-    return date.toLocaleDateString();
+    return dateObj.toLocaleDateString();
   }
 }
 
@@ -3760,7 +3778,11 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
           interests: otherUserProfile?.interests || [],
           relationshipGoal: otherUserProfile?.relationshipGoal,
           lastMessage: m.lastMessage,
-          lastMessageTime: m.lastMessageTime instanceof Date ? m.lastMessageTime : m.lastMessageTime?.toDate(),
+          lastMessageTime: m.lastMessageTime instanceof Date 
+            ? m.lastMessageTime 
+            : (m.lastMessageTime && typeof m.lastMessageTime.toDate === 'function')
+              ? m.lastMessageTime.toDate()
+              : m.lastMessageTime ? new Date(m.lastMessageTime) : undefined,
           unreadCount: 0,
           isOnline: false,
           isNewMatch: false,
@@ -3816,10 +3838,23 @@ export default function Messages({ initialGroupId, onGroupOpened }: MessagesProp
     );
   }
 
-  // Get new matches, conversations, and unmatched conversations
+  // Helper function to get timestamp value for sorting
+  const getMessageTime = (m: Match): number => {
+    if (!m.lastMessageTime) return 0;
+    if (m.lastMessageTime instanceof Date) return m.lastMessageTime.getTime();
+    if (typeof (m.lastMessageTime as any).toDate === 'function') return (m.lastMessageTime as any).toDate().getTime();
+    if (typeof m.lastMessageTime === 'number') return m.lastMessageTime;
+    return 0;
+  };
+
+  // Get new matches, conversations, and unmatched conversations - sorted by most recent first
   const newMatches = matches.filter(m => m.isNewMatch && !m.isUnmatched);
-  const conversations = matches.filter(m => !m.isNewMatch && m.lastMessage && !m.isUnmatched);
-  const unmatchedConversations = matches.filter(m => m.isUnmatched);
+  const conversations = matches
+    .filter(m => !m.isNewMatch && m.lastMessage && !m.isUnmatched)
+    .sort((a, b) => getMessageTime(b) - getMessageTime(a));
+  const unmatchedConversations = matches
+    .filter(m => m.isUnmatched)
+    .sort((a, b) => getMessageTime(b) - getMessageTime(a));
 
   if (loading) {
     return (

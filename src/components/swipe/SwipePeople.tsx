@@ -16,7 +16,8 @@ import {
   Crown,
   Zap,
   ShieldCheck,
-  User
+  User,
+  ShoppingBag
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -699,7 +700,11 @@ function SwipeCard({
   );
 }
 
-export default function SwipePeople() {
+interface SwipePeopleProps {
+  onGoToShop?: () => void;
+}
+
+export default function SwipePeople({ onGoToShop }: SwipePeopleProps) {
   const { user, userProfile } = useAuth();
   const { notifications } = useSettings();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -1095,29 +1100,19 @@ export default function SwipePeople() {
               <span className='text-xl'>Out of Super Likes!</span>
             </DialogTitle>
             <DialogDescription className='text-center'>
-              Super Likes instantly match you with someone special. Get more to increase your chances!
+              Super Likes instantly match you with someone special. Visit the shop to get more!
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-3 pt-4'>
             <Button
-              onClick={handlePurchaseSuperLikes}
-              disabled={purchasing}
-              className='w-full bg-blue-500 hover:bg-blue-600 text-white'
+              onClick={() => {
+                setShowNoSuperLikesDialog(false);
+                onGoToShop?.();
+              }}
+              className='w-full bg-gradient-to-r from-frinder-orange to-frinder-gold text-white'
             >
-              {purchasing ? (
-                <Loader2 className='w-4 h-4 animate-spin mr-2' />
-              ) : (
-                <Star className='w-4 h-4 mr-2' fill='currentColor' />
-              )}
-              Get 10 Super Likes - $1
-            </Button>
-            <Button
-              onClick={handlePurchasePremium}
-              disabled={purchasing}
-              className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
-            >
-              {purchasing ? <Loader2 className='w-4 h-4 animate-spin mr-2' /> : <Crown className='w-4 h-4 mr-2' />}
-              Go Premium - $5/month
+              <ShoppingBag className='w-4 h-4 mr-2' />
+              Go to Shop
             </Button>
             <Button variant='outline' onClick={() => setShowNoSuperLikesDialog(false)} className='w-full'>
               Maybe Later
