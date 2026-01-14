@@ -1,79 +1,12 @@
-import nodemailer from 'nodemailer';
-import { google } from 'googleapis';
+// Brevo API for sending emails
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
-// OAuth2 client setup for Gmail - much more trusted by Google than app passwords
-const OAuth2 = google.auth.OAuth2;
-
-const oauth2Client = new OAuth2(
-  process.env.GMAIL_CLIENT_ID,
-  process.env.GMAIL_CLIENT_SECRET,
-  'https://developers.google.com/oauthplayground' // Redirect URL
-);
-
-oauth2Client.setCredentials({
-  refresh_token: process.env.GMAIL_REFRESH_TOKEN
-});
-
-// Create transporter with OAuth2 - this prevents account restrictions
-async function createTransporter() {
-  try {
-    const accessToken = await oauth2Client.getAccessToken();
-
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: process.env.EMAIL_USER,
-        clientId: process.env.GMAIL_CLIENT_ID,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-        accessToken: accessToken.token || undefined
-      },
-      // Pool connections for faster sending
-      pool: true,
-      maxConnections: 5, // Increased from 3
-      maxMessages: 200, // Increased from 100
-      // Faster rate limiting
-      rateDelta: 500, // Reduced from 1000ms
-      rateLimit: 5 // Increased from 3
-    });
-  } catch (error) {
-    console.error('OAuth2 transporter creation failed, falling back to basic auth:', error);
-    // Fallback to basic auth if OAuth2 fails (but with better settings)
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      },
-      pool: true,
-      maxConnections: 2,
-      maxMessages: 100,
-      rateDelta: 1000,
-      rateLimit: 2,
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-  }
-}
-
-// Singleton transporter instance
-let transporterInstance: nodemailer.Transporter | null = null;
-
-export async function getTransporter(): Promise<nodemailer.Transporter> {
-  if (!transporterInstance) {
-    transporterInstance = await createTransporter();
-  }
-  return transporterInstance;
-}
-
-// Reset transporter (useful if credentials change)
-export function resetTransporter() {
-  if (transporterInstance) {
-    transporterInstance.close();
-    transporterInstance = null;
-  }
+interface BrevoEmailPayload {
+  sender: { name: string; email: string };
+  to: Array<{ email: string; name?: string }>;
+  subject: string;
+  htmlContent?: string;
+  textContent?: string;
 }
 
 // Delay helper for rate limiting
@@ -81,7 +14,7 @@ export function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Send a single email with proper headers
+// Send a single email via Brevo API
 export async function sendEmail(options: {
   to: string;
   subject: string;
@@ -90,21 +23,36 @@ export async function sendEmail(options: {
   fromName?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const transporter = await getTransporter();
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) {
+      throw new Error('BREVO_API_KEY is not configured');
+    }
 
-    await transporter.sendMail({
-      from: `"${options.fromName || 'Frinder'}" <${process.env.EMAIL_USER}>`,
-      to: options.to,
+    const payload: BrevoEmailPayload = {
+      sender: {
+        name: options.fromName || 'Frinder',
+        email: process.env.BREVO_SENDER_EMAIL || 'noreply@frinder.co'
+      },
+      to: [{ email: options.to }],
       subject: options.subject,
-      html: options.html,
-      text: options.text,
-      // Add proper headers to look legitimate
+      htmlContent: options.html,
+      textContent: options.text
+    };
+
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
       headers: {
-        'X-Priority': '3',
-        'X-Mailer': 'Frinder App',
-        'List-Unsubscribe': '<https://frinder.co/unsubscribe>'
-      }
+        accept: 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Brevo API error: ${response.status}`);
+    }
 
     return { success: true };
   } catch (error: any) {
@@ -113,7 +61,7 @@ export async function sendEmail(options: {
   }
 }
 
-// Send bulk emails in parallel with rate limiting
+// Send bulk emails with parallel processing
 export async function sendBulkEmails(
   emails: Array<{
     to: string;
@@ -124,11 +72,11 @@ export async function sendBulkEmails(
   }>,
   options?: {
     batchSize?: number; // emails per batch (default: 20)
-    delayBetweenBatches?: number; // ms between batches (default: 2000ms)
-    parallelInBatch?: number; // how many to send in parallel within a batch (default: 5)
+    delayBetweenBatches?: number; // ms between batches (default: 1000ms)
+    parallelInBatch?: number; // how many to send in parallel within a batch (default: 10)
   }
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
-  const { batchSize = 20, delayBetweenBatches = 2000, parallelInBatch = 5 } = options || {};
+  const { batchSize = 20, delayBetweenBatches = 1000, parallelInBatch = 10 } = options || {};
 
   let sent = 0;
   let failed = 0;
@@ -157,7 +105,7 @@ export async function sendBulkEmails(
 
       // Small delay between parallel chunks within a batch
       if (j + parallelInBatch < batch.length) {
-        await delay(300);
+        await delay(100);
       }
     }
 
@@ -185,14 +133,27 @@ export async function sendFastEmail(options: {
   return sendEmail(options);
 }
 
-// Verify transporter connection
+// Verify API connection
 export async function verifyConnection(): Promise<boolean> {
   try {
-    const transporter = await getTransporter();
-    await transporter.verify();
-    return true;
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) {
+      console.error('BREVO_API_KEY is not configured');
+      return false;
+    }
+
+    // Check account info to verify API key works
+    const response = await fetch('https://api.brevo.com/v3/account', {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'api-key': apiKey
+      }
+    });
+
+    return response.ok;
   } catch (error) {
-    console.error('Email connection verification failed:', error);
+    console.error('Brevo connection verification failed:', error);
     return false;
   }
 }
