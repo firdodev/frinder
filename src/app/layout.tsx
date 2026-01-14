@@ -470,8 +470,7 @@ export default function RootLayout({
       <body
         className={`${acidGrotesk.variable} ${geistMono.variable} font-sans antialiased`}
         style={{
-          minHeight: '100dvh',
-          minHeight: '-webkit-fill-available'
+          minHeight: '100dvh'
         }}
         suppressHydrationWarning
       >
