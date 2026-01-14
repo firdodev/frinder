@@ -829,7 +829,7 @@ export default function AdminPanelTab() {
                     <Input placeholder="Search users..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 rounded-xl bg-card" />
                   </div>
                   <Button
-                    variant="danger"
+                    variant="destructive"
                     size="sm"
                     onClick={handleRemoveUnusedAccounts}
                     disabled={actionLoading === 'remove-unused'}
