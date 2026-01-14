@@ -58,9 +58,9 @@ export async function POST(request: NextRequest) {
 
     // Send with rate limiting to avoid Google restrictions
     const result = await sendBulkEmails(emailsToSend, {
-      delayBetweenEmails: 2000,
-      batchSize: 5,
-      delayBetweenBatches: 10000,
+      batchSize: 20, // emails per batch
+      delayBetweenBatches: 2000, // 2 seconds between batches
+      parallelInBatch: 5, // send 5 emails in parallel within each batch
     });
 
     return NextResponse.json({ success: true, ...result });
