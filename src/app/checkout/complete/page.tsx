@@ -17,9 +17,9 @@ function CheckoutCompleteContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [credited, setCredited] = useState(false);
 
-  const paymentStatus = searchParams.get('status');
-  const receiptId = searchParams.get('receipt_id');
-  const planId = searchParams.get('plan_id');
+  const paymentStatus = searchParams?.get('status');
+  const receiptId = searchParams?.get('receipt_id');
+  const planId = searchParams?.get('plan_id');
 
   useEffect(() => {
     if (paymentStatus === 'success') {
