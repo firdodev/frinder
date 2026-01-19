@@ -8,7 +8,6 @@ import {
   Users,
   MessageCircle,
   User,
-  Flame,
   Settings,
   LogOut,
   Sparkles,
@@ -16,12 +15,9 @@ import {
   Star,
   Crown,
   ShoppingBag,
-  X,
   ChevronRight,
-  Zap,
   ThumbsUp,
-  ThumbsDown,
-  ArrowUp
+  ThumbsDown
 } from 'lucide-react';
 import SwipePeople from '@/components/swipe/SwipePeople';
 import SwipeGroups from '@/components/swipe/SwipeGroups';
@@ -224,19 +220,13 @@ const ADMIN_EMAILS = [
 
 export default function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('swipe');
-  const { darkMode } = useSettings();
+  useSettings(); // Keep for potential future use
   const { user, userProfile, signOut } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [selectedChatInfo, setSelectedChatInfo] = useState<{
-    matchId: string;
-    name: string;
-    photo: string;
-    otherUserId: string;
-  } | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   // Check if user has seen onboarding
@@ -310,14 +300,12 @@ export default function MainApp() {
     { id: 'search', icon: Search, label: 'Search', fillActive: false },
     { id: 'matches', icon: Sparkles, label: 'Matches', fillActive: false },
     { id: 'messages', icon: MessageCircle, label: 'Messages', fillActive: false },
-    { id: 'profile', icon: User, label: 'Profile', fillActive: false },
   ];
   if (isAdmin) {
     tabs.push({ id: 'admin', icon: Crown, label: 'Admin', fillActive: false });
   }
 
-  const handleStartChat = (matchId: string, name: string, photo: string, otherUserId: string) => {
-    setSelectedChatInfo({ matchId, name, photo, otherUserId });
+  const handleStartChat = (_matchId: string, _name: string, _photo: string, _otherUserId: string) => {
     setActiveTab('messages');
   };
 
@@ -329,7 +317,7 @@ export default function MainApp() {
   const renderContent = () => {
     switch (activeTab) {
       case 'swipe':
-        return <SwipePeople onGoToShop={() => setActiveTab('profile')} />;
+        return <SwipePeople onGoToShop={() => setActiveTab('profile')} onGoToProfile={() => setActiveTab('profile')} />;
       case 'groups':
         return <SwipeGroups onOpenGroupChat={handleOpenGroupChat} />;
       case 'search':
@@ -339,7 +327,7 @@ export default function MainApp() {
       case 'messages':
         return <Messages initialGroupId={selectedGroupId} onGroupOpened={() => setSelectedGroupId(null)} />;
       case 'profile':
-        return <Profile onGoToShop={() => setActiveTab('profile')} />;
+        return <Profile onGoToShop={() => setActiveTab('profile')} onBack={() => setActiveTab('swipe')} />;
       case 'admin':
         if (!isAdmin) {
           return (
@@ -494,37 +482,6 @@ export default function MainApp() {
       <div className='flex-1 flex flex-col min-w-0 lg:my-3 lg:mr-3'>
         {/* Status bar background - extends behind notch on mobile */}
         <div className='lg:hidden status-bar-bg status-bar-bg-white' />
-        
-        {/* Mobile Header - hidden on desktop */}
-        <div className='lg:hidden mobile-header-safe pb-3 flex items-center justify-between border-b bg-white dark:bg-black dark:border-frinder-orange/20'>
-          <motion.button
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={() => setActiveTab('swipe')}
-            className='flex items-center gap-2 hover:opacity-80 transition-opacity'
-          >
-            <img src='/frinder-logo.png' alt='Frinder' className='w-8 h-8 rounded-lg shadow-sm' />
-            <span className='text-xl font-bold bg-gradient-to-r from-frinder-orange to-frinder-gold bg-clip-text text-transparent'>
-              Frinder
-            </span>
-          </motion.button>
-
-          {/* Pro Badge & Super Likes - Mobile */}
-          <div className='flex items-center gap-2'>
-            <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10'>
-              <Star className='w-3 h-3 text-blue-500' fill='currentColor' />
-              <span className='text-xs font-semibold text-blue-500'>
-                {isAdmin ? '∞' : (userCredits?.superLikes ?? 0)}
-              </span>
-            </div>
-            {effectiveUserSubscription?.isPremium && (
-              <div className='flex items-center gap-1 px-2 py-1 rounded-full bg-frinder-orange/10 dark:bg-frinder-orange/20'>
-                <Crown className='w-3.5 h-3.5 text-frinder-orange' />
-                <span className='text-xs font-semibold text-frinder-orange'>PRO</span>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Desktop Header */}
         <div className='hidden lg:flex px-6 py-5 items-center justify-between bg-white dark:bg-black rounded-t-2xl border-b dark:border-frinder-orange/20'>
@@ -557,7 +514,7 @@ export default function MainApp() {
         </div>
 
         {/* Content */}
-        <div className='flex-1 overflow-hidden pb-20 lg:pb-0 lg:bg-white lg:dark:bg-black lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-frinder-orange/20'>
+        <div className={`flex-1 overflow-hidden ${activeTab === 'profile' ? 'pb-0' : 'pb-20'} lg:pb-0 lg:bg-white lg:dark:bg-black lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-frinder-orange/20`}>
           <AnimatePresence mode='wait'>
             <motion.div
               key={activeTab}
@@ -572,7 +529,8 @@ export default function MainApp() {
           </AnimatePresence>
         </div>
 
-        {/* Mobile Bottom Navigation - hidden on desktop */}
+        {/* Mobile Bottom Navigation - hidden on desktop and profile */}
+        {activeTab !== 'profile' && (
         <div className='lg:hidden fixed bottom-0 left-0 right-0 pl-safe pr-safe' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className='mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-frinder-orange/20 shadow-lg'>
           <div className='flex items-center justify-around py-2'>
@@ -585,28 +543,12 @@ export default function MainApp() {
                 className='relative flex flex-col items-center gap-1 p-2 min-w-[50px] sm:min-w-[60px]'
               >
                 <div className='relative'>
-                  {tab.id === 'profile' && userProfile?.photos?.[0] ? (
-                    <div
-                      className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full overflow-hidden transition-all ${
-                        activeTab === tab.id
-                          ? 'ring-2 ring-frinder-orange ring-offset-1 ring-offset-white dark:ring-offset-black'
-                          : 'ring-1 ring-gray-200 dark:ring-gray-700'
-                      }`}
-                    >
-                      <img
-                        src={userProfile.photos[0]}
-                        alt='Profile'
-                        className='w-full h-full object-cover'
-                      />
-                    </div>
-                  ) : (
-                    <tab.icon
-                      className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
-                        activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
-                      }`}
-                      fill={activeTab === tab.id && tab.fillActive ? 'currentColor' : 'none'}
-                    />
-                  )}
+                  <tab.icon
+                    className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
+                      activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
+                    }`}
+                    fill={activeTab === tab.id && tab.fillActive ? 'currentColor' : 'none'}
+                  />
                   {tab.id === 'messages' && unreadCount > 0 && (
                     <motion.span 
                       initial={{ scale: 0 }}
@@ -617,13 +559,6 @@ export default function MainApp() {
                     </motion.span>
                   )}
                 </div>
-                <span
-                  className={`text-[10px] sm:text-xs font-medium transition-colors ${
-                    activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
-                  }`}
-                >
-                  {tab.label}
-                </span>
                 {activeTab === tab.id && (
                   <motion.div
                     layoutId='activeTab'
@@ -635,6 +570,7 @@ export default function MainApp() {
           </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Settings Sheet */}

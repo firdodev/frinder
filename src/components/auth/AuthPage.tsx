@@ -9,20 +9,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle, KeyRound, User, GraduationCap, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
+import { isUsernameTaken } from '@/lib/firebaseServices';
 
-type AuthStep = 'auth' | 'verify' | 'success' | 'forgot-password' | 'reset-sent';
+type AuthStep = 'auth' | 'verify' | 'profile-info' | 'forgot-password' | 'reset-sent';
 
 interface AuthPageProps {
   onBack?: () => void;
 }
 
 export default function AuthPage({ onBack }: AuthPageProps) {
-  const { user, userProfile, signIn, signUp, updateProfile, resetPassword } = useAuth();
+  const { user, userProfile, signIn, signUp, updateProfile, completeRegistration, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [username, setUsername] = useState('');
+  const [university, setUniversity] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,14 +36,62 @@ export default function AuthPage({ onBack }: AuthPageProps) {
   const [authStep, setAuthStep] = useState<AuthStep>('auth');
   const [verificationCode, setVerificationCode] = useState(['', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const usernameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Check if user is logged in but email not verified - auto-show verification
+  // Check if user is logged in but hasn't completed profile (no username)
   useEffect(() => {
-    if (user && userProfile && !userProfile.isEmailVerified) {
+    if (user && userProfile) {
       setEmail(userProfile.email);
-      setAuthStep('verify');
+      if (!userProfile.username) {
+        setAuthStep('profile-info');
+      }
     }
   }, [user, userProfile]);
+
+  // Check username availability with debounce
+  const checkUsernameAvailability = (value: string) => {
+    const trimmedValue = value.trim().toLowerCase();
+    
+    // Clear previous timeout
+    if (usernameCheckTimeout.current) {
+      clearTimeout(usernameCheckTimeout.current);
+    }
+
+    // Reset state if empty
+    if (!trimmedValue || trimmedValue.length < 3) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+
+    // Validate username format (alphanumeric and underscore only)
+    if (!/^[a-z0-9_]+$/.test(trimmedValue)) {
+      setUsernameAvailable(false);
+      setCheckingUsername(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+    
+    // Debounce the check
+    usernameCheckTimeout.current = setTimeout(async () => {
+      try {
+        const taken = await isUsernameTaken(trimmedValue);
+        setUsernameAvailable(!taken);
+      } catch {
+        setUsernameAvailable(null);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500);
+  };
+
+  const handleUsernameChange = (value: string) => {
+    // Only allow lowercase letters, numbers, and underscores
+    const sanitized = value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    setUsername(sanitized);
+    checkUsernameAvailability(sanitized);
+  };
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) {
@@ -99,8 +153,8 @@ export default function AuthPage({ onBack }: AuthPageProps) {
       const data = await response.json();
       if (data.verified) {
         await updateProfile({ isEmailVerified: true });
-        setAuthStep('success');
-        toast.success('Email verified successfully!');
+        setAuthStep('profile-info');
+        toast.success('Email verified! Now complete your profile.');
       } else {
         setError(data.error || 'Invalid verification code');
       }
@@ -141,9 +195,57 @@ export default function AuthPage({ onBack }: AuthPageProps) {
     setLoading(true);
     try {
       await signUp(email, password);
-      await sendVerificationCode();
+      setAuthStep('profile-info');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate first name
+    if (!firstName.trim()) {
+      setError('Please enter your first name');
+      return;
+    }
+
+    // Validate username
+    if (!username.trim() || username.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
+    if (!/^[a-z0-9_]+$/.test(username)) {
+      setError('Username can only contain lowercase letters, numbers, and underscores');
+      return;
+    }
+
+    if (usernameAvailable === false) {
+      setError('Username is already taken');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Final check for username availability
+      const taken = await isUsernameTaken(username);
+      if (taken) {
+        setError('Username is already taken');
+        setUsernameAvailable(false);
+        setLoading(false);
+        return;
+      }
+      
+      await completeRegistration(firstName.trim(), username.trim(), university || undefined);
+      toast.success('Profile info saved! Now let\'s complete your profile.');
+      // The page will automatically redirect to ProfileSetup since username is now set
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to complete profile');
+    } finally {
       setLoading(false);
     }
   };
@@ -236,20 +338,112 @@ export default function AuthPage({ onBack }: AuthPageProps) {
     );
   }
 
-  if (authStep === 'success') {
+  if (authStep === 'profile-info') {
     return (
       <div className='min-h-dvh bg-[#fff7ed] flex flex-col items-center justify-center p-4 pt-safe mobile-fullscreen'>
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', duration: 0.5 }}
-          className='text-center'
-        >
-          <div className='w-24 h-24 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-6'>
-            <CheckCircle className='w-12 h-12 text-white' />
-          </div>
-          <h1 className='text-3xl font-bold text-[#1a1a1a] mb-2'>Email Verified!</h1>
-          <p className='text-[#666] mb-6'>Your account is ready. Let&apos;s set up your profile.</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className='w-full max-w-md'>
+          <Card className='shadow-xl border-0'>
+            <CardHeader className='text-center'>
+              <div className='w-16 h-16 rounded-full bg-[#ed8c00] flex items-center justify-center mx-auto mb-4'>
+                <User className='w-8 h-8 text-white' />
+              </div>
+              <CardTitle className='text-2xl'>Complete Your Profile</CardTitle>
+              <CardDescription>
+                Just a few more details to get started
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCompleteProfile} className='space-y-4'>
+                <div className='space-y-2'>
+                  <Label htmlFor='profile-firstName'>First Name</Label>
+                  <div className='relative'>
+                    <User className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+                    <Input
+                      id='profile-firstName'
+                      type='text'
+                      placeholder='Your first name'
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      className='pl-10'
+                      required
+                      maxLength={30}
+                    />
+                  </div>
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='profile-username'>Username</Label>
+                  <div className='relative'>
+                    <AtSign className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+                    <Input
+                      id='profile-username'
+                      type='text'
+                      placeholder='username (letters, numbers, _)'
+                      value={username}
+                      onChange={e => handleUsernameChange(e.target.value)}
+                      className={`pl-10 pr-10 ${
+                        username.length >= 3
+                          ? usernameAvailable === true
+                            ? 'border-green-500 focus:ring-green-500'
+                            : usernameAvailable === false
+                            ? 'border-red-500 focus:ring-red-500'
+                            : ''
+                          : ''
+                      }`}
+                      required
+                      maxLength={20}
+                    />
+                    {username.length >= 3 && (
+                      <div className='absolute right-3 top-1/2 -translate-y-1/2'>
+                        {checkingUsername ? (
+                          <div className='w-4 h-4 border-2 border-[#ed8c00] border-t-transparent rounded-full animate-spin' />
+                        ) : usernameAvailable === true ? (
+                          <CheckCircle className='w-4 h-4 text-green-500' />
+                        ) : usernameAvailable === false ? (
+                          <span className='text-red-500 text-xs'>Taken</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  {username && username.length < 3 && (
+                    <p className='text-xs text-muted-foreground'>Username must be at least 3 characters</p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='profile-university'>University (Optional)</Label>
+                  <div className='relative'>
+                    <GraduationCap className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+                    <select
+                      id='profile-university'
+                      value={university}
+                      onChange={e => setUniversity(e.target.value)}
+                      className='flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                    >
+                      <option value=''>Select university...</option>
+                      <option value='Universiteti Polis'>Universiteti Polis</option>
+                    </select>
+                  </div>
+                </div>
+
+                {error && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className='text-sm text-destructive text-center'
+                  >
+                    {error}
+                  </motion.p>
+                )}
+
+                <Button
+                  type='submit'
+                  className='w-full bg-[#ed8c00] hover:bg-[#cc5d00] text-white h-12'
+                  disabled={loading || checkingUsername}
+                >
+                  {loading ? 'Completing...' : 'Complete Profile'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     );

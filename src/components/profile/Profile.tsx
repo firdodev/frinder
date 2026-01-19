@@ -53,19 +53,18 @@ import {
   Loader2,
   Crown,
   Sparkles,
-  Zap,
-  Heart,
-  Ban,
   Check,
   Gift,
   Users,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  ArrowLeft
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type ProfileProps = {
   onGoToShop?: () => void;
+  onBack?: () => void;
 };
 
 const ADMIN_EMAILS = [
@@ -73,7 +72,7 @@ const ADMIN_EMAILS = [
   'firdeus_kasaj@universitetipolis.edu.al'
 ];
 
-export default function Profile({ onGoToShop }: ProfileProps) {
+export default function Profile({ onGoToShop, onBack }: ProfileProps) {
   const router = useRouter();
   const { user, userProfile, updateProfile, signOut } = useAuth();
   const isAdmin = user && user.email && ADMIN_EMAILS.includes(user.email);
@@ -306,10 +305,10 @@ export default function Profile({ onGoToShop }: ProfileProps) {
         <div className='absolute inset-0 flex flex-col items-center justify-center text-white'>
           <div className='absolute top-4 left-4 right-4 flex justify-between'>
             <button
-              onClick={toggleDarkMode}
+              onClick={onBack}
               className='w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors'
             >
-              {darkMode ? <Moon className='w-5 h-5 text-white' /> : <Sun className='w-5 h-5 text-white' />}
+              <ArrowLeft className='w-5 h-5 text-white' />
             </button>
             <button
               onClick={() => setSettingsOpen(true)}

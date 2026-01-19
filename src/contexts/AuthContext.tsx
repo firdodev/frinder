@@ -29,27 +29,12 @@ import {
 } from 'firebase/firestore';
 import { ref, listAll, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
-import { updateUserProfileInMatches } from '@/lib/firebaseServices';
+import { updateUserProfileInMatches, reserveUsername, releaseUsername } from '@/lib/firebaseServices';
 import { checkRateLimit, sanitizeProfileData } from '@/lib/security';
+import type { UserProfile } from '@/lib/models';
 
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  bio: string;
-  age: number;
-  gender: 'male' | 'female' | 'other';
-  city: string;
-  country: string;
-  photos: string[];
-  interests: string[];
-  lookingFor: 'people' | 'groups' | 'both';
-  relationshipGoal: 'relationship' | 'casual' | 'friends';
-  createdAt: Date;
-  isProfileComplete: boolean;
-  isEmailVerified: boolean;
-  emailNotifications?: boolean;
-}
+// Re-export UserProfile for backwards compatibility
+export type { UserProfile } from '@/lib/models';
 
 interface AuthContextType {
   user: User | null;
@@ -59,6 +44,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  completeRegistration: (firstName: string, username: string, university?: string) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -174,12 +160,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(`Only ${ALLOWED_EMAIL_DOMAIN} email addresses are allowed`);
     }
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await sendEmailVerification(userCredential.user);
 
-    // Create initial profile
+    // Create initial profile without username/firstName (will be added after profile completion)
     const initialProfile: UserProfile = {
       uid: userCredential.user.uid,
       email: email,
+      username: '',
+      firstName: '',
       displayName: '',
       bio: '',
       age: 18,
@@ -192,11 +179,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       relationshipGoal: 'friends',
       createdAt: new Date(),
       isProfileComplete: false,
-      isEmailVerified: false
+      isEmailVerified: true
     };
 
     await setDoc(doc(db, 'users', userCredential.user.uid), initialProfile);
     setUserProfile(initialProfile);
+  };
+
+  const completeRegistration = async (firstName: string, username: string, university?: string) => {
+    if (!user) throw new Error('No user logged in');
+    
+    // Reserve the username in the usernames collection
+    await reserveUsername(username, user.uid);
+
+    // Update profile with username, firstName, and university
+    const updates: Partial<UserProfile> = {
+      username: username.trim().toLowerCase(),
+      firstName: firstName.trim(),
+      displayName: firstName.trim(),
+      university: university || undefined
+    };
+
+    await updateDoc(doc(db, 'users', user.uid), updates);
+    setUserProfile(prev => prev ? { ...prev, ...updates } : null);
   };
 
   const signOut = async () => {
@@ -388,7 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, deleteAccount, resetPassword, changePassword }}
+      value={{ user, userProfile, loading, signIn, signUp, signOut, updateProfile, completeRegistration, deleteAccount, resetPassword, changePassword }}
     >
       {children}
     </AuthContext.Provider>

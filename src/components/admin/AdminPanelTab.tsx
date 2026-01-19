@@ -29,50 +29,18 @@ import {
   TrendingUp,
   Image as ImageIcon,
   MessageSquare,
-  ArrowLeft,
   ChevronLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { AdminUserData, DashboardStats } from "@/lib/models";
 
 const ADMIN_EMAILS = [
   "rikardo_balaj@universitetipolis.edu.al",
   "firdeus_kasaj@universitetipolis.edu.al"
 ];
-
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  gender?: string;
-  photos?: string[];
-  isEmailVerified?: boolean;
-  isOnline?: boolean;
-  lastSeen?: any;
-  createdAt?: any;
-  bio?: string;
-  isBanned?: boolean;
-  isPremium?: boolean;
-}
-
-interface DashboardStats {
-  totalUsers: number;
-  activeUsers: number;
-  verifiedUsers: number;
-  maleUsers: number;
-  femaleUsers: number;
-  otherGender: number;
-  completeProfiles: number;
-  incompleteProfiles: number;
-  premiumUsers: number;
-  bannedUsers: number;
-  totalMatches: number;
-  todaySignups: number;
-  weeklySignups: number;
-  avgPhotosPerUser: number;
-}
 
 interface MatchData {
   id: string;
@@ -193,7 +161,7 @@ function ActionButton({ label, icon: Icon, onClick, loading, variant = "default"
 }
 
 // User Row
-function UserRow({ user, onBan, onDelete, loading }: { user: UserData; onBan: () => void; onDelete: () => void; loading: boolean; }) {
+function UserRow({ user, onBan, onDelete, loading }: { user: AdminUserData; onBan: () => void; onDelete: () => void; loading: boolean; }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -201,11 +169,11 @@ function UserRow({ user, onBan, onDelete, loading }: { user: UserData; onBan: ()
       <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setExpanded(!expanded)}>
         <Avatar className="w-10 h-10">
           <AvatarImage src={user.photos?.[0]} />
-          <AvatarFallback className="bg-primary/20 text-primary font-semibold">{user.name?.[0] || '?'}</AvatarFallback>
+          <AvatarFallback className="bg-primary/20 text-primary font-semibold">{user.username?.[0]?.toUpperCase() || user.firstName?.[0]?.toUpperCase() || '?'}</AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground truncate">{user.name || 'Unknown'}</span>
+            <span className="font-medium text-foreground truncate">@{user.username || 'unknown'}</span>
             {user.isPremium && <Crown size={14} className="text-yellow-500 shrink-0" />}
             {user.isBanned && <Ban size={14} className="text-red-500 shrink-0" />}
           </div>
@@ -528,7 +496,7 @@ export default function AdminPanelTab() {
   const { user, loading } = useAuth();
   const [authorized, setAuthorized] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [users, setUsers] = useState<UserData[]>([]);
+  const [users, setUsers] = useState<AdminUserData[]>([]);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [fetchingStats, setFetchingStats] = useState(true);
   const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'chats' | 'email'>('dashboard');
@@ -574,7 +542,7 @@ export default function AdminPanelTab() {
       let premiumUsers = 0, bannedUsers = 0;
       let todaySignups = 0, weeklySignups = 0, totalPhotos = 0;
       
-      const usersList: UserData[] = [];
+      const usersList: AdminUserData[] = [];
       const matchesList: MatchData[] = [];
 
       usersSnap.forEach(docSnap => {
@@ -583,7 +551,8 @@ export default function AdminPanelTab() {
         
         usersList.push({
           id: docSnap.id,
-          name: data.name,
+          username: data.username || '',
+          firstName: data.firstName || data.displayName || '',
           email: data.email,
           gender: data.gender,
           photos: data.photos,
@@ -759,8 +728,8 @@ export default function AdminPanelTab() {
   };
 
   const exportCSV = () => {
-    const csv = users.map(u => `"${u.name || ''}","${u.email}","${u.gender || ''}",${u.photos?.length || 0}`).join('\n');
-    const blob = new Blob([`Name,Email,Gender,Photos\n${csv}`], { type: 'text/csv' });
+    const csv = users.map(u => `"${u.username || ''}","${u.firstName || ''}","${u.email}","${u.gender || ''}",${u.photos?.length || 0}`).join('\n');
+    const blob = new Blob([`Username,FirstName,Email,Gender,Photos\n${csv}`], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'frinder-users.csv';
@@ -768,7 +737,7 @@ export default function AdminPanelTab() {
   };
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || u.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase());
     if (userFilter === 'banned') return matchesSearch && u.isBanned;
     if (userFilter === 'premium') return matchesSearch && u.isPremium;
     return matchesSearch;
@@ -896,14 +865,14 @@ export default function AdminPanelTab() {
                 <div className="bg-card rounded-2xl p-4 border border-border">
                   <h3 className="font-semibold text-foreground mb-3">Recent Signups</h3>
                   <div className="space-y-2">
-                    {users.filter(u => u.createdAt?.toDate).sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime()).slice(0, 5).map(user => (
+                    {users.filter(u => u.createdAt?.toDate).sort((a, b) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)).slice(0, 5).map(user => (
                       <div key={user.id} className="flex items-center gap-3 p-2 rounded-xl bg-muted/50">
                         <Avatar className="w-8 h-8">
                           <AvatarImage src={user.photos?.[0]} />
-                          <AvatarFallback className="bg-primary/20 text-primary text-xs">{user.name?.[0] || '?'}</AvatarFallback>
+                          <AvatarFallback className="bg-primary/20 text-primary text-xs">{user.username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-foreground truncate">{user.name || 'New User'}</div>
+                          <div className="text-sm font-medium text-foreground truncate">@{user.username || 'new_user'}</div>
                           <div className="text-xs text-muted-foreground">{user.createdAt?.toDate?.().toLocaleDateString()}</div>
                         </div>
                         {user.isPremium && <Crown size={14} className="text-yellow-500" />}

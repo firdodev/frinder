@@ -107,12 +107,12 @@ export default function Home() {
     return <LandingPage onGetStarted={() => setShowAuth(true)} />;
   }
 
-  // Logged in but email not verified - stay in auth page for verification
-  if (!userProfile?.isEmailVerified) {
-    return <AuthPage onBack={() => setShowAuth(false)} />;
+  // Logged in but no username - show auth page for profile completion
+  if (!userProfile?.username) {
+    return <AuthPage />;
   }
 
-  // Logged in but profile not complete - show profile setup
+  // Logged in but profile not complete - show profile setup (bio, photos, etc.)
   if (!userProfile?.isProfileComplete) {
     return <ProfileSetup />;
   }

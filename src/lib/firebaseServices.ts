@@ -28,98 +28,39 @@ import {
   sanitizeInterests
 } from './security';
 
-// Types
-export interface Swipe {
-  odFromUserId: string;
-  odToUserId: string;
-  direction: 'left' | 'right' | 'superlike';
-  timestamp: Timestamp;
-}
+// Re-export all models from centralized location
+export * from './models';
 
-// User Credits & Subscription Types
-export interface UserCredits {
-  superLikes: number;
-  lastFreeSuperLike: Timestamp | null;
-  totalSuperLikesPurchased: number;
-  swipeCount: number; // For ad tracking
-  lastSwipeCountReset: Timestamp | null;
-}
+// Import types from models for internal use
+import type {
+  Swipe,
+  UserCredits,
+  UserSubscription,
+  Match,
+  Message,
+  DateRequest,
+  Group,
+  GroupMessage,
+  CallData,
+  IceCandidate,
+  RedeemCode,
+  COLLECTIONS
+} from './models';
 
-export interface UserSubscription {
-  isPremium: boolean;
-  isAdFree: boolean;
-  premiumExpiresAt: Timestamp | null;
-  adFreeExpiresAt: Timestamp | null;
-  // Premium benefits
-  unlimitedSuperLikes: boolean;
-  canSeeWhoLikedYou: boolean;
-  unlimitedRewinds: boolean;
-  priorityInDiscovery: boolean;
-  advancedFilters: boolean;
-  // Whop subscription management
-  membershipId?: string | null;
-  cancelAtPeriodEnd?: boolean;
-  // Pro super likes (15/month, 1/day)
-  proSuperLikesRemaining?: number;
-  proSuperLikesResetAt?: Timestamp | null;
-  lastProSuperLikeUsed?: Timestamp | null;
-}
-
-export interface Match {
-  id: string;
-  users: string[];
-  userProfiles: { [key: string]: UserProfile };
-  createdAt: Timestamp;
-  lastMessage?: string;
-  lastMessageTime?: Timestamp;
-}
-
-export interface Message {
-  id: string;
-  matchId: string;
-  senderId: string;
-  text: string;
-  timestamp: Timestamp;
-  read: boolean;
-}
-
-// Date Request types
-export interface DateRequest {
-  id: string;
-  matchId: string;
-  senderId: string;
-  recipientId: string;
-  title: string;
-  date: Timestamp;
-  time: string;
-  location: string;
-  description?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
-  createdAt: Timestamp;
-  respondedAt?: Timestamp;
-  cancelledAt?: Timestamp;
-  cancelledBy?: string;
-}
-
-export interface Group {
-  id: string;
-  name: string;
-  description: string;
-  photo: string;
-  creatorId: string;
-  members: string[];
-  memberProfiles: { [key: string]: UserProfile };
-  interests: string[];
-  activity: string;
-  location?: string;
-  isPrivate: boolean;
-  pendingMembers?: string[];
-  pendingMemberProfiles?: { [key: string]: UserProfile };
-  createdAt: Timestamp;
-  lastMessage?: string;
-  lastMessageTime?: Timestamp;
-  lastMessageSender?: string;
-}
+// Re-export types for backwards compatibility
+export type {
+  Swipe,
+  UserCredits,
+  UserSubscription,
+  Match,
+  Message,
+  DateRequest,
+  Group,
+  GroupMessage,
+  CallData,
+  IceCandidate,
+  RedeemCode
+};
 
 // Check if a display name is already taken by another user
 export async function isDisplayNameTaken(displayName: string, currentUserId?: string): Promise<boolean> {
@@ -145,6 +86,51 @@ export async function isDisplayNameTaken(displayName: string, currentUserId?: st
   } catch (error) {
     console.error('Error checking display name:', error);
     return false; // In case of error, allow the name (backend validation should also check)
+  }
+}
+
+// Check if a username is already taken
+export async function isUsernameTaken(username: string, currentUserId?: string): Promise<boolean> {
+  try {
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!normalizedUsername) return false;
+
+    // Check in the usernames collection (fast lookup)
+    const usernameDoc = await getDoc(doc(db, 'usernames', normalizedUsername));
+    
+    if (usernameDoc.exists()) {
+      const data = usernameDoc.data();
+      // If the username belongs to the current user, it's not "taken"
+      if (currentUserId && data.uid === currentUserId) {
+        return false;
+      }
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking username:', error);
+    return false;
+  }
+}
+
+// Reserve a username for a user
+export async function reserveUsername(username: string, userId: string): Promise<void> {
+  const normalizedUsername = username.trim().toLowerCase();
+  await setDoc(doc(db, 'usernames', normalizedUsername), {
+    uid: userId,
+    username: normalizedUsername,
+    createdAt: serverTimestamp()
+  });
+}
+
+// Release a username (when user changes username or deletes account)
+export async function releaseUsername(username: string): Promise<void> {
+  const normalizedUsername = username.trim().toLowerCase();
+  try {
+    await deleteDoc(doc(db, 'usernames', normalizedUsername));
+  } catch (error) {
+    console.error('Error releasing username:', error);
   }
 }
 
@@ -411,23 +397,6 @@ async function createMatch(userId1: string, userId2: string, isSuperLike: boolea
   });
 
   return matchId;
-}
-
-// Get user's matches
-export async function getMatches(userId: string): Promise<Match[]> {
-  try {
-    const matchesRef = collection(db, 'matches');
-    const matchesQuery = query(matchesRef, where('users', 'array-contains', userId), orderBy('createdAt', 'desc'));
-    const matchesSnapshot = await getDocs(matchesQuery);
-
-    return matchesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Match[];
-  } catch (error) {
-    console.error('Error getting matches:', error);
-    return [];
-  }
 }
 
 // Subscribe to matches in real-time
@@ -976,26 +945,6 @@ export async function updateGroup(
   }
 }
 
-// Get groups created by user
-export async function getMyCreatedGroups(userId: string): Promise<Group[]> {
-  try {
-    const groupsRef = collection(db, 'groups');
-    const groupsQuery = query(groupsRef, where('creatorId', '==', userId));
-    const groupsSnapshot = await getDocs(groupsQuery);
-
-    return groupsSnapshot.docs.map(
-      doc =>
-        ({
-          id: doc.id,
-          ...doc.data()
-        } as Group)
-    );
-  } catch (error) {
-    console.error('Error getting created groups:', error);
-    return [];
-  }
-}
-
 // Subscribe to groups created by user (for real-time updates)
 export function subscribeToMyCreatedGroups(userId: string, callback: (groups: Group[]) => void): () => void {
   const groupsRef = collection(db, 'groups');
@@ -1057,26 +1006,6 @@ export async function createGroup(
   } catch (error) {
     console.error('Error creating group:', error);
     throw error;
-  }
-}
-
-// Get user's joined groups
-export async function getUserGroups(userId: string): Promise<Group[]> {
-  try {
-    const groupsRef = collection(db, 'groups');
-    const groupsQuery = query(groupsRef, where('members', 'array-contains', userId));
-    const groupsSnapshot = await getDocs(groupsQuery);
-
-    return groupsSnapshot.docs.map(
-      doc =>
-        ({
-          id: doc.id,
-          ...doc.data()
-        } as Group)
-    );
-  } catch (error) {
-    console.error('Error getting user groups:', error);
-    return [];
   }
 }
 
@@ -1497,56 +1426,6 @@ export async function checkSwipeStatus(
   }
 }
 
-// Get pending match requests (people you swiped right on but haven't matched)
-export async function getPendingRequests(userId: string): Promise<(UserProfile & { swipedAt: Date })[]> {
-  try {
-    // Get all right swipes from this user
-    const swipesRef = collection(db, 'swipes');
-    const swipesQuery = query(
-      swipesRef,
-      where('fromUserId', '==', userId),
-      where('direction', 'in', ['right', 'superlike'])
-    );
-    const swipesSnapshot = await getDocs(swipesQuery);
-
-    const pendingRequests: (UserProfile & { swipedAt: Date })[] = [];
-
-    for (const swipeDoc of swipesSnapshot.docs) {
-      const swipeData = swipeDoc.data();
-      const targetUserId = swipeData.toUserId;
-
-      // Check if there's already a match
-      const matchId = [userId, targetUserId].sort().join('_');
-      const matchDoc = await getDoc(doc(db, 'matches', matchId));
-
-      if (matchDoc.exists()) {
-        const matchData = matchDoc.data();
-        // If matched (active or unmatched), skip - don't show as pending
-        // Unmatched users will appear in discovery again, not in pending
-        continue;
-      }
-
-      // Get the target user's profile
-      const userDoc = await getDoc(doc(db, 'users', targetUserId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserProfile;
-        pendingRequests.push({
-          ...userData,
-          swipedAt: (swipeData.timestamp && typeof swipeData.timestamp.toDate === 'function') ? swipeData.timestamp.toDate() : new Date()
-        });
-      }
-    }
-
-    // Sort by most recent
-    pendingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
-
-    return pendingRequests;
-  } catch (error) {
-    console.error('Error getting pending requests:', error);
-    return [];
-  }
-}
-
 // Subscribe to pending requests in real-time (optimized with parallel fetches)
 export function subscribeToPendingRequests(
   userId: string,
@@ -1606,63 +1485,6 @@ export async function cancelPendingRequest(fromUserId: string, toUserId: string)
   } catch (error) {
     console.error('Error canceling pending request:', error);
     throw error;
-  }
-}
-
-// Get incoming match requests (people who liked you but you haven't responded)
-export async function getIncomingRequests(userId: string): Promise<(UserProfile & { swipedAt: Date })[]> {
-  try {
-    // Get all right swipes TO this user
-    const swipesRef = collection(db, 'swipes');
-    const swipesQuery = query(
-      swipesRef,
-      where('toUserId', '==', userId),
-      where('direction', 'in', ['right', 'superlike'])
-    );
-    const swipesSnapshot = await getDocs(swipesQuery);
-
-    const incomingRequests: (UserProfile & { swipedAt: Date })[] = [];
-
-    for (const swipeDoc of swipesSnapshot.docs) {
-      const swipeData = swipeDoc.data();
-      const fromUserId = swipeData.fromUserId;
-
-      // Check if there's already a match (active or unmatched)
-      const matchId = [userId, fromUserId].sort().join('_');
-      const matchDoc = await getDoc(doc(db, 'matches', matchId));
-
-      // If any match exists (active or unmatched), skip
-      // Unmatched users will show in discovery, not as incoming requests
-      if (matchDoc.exists()) {
-        continue;
-      }
-
-      // Check if current user already swiped on this person
-      const reverseSwipeId = `${userId}_${fromUserId}`;
-      const reverseSwipeDoc = await getDoc(doc(db, 'swipes', reverseSwipeId));
-      if (reverseSwipeDoc.exists()) {
-        // Already responded, skip
-        continue;
-      }
-
-      // Get the from user's profile
-      const userDoc = await getDoc(doc(db, 'users', fromUserId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserProfile;
-        incomingRequests.push({
-          ...userData,
-          swipedAt: (swipeData.timestamp && typeof swipeData.timestamp.toDate === 'function') ? swipeData.timestamp.toDate() : new Date()
-        });
-      }
-    }
-
-    // Sort by most recent
-    incomingRequests.sort((a, b) => b.swipedAt.getTime() - a.swipedAt.getTime());
-
-    return incomingRequests;
-  } catch (error) {
-    console.error('Error getting incoming requests:', error);
-    return [];
   }
 }
 
@@ -1747,30 +1569,6 @@ export async function declineMatchRequest(currentUserId: string, fromUserId: str
     console.error('Error declining match request:', error);
     throw error;
   }
-}
-
-// Voice Call Types
-export interface CallData {
-  id: string;
-  callerId: string;
-  callerName: string;
-  callerPhoto: string;
-  receiverId: string;
-  receiverName: string;
-  receiverPhoto: string;
-  matchId: string;
-  status: 'ringing' | 'ongoing' | 'ended' | 'missed' | 'declined';
-  offer?: RTCSessionDescriptionInit;
-  answer?: RTCSessionDescriptionInit;
-  createdAt: Timestamp;
-  endedAt?: Timestamp;
-}
-
-export interface IceCandidate {
-  id: string;
-  candidate: RTCIceCandidateInit;
-  fromUserId: string;
-  timestamp: Timestamp;
 }
 
 // Create a new voice call
@@ -1908,27 +1706,6 @@ export function subscribeToIncomingCalls(userId: string, callback: (call: CallDa
       callback(null);
     }
   });
-}
-
-// Group Message type
-export interface GroupMessage {
-  id: string;
-  groupId: string;
-  senderId: string;
-  senderName: string;
-  senderPhoto: string;
-  text: string;
-  timestamp: Timestamp;
-  type: 'text' | 'image';
-  imageUrl?: string;
-  replyTo?: {
-    id: string;
-    text: string;
-    senderId: string;
-    senderName: string;
-  };
-  edited?: boolean;
-  deleted?: boolean;
 }
 
 // Send a message to a group
@@ -2380,16 +2157,6 @@ export async function incrementSwipeCount(userId: string, swipeInterval: number 
 // =====================================
 // REDEEM CODES
 // =====================================
-
-// Redeem code types
-export interface RedeemCode {
-  code: string;
-  type: 'pro' | 'superlikes';
-  used: boolean;
-  usedBy?: string;
-  usedAt?: Timestamp;
-  createdAt: Timestamp;
-}
 
 // Valid redeem codes (checked directly, no Firebase init needed)
 export const VALID_REDEEM_CODES: { [code: string]: 'pro' | 'superlikes' } = {
