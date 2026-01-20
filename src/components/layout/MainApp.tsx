@@ -296,8 +296,7 @@ export default function MainApp() {
 
   const tabs: { id: Tab; icon: any; label: string; fillActive: boolean }[] = [
     { id: 'swipe', icon: Heart, label: 'Discover', fillActive: true },
-    { id: 'groups', icon: Users, label: 'Groups', fillActive: false },
-    { id: 'search', icon: Search, label: 'Search', fillActive: false },
+    { id: 'search', icon: Search, label: 'Explore', fillActive: false },
     { id: 'matches', icon: Sparkles, label: 'Matches', fillActive: false },
     { id: 'messages', icon: MessageCircle, label: 'Messages', fillActive: false },
   ];
@@ -317,11 +316,11 @@ export default function MainApp() {
   const renderContent = () => {
     switch (activeTab) {
       case 'swipe':
-        return <SwipePeople onGoToShop={() => setActiveTab('profile')} onGoToProfile={() => setActiveTab('profile')} />;
+        return <SwipePeople onGoToShop={() => setActiveTab('profile')} onGoToProfile={() => setActiveTab('profile')} onOpenGroupChat={handleOpenGroupChat} />;
       case 'groups':
         return <SwipeGroups onOpenGroupChat={handleOpenGroupChat} />;
       case 'search':
-        return <SearchComponent />;
+        return <SearchComponent onStartChat={handleStartChat} />;
       case 'matches':
         return <Matches onStartChat={handleStartChat} />;
       case 'messages':
@@ -490,7 +489,7 @@ export default function MainApp() {
             <p className='text-sm text-muted-foreground'>
               {activeTab === 'swipe' && 'Find your perfect match'}
               {activeTab === 'groups' && 'Join groups with similar interests'}
-              {activeTab === 'search' && 'Search for people and groups'}
+              {activeTab === 'search' && 'Explore and discover new people'}
               {activeTab === 'matches' && 'View and interact with your matches'}
               {activeTab === 'messages' && 'Chat with your matches'}
               {activeTab === 'profile' && 'Manage your profile'}
@@ -514,7 +513,7 @@ export default function MainApp() {
         </div>
 
         {/* Content */}
-        <div className={`flex-1 overflow-hidden ${activeTab === 'profile' ? 'pb-0' : 'pb-20'} lg:pb-0 lg:bg-white lg:dark:bg-black lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-frinder-orange/20`}>
+        <div className={`flex-1 overflow-hidden lg:pb-0 lg:bg-white lg:dark:bg-black lg:rounded-b-2xl lg:shadow-xl lg:dark:shadow-none lg:dark:border lg:dark:border-t-0 lg:dark:border-frinder-orange/20`}>
           <AnimatePresence mode='wait'>
             <motion.div
               key={activeTab}
@@ -531,21 +530,21 @@ export default function MainApp() {
 
         {/* Mobile Bottom Navigation - hidden on desktop and profile */}
         {activeTab !== 'profile' && (
-        <div className='lg:hidden fixed bottom-0 left-0 right-0 pl-safe pr-safe' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <div className='mx-3 mb-3 rounded-2xl bg-white/95 dark:bg-black/95 backdrop-blur-lg border border-gray-200 dark:border-frinder-orange/20 shadow-lg'>
-          <div className='flex items-center justify-around py-2'>
+        <div className='lg:hidden fixed bottom-0 left-0 right-0 flex justify-center z-50' style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}>
+          <div className='px-4 py-2 rounded-full bg-black/60 backdrop-blur-2xl border border-white/10 shadow-2xl'>
+          <div className='flex items-center gap-6'>
             {tabs.map(tab => (
               <motion.button
                 key={tab.id}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setActiveTab(tab.id as Tab)}
-                className='relative flex flex-col items-center gap-1 p-2 min-w-[50px] sm:min-w-[60px]'
+                className='relative flex items-center justify-center p-2'
               >
                 <div className='relative'>
                   <tab.icon
-                    className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
-                      activeTab === tab.id ? 'text-frinder-orange' : 'text-muted-foreground'
+                    className={`w-5 h-5 transition-colors ${
+                      activeTab === tab.id ? 'text-frinder-orange' : 'text-white/60'
                     }`}
                     fill={activeTab === tab.id && tab.fillActive ? 'currentColor' : 'none'}
                   />
@@ -553,18 +552,12 @@ export default function MainApp() {
                     <motion.span 
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className='absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-0.5'
+                      className='absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center bg-red-500 text-white text-[8px] font-bold rounded-full px-0.5'
                     >
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </motion.span>
                   )}
                 </div>
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId='activeTab'
-                    className='absolute -bottom-1 w-6 h-1 rounded-full bg-frinder-orange'
-                  />
-                )}
               </motion.button>
             ))}
           </div>

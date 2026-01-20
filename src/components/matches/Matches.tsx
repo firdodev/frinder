@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserAvatar, getAvatarColor } from '@/components/ui/user-avatar';
 import { Button } from '@/components/ui/button';
@@ -20,12 +20,16 @@ import {
   MoreHorizontal,
   X,
   ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Users,
   Clock,
   Send,
   Check,
   UserCheck,
-  User
+  User,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -37,6 +41,9 @@ import {
   subscribeToIncomingRequests,
   acceptMatchRequest,
   declineMatchRequest,
+  getActiveStoryForUser,
+  getUserStories,
+  sendMessage,
   type Match as FirebaseMatch
 } from '@/lib/firebaseServices';
 import { UserProfile } from '@/contexts/AuthContext';
@@ -57,6 +64,8 @@ interface MatchProfile {
   lastSeen?: Date;
   relationshipGoal?: 'relationship' | 'casual' | 'friends';
   lookingFor?: 'people' | 'groups' | 'both';
+  storyPhoto?: string;
+  allStories?: Array<{ id: string; photoUrl: string; createdAt: Date; expiresAt: Date; matchesOnly: boolean }>;
 }
 
 interface MatchesProps {
@@ -77,6 +86,15 @@ export default function Matches({ onStartChat }: MatchesProps) {
   const [showUnmatchDialog, setShowUnmatchDialog] = useState(false);
   const [matchToUnmatch, setMatchToUnmatch] = useState<MatchProfile | null>(null);
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  
+  // Story viewing state
+  const [viewingStory, setViewingStory] = useState<MatchProfile | null>(null);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [storyDirection, setStoryDirection] = useState<'next' | 'prev'>('next');
+  const [storyReply, setStoryReply] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [showPendingSection, setShowPendingSection] = useState(false);
+  const storyReplyRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -90,6 +108,19 @@ export default function Matches({ onStartChat }: MatchesProps) {
           const otherUserIndex = m.users[0] === user.uid ? 1 : 0;
           const otherUserId = m.users[otherUserIndex];
           const otherUserProfile = m.userProfiles?.[otherUserId];
+          
+          // Fetch ALL stories for this matched user (only if we have a valid userId)
+          let storyPhoto: string | undefined;
+          let allStories: Array<{ id: string; photoUrl: string; createdAt: Date; expiresAt: Date; matchesOnly: boolean }> | undefined;
+          if (otherUserId) {
+            try {
+              const stories = await getUserStories(otherUserId);
+              allStories = stories;
+              storyPhoto = stories.length > 0 ? stories[0].photoUrl : undefined;
+            } catch (e) {
+              console.error('Error fetching stories:', e);
+            }
+          }
 
           return {
             id: m.id,
@@ -110,7 +141,9 @@ export default function Matches({ onStartChat }: MatchesProps) {
                 : new Date(),
             isOnline: false,
             relationshipGoal: otherUserProfile?.relationshipGoal,
-            lookingFor: otherUserProfile?.lookingFor
+            lookingFor: otherUserProfile?.lookingFor,
+            storyPhoto,
+            allStories
           };
         })
       );
@@ -180,6 +213,45 @@ export default function Matches({ onStartChat }: MatchesProps) {
     }
   };
 
+  // Story reply handlers
+  const handleSendStoryReply = async (message: string) => {
+    if (!viewingStory || !user?.uid || !message.trim()) return;
+    
+    setSendingReply(true);
+    try {
+      // Send message with story reference
+      const storyMessage = `📸 Replied to story: "${message}"`;
+      await sendMessage(viewingStory.id, user.uid, storyMessage);
+      toast.success('Reply sent!');
+      setStoryReply('');
+      setViewingStory(null);
+    } catch (error) {
+      console.error('Error sending story reply:', error);
+      toast.error('Failed to send reply');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleSendHeartReaction = async () => {
+    if (!viewingStory || !user?.uid) return;
+    
+    setSendingReply(true);
+    try {
+      // Send heart emoji as reaction to story
+      const heartMessage = `❤️ Reacted to your story`;
+      await sendMessage(viewingStory.id, user.uid, heartMessage);
+      toast.success('Heart sent!');
+      setViewingStory(null);
+    } catch (error) {
+      console.error('Error sending heart reaction:', error);
+      toast.error('Failed to send reaction');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const matchesWithStories = matches.filter(m => m.storyPhoto);
   const filteredMatches = matches.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const formatMatchDate = (date: Date) => {
@@ -227,6 +299,199 @@ export default function Matches({ onStartChat }: MatchesProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Story Viewer Modal */}
+      <AnimatePresence>
+        {viewingStory && viewingStory.allStories && viewingStory.allStories.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 z-50 bg-black flex flex-col'
+            onClick={() => setViewingStory(null)}
+          >
+            {/* Progress bars for multiple stories */}
+            {viewingStory.allStories.length > 1 && (
+              <div className='absolute top-2 left-4 right-4 z-20 flex gap-1.5'>
+                {viewingStory.allStories.map((_, index) => (
+                  <div 
+                    key={index} 
+                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                      index === currentStoryIndex 
+                        ? 'bg-frinder-orange shadow-[0_0_8px_rgba(255,140,0,0.6)]' 
+                        : 'bg-white/20 backdrop-blur-md'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Story Header - Blurry Card Style */}
+            <div className='absolute top-4 left-4 right-4 z-10 flex items-start justify-between'>
+              {/* User Info Card */}
+              <div className='bg-black/25 backdrop-blur-2xl rounded-2xl px-3 py-2.5 flex items-center gap-3 border border-white/10 shadow-lg'>
+                {/* Profile Picture */}
+                <div className='w-10 h-10 rounded-full overflow-hidden border-2 border-white/30'>
+                  {viewingStory.photo ? (
+                    <img 
+                      src={viewingStory.photo} 
+                      alt={viewingStory.name}
+                      className='w-full h-full object-cover'
+                    />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(viewingStory.name)}`}>
+                      <User className='w-5 h-5 text-white' />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className='text-white font-semibold text-base'>
+                    {viewingStory.name}{viewingStory.age ? <span className='font-medium text-white ml-1.5'>{viewingStory.age}</span> : ''}
+                  </p>
+                  {/* Matches Only badge inside card */}
+                  {viewingStory.allStories[currentStoryIndex]?.matchesOnly && (
+                    <p className='text-frinder-orange text-xs flex items-center gap-1 mt-0.5'>
+                      <Lock className='w-3 h-3' />
+                      Matches only
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Close Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewingStory(null);
+                }}
+                className='w-10 h-10 rounded-full bg-black/25 backdrop-blur-2xl border border-white/10 shadow-lg flex items-center justify-center hover:bg-black/40 transition-colors'
+              >
+                <X className='w-5 h-5 text-white' />
+              </button>
+            </div>
+
+            {/* Navigation Arrows */}
+            {viewingStory.allStories.length > 1 && (
+              <>
+                {/* Previous Story Button */}
+                {currentStoryIndex > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStoryDirection('prev');
+                      setCurrentStoryIndex(currentStoryIndex - 1);
+                    }}
+                    className='absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors'
+                  >
+                    <ChevronLeft className='w-6 h-6 text-white' />
+                  </button>
+                )}
+                
+                {/* Next Story Button */}
+                {currentStoryIndex < viewingStory.allStories.length - 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStoryDirection('next');
+                      setCurrentStoryIndex(currentStoryIndex + 1);
+                    }}
+                    className='absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors'
+                  >
+                    <ChevronRight className='w-6 h-6 text-white' />
+                  </button>
+                )}
+              </>
+            )}
+            
+            {/* Story Image with Cube Animation */}
+            <div className='flex-1 flex items-center justify-center overflow-hidden' style={{ perspective: '1000px' }}>
+              <AnimatePresence mode='wait' initial={false}>
+                <motion.img 
+                  key={`${viewingStory.id}-${currentStoryIndex}`}
+                  src={viewingStory.allStories[currentStoryIndex]?.photoUrl || viewingStory.storyPhoto} 
+                  alt='Story' 
+                  className='w-full h-full object-cover'
+                  onClick={(e) => e.stopPropagation()}
+                  initial={{ 
+                    rotateY: storyDirection === 'next' ? 45 : -45,
+                    opacity: 0,
+                    x: storyDirection === 'next' ? 100 : -100
+                  }}
+                  animate={{ 
+                    rotateY: 0,
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{ 
+                    rotateY: storyDirection === 'next' ? -45 : 45,
+                    opacity: 0,
+                    x: storyDirection === 'next' ? -100 : 100
+                  }}
+                  transition={{ 
+                    type: 'tween',
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                    duration: 0.25
+                  }}
+                  style={{ transformStyle: 'preserve-3d' }}
+                />
+              </AnimatePresence>
+            </div>
+
+            {/* Story Reply Footer */}
+            <div className='absolute bottom-0 left-0 right-0 p-4 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent'>
+              <div className='flex items-center gap-3'>
+                {/* Blurry Input */}
+                <div className='flex-1 relative'>
+                  <input
+                    ref={storyReplyRef}
+                    type='text'
+                    value={storyReply}
+                    onChange={(e) => setStoryReply(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && storyReply.trim()) {
+                        handleSendStoryReply(storyReply);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder='Enter your answer...'
+                    className='w-full px-4 py-3 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-frinder-orange/50 text-sm'
+                  />
+                </div>
+                
+                {/* Send Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (storyReply.trim()) {
+                      handleSendStoryReply(storyReply);
+                    }
+                  }}
+                  disabled={sendingReply || !storyReply.trim()}
+                  className='w-12 h-12 rounded-full bg-frinder-orange flex items-center justify-center hover:bg-frinder-burnt transition-colors disabled:opacity-50'
+                >
+                  {sendingReply ? (
+                    <Loader2 className='w-5 h-5 text-white animate-spin' />
+                  ) : (
+                    <Send className='w-5 h-5 text-white' />
+                  )}
+                </button>
+                
+                {/* Heart Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendHeartReaction();
+                  }}
+                  disabled={sendingReply}
+                  className='w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors disabled:opacity-50'
+                >
+                  <Heart className='w-6 h-6 text-white fill-white' />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Match Detail Sheet/Dialog */}
       <AnimatePresence>
@@ -404,36 +669,89 @@ export default function Matches({ onStartChat }: MatchesProps) {
 
       {/* Matches Content */}
       <div className='flex-1 overflow-y-auto'>
-        {/* Pending Requests Section */}
-        {pendingRequests.length > 0 && (
+        {/* Stories Section - Only show if there are matches with stories */}
+        {matchesWithStories.length > 0 && (
           <div className='px-4 py-3 border-b dark:border-frinder-orange/20'>
             <div className='flex items-center gap-2 mb-3'>
-              <Send className='w-4 h-4 text-frinder-gold' />
-              <h2 className='text-sm font-semibold dark:text-white'>Pending Requests</h2>
-              <Badge variant='secondary' className='bg-frinder-gold/10 text-frinder-gold text-xs'>
-                {pendingRequests.length}
+              <div className='w-5 h-5 rounded-full bg-gradient-to-tr from-frinder-orange via-pink-500 to-purple-600 flex items-center justify-center'>
+                <Sparkles className='w-3 h-3 text-white' />
+              </div>
+              <h2 className='text-sm font-semibold dark:text-white'>Stories</h2>
+              <Badge variant='secondary' className='bg-frinder-orange/10 text-frinder-orange text-xs'>
+                {matchesWithStories.length}
               </Badge>
             </div>
             <div className='flex gap-3 overflow-x-auto pb-2 -mx-4 px-4'>
-              {pendingRequests.map(request => (
+              {matchesWithStories.map(match => (
+                <motion.button
+                  key={match.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setCurrentStoryIndex(0);
+                    setViewingStory(match);
+                  }}
+                  className='flex flex-col items-center gap-1.5 min-w-16'
+                >
+                  <div className='relative'>
+                    {/* Orange gradient ring for story indicator */}
+                    <div className='w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-frinder-orange via-pink-500 to-purple-600'>
+                      <div className='w-full h-full rounded-full border-2 border-white dark:border-black overflow-hidden'>
+                        {match.photo ? (
+                          <img 
+                            src={match.photo} 
+                            alt={match.name}
+                            className='w-full h-full object-cover'
+                          />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(match.name)}`}>
+                            <User className='w-6 h-6 text-white/80' />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className='text-xs text-center truncate w-full dark:text-white'>
+                    {match.name?.split(' ')[0] || 'User'}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Incoming Requests Section (People who liked you) */}
+        {incomingRequests.length > 0 && (
+          <div className='px-4 py-3 border-b dark:border-frinder-orange/20 bg-frinder-orange/5'>
+            <div className='flex items-center gap-2 mb-3'>
+              <Heart className='w-4 h-4 text-frinder-orange fill-frinder-orange' />
+              <h2 className='text-sm font-semibold dark:text-white'>Likes You</h2>
+              <Badge variant='secondary' className='bg-frinder-orange/10 text-frinder-orange text-xs'>
+                {incomingRequests.length}
+              </Badge>
+            </div>
+            <div className='flex gap-3 overflow-x-auto pb-2 -mx-4 px-4'>
+              {incomingRequests.map(request => (
                 <motion.button
                   key={request.uid}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedPending(request)}
+                  onClick={() => setSelectedIncoming(request)}
                   className='flex flex-col items-center gap-1.5 min-w-16'
                 >
                   <div className='relative'>
                     <UserAvatar
                       src={request.photos?.[0]}
                       name={request.displayName}
-                      className='w-14 h-14 border-2 border-frinder-gold'
+                      className='w-14 h-14 border-2 border-frinder-orange'
                       showInitial={!!request.photos?.[0]}
                     />
-                    <div className='absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-frinder-gold rounded-full flex items-center justify-center'>
-                      <Clock className='w-3 h-3 text-white' />
+                    <div className='absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-frinder-orange rounded-full flex items-center justify-center'>
+                      <Heart className='w-3 h-3 text-white fill-white' />
                     </div>
                   </div>
                   <span className='text-xs text-center truncate w-full dark:text-white'>
@@ -442,6 +760,71 @@ export default function Matches({ onStartChat }: MatchesProps) {
                 </motion.button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Pending Requests Section - Collapsible */}
+        {pendingRequests.length > 0 && (
+          <div className='border-b dark:border-frinder-orange/20'>
+            <button
+              onClick={() => setShowPendingSection(!showPendingSection)}
+              className='w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors'
+            >
+              <div className='flex items-center gap-2'>
+                <Send className='w-4 h-4 text-frinder-gold' />
+                <h2 className='text-sm font-semibold dark:text-white'>Pending Requests</h2>
+                <Badge variant='secondary' className='bg-frinder-gold/10 text-frinder-gold text-xs'>
+                  {pendingRequests.length}
+                </Badge>
+              </div>
+              {showPendingSection ? (
+                <ChevronUp className='w-4 h-4 text-muted-foreground' />
+              ) : (
+                <ChevronDown className='w-4 h-4 text-muted-foreground' />
+              )}
+            </button>
+            <AnimatePresence>
+              {showPendingSection && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className='overflow-hidden'
+                >
+                  <div className='px-4 pb-3'>
+                    <div className='flex gap-3 overflow-x-auto pb-2 -mx-4 px-4'>
+                      {pendingRequests.map(request => (
+                        <motion.button
+                          key={request.uid}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedPending(request)}
+                          className='flex flex-col items-center gap-1.5 min-w-16'
+                        >
+                          <div className='relative'>
+                            <UserAvatar
+                              src={request.photos?.[0]}
+                              name={request.displayName}
+                              className='w-14 h-14 border-2 border-frinder-gold'
+                              showInitial={!!request.photos?.[0]}
+                            />
+                            <div className='absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-frinder-gold rounded-full flex items-center justify-center'>
+                              <Clock className='w-3 h-3 text-white' />
+                            </div>
+                          </div>
+                          <span className='text-xs text-center truncate w-full dark:text-white'>
+                            {request.displayName?.split(' ')[0] || 'User'}
+                          </span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 

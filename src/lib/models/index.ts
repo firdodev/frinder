@@ -25,6 +25,7 @@ export const COLLECTIONS = {
   ICE_CANDIDATES: 'iceCandidates', // Subcollection of calls
   PURCHASES: 'purchases',
   REDEEM_CODES: 'redeemCodes',
+  STORIES: 'stories',
 } as const;
 
 // =====================================
@@ -419,3 +420,20 @@ export type MessageType = 'text' | 'image' | 'gif';
  * Notification type options
  */
 export type NotificationType = 'match' | 'message' | 'superlike' | 'group_invite' | 'date_request' | 'system';
+
+// =====================================
+// STORY MODELS
+// =====================================
+
+/**
+ * Story document in 'stories' collection
+ * Stories auto-expire after 24 hours
+ */
+export interface Story {
+  id: string;
+  userId: string;
+  photoUrl: string;
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+  matchesOnly?: boolean; // If true, story only visible to matched users
+}

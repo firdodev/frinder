@@ -13,6 +13,7 @@ import {
   Crown,
   Zap,
   User,
+  Users,
   ShoppingBag,
   BadgeCheck,
   ChevronDown,
@@ -21,7 +22,9 @@ import {
   Bookmark,
   Menu,
   Flame,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Lock,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -54,9 +57,11 @@ interface Profile {
   interests: string[];
   distance?: string;
   course?: string;
+  city?: string;
   relationshipGoal?: 'relationship' | 'casual' | 'friends';
   gender?: 'male' | 'female' | 'other';
   university?: string;
+  storyPhoto?: string; // Active story photo URL
 }
 
 // Gold star particle for super like celebration
@@ -571,8 +576,15 @@ function SwipeCard({
     };
   }, [triggerButtonSwipe, onButtonSwipe, isTop]);
 
+  // Combine photos with story (story appears at the end)
+  const allPhotos = profile.storyPhoto 
+    ? [...profile.photos, profile.storyPhoto]
+    : profile.photos;
+  
+  const isStoryPhoto = profile.storyPhoto && currentPhoto === allPhotos.length - 1;
+
   const nextPhoto = () => {
-    if (currentPhoto < profile.photos.length - 1) setCurrentPhoto(currentPhoto + 1);
+    if (currentPhoto < allPhotos.length - 1) setCurrentPhoto(currentPhoto + 1);
   };
 
   const prevPhoto = () => {
@@ -583,29 +595,29 @@ function SwipeCard({
     <>
       {/* Main swipeable card - outer container */}
       <motion.div
-        className='absolute inset-4 top-16 bottom-6 z-10 flex flex-col'
+        className='absolute inset-3 top-14 bottom-20 z-10 flex flex-col'
         style={{ x, y, rotate, scale }}
         drag={!isExpanded}
         dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-        dragElastic={0.8}
+        dragElastic={0.9}
         onDragEnd={handleDragEnd}
         animate={controls}
-        initial={{ scale: 0.95, opacity: 0 }}
-        whileInView={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 25, mass: 0.8 }}
+        initial={{ scale: 0.98, opacity: 0, y: 20 }}
+        whileInView={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         whileTap={{ cursor: isExpanded ? 'default' : 'grabbing' }}
       >
         {/* Unified card container */}
-        <div className='flex flex-col h-full rounded-[2rem] overflow-hidden shadow-2xl ring-[3px] ring-frinder-orange/80'>
+        <div className='flex flex-col h-full rounded-[2.5rem] overflow-hidden shadow-2xl bg-zinc-900'>
           {/* Inner photo section */}
           <div className='flex-1 relative'>
             {/* Photo */}
             <div className='absolute inset-0'>
               <AnimatePresence mode='wait'>
-                {profile.photos[currentPhoto] ? (
+                {allPhotos[currentPhoto] ? (
                   <motion.img
                     key={currentPhoto}
-                    src={profile.photos[currentPhoto]}
+                    src={allPhotos[currentPhoto]}
                     alt={profile.name}
                     className='w-full h-full object-cover'
                     initial={{ opacity: 0 }}
@@ -627,19 +639,37 @@ function SwipeCard({
               </AnimatePresence>
             </div>
 
+            {/* Story indicator badge - shows when viewing story photo */}
+            {isStoryPhoto && (
+              <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-30'>
+                <div className='px-3 py-1 bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 rounded-full'>
+                  <span className='text-white text-xs font-semibold'>Story</span>
+                </div>
+              </div>
+            )}
+
             {/* Photo indicators - horizontal bars */}
-            {profile.photos.length > 1 && (
+            {allPhotos.length > 1 && (
               <div className='absolute top-4 left-4 right-4 flex gap-1.5 z-20'>
-                {profile.photos.map((_, i) => (
-                  <div
-                    key={i}
-                  className={`h-1 flex-1 rounded-full transition-all ${
-                    i === currentPhoto ? 'bg-white' : 'bg-white/30'
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+                {allPhotos.map((_, i) => {
+                  const isStory = profile.storyPhoto && i === allPhotos.length - 1;
+                  return (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-all ${
+                        i === currentPhoto 
+                          ? isStory 
+                            ? 'bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600' 
+                            : 'bg-white' 
+                          : isStory 
+                            ? 'bg-gradient-to-r from-yellow-400/40 via-pink-500/40 to-purple-600/40'
+                            : 'bg-white/30'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            )}
 
           {/* Photo navigation areas */}
           <div className='absolute inset-0 flex z-10'>
@@ -719,26 +749,30 @@ function SwipeCard({
           </motion.div>
 
           {/* Bottom gradient */}
-          <div className='absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none rounded-b-3xl' />
+          <div className='absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black via-black/70 to-transparent pointer-events-none' />
 
           {/* Profile info - bottom section of photo */}
-          <div className='absolute bottom-0 left-0 right-0 p-5 text-white z-20'>
+          <div className='absolute bottom-24 left-0 right-0 p-5 text-white z-20'>
             {/* Name row with info button */}
             <div className='flex items-end justify-between'>
               <div>
                 {/* Name and badge */}
                 <div className='flex items-center gap-2 mb-1'>
-                  <h2 className='text-2xl font-bold'>
+                  <h2 className='text-3xl font-bold'>
                     {profile.name}, {profile.age}
                   </h2>
                   <BadgeCheck className='w-6 h-6 text-blue-400' fill='currentColor' />
                 </div>
 
-                {/* In real time indicator */}
-                <div className='flex items-center gap-2 text-white/80'>
-                  <div className='w-2 h-2 rounded-full bg-green-400 animate-pulse' />
-                  <span className='text-sm'>In real time</span>
-                </div>
+                {/* Location info */}
+                {(profile.city || profile.course) && (
+                  <div className='flex items-center gap-2 text-white/90'>
+                    <MapPin className='w-4 h-4' />
+                    <span className='text-sm font-medium'>
+                      {profile.city}{profile.city && profile.course && ' · '}{profile.course}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Info button - bottom right of info section */}
@@ -747,7 +781,7 @@ function SwipeCard({
                   e.stopPropagation();
                   setIsExpanded(true);
                 }}
-                className='w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center'
+                className='w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20'
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
@@ -902,61 +936,500 @@ function SwipeCard({
               </motion.div>
             )}
           </AnimatePresence>
-          </div>
 
-          {/* Buttons section - connected to photo as part of unified card */}
-          <div className='py-4 bg-[#1a1a1a] dark:bg-[#1a1a1a] flex items-center justify-center gap-8'>
+          {/* Buttons section - inside card, floating over gradient */}
+          <div className='absolute bottom-6 left-0 right-0 flex items-center justify-center gap-5 z-30'>
             {/* Nope - X */}
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.85 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onButtonSwipe?.('left');
               }}
-              className='w-14 h-14 rounded-full bg-white border-2 border-gray-200 dark:bg-gray-800 dark:border-gray-600 flex items-center justify-center shadow-md'
+              className='w-14 h-14 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg'
             >
-              <X className='w-7 h-7 text-gray-500 dark:text-gray-300' strokeWidth={2.5} />
+              <X className='w-7 h-7 text-zinc-600' strokeWidth={2.5} />
             </motion.button>
 
             {/* Super Like - Star */}
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.85 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onButtonSwipe?.('up');
               }}
-              className='w-14 h-14 rounded-full bg-amber-400 flex items-center justify-center shadow-md'
+              className='w-12 h-12 rounded-full bg-amber-400 flex items-center justify-center shadow-lg'
             >
-              <Star className='w-7 h-7 text-white' fill='currentColor' />
+              <Star className='w-6 h-6 text-white' fill='currentColor' />
             </motion.button>
 
             {/* Like - Heart */}
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.85 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onButtonSwipe?.('right');
               }}
-              className='w-14 h-14 rounded-full bg-pink-500 flex items-center justify-center shadow-md'
+              className='w-16 h-16 rounded-full bg-pink-500 flex items-center justify-center shadow-lg'
             >
-              <Heart className='w-7 h-7 text-white' fill='currentColor' />
+              <Heart className='w-8 h-8 text-white' fill='currentColor' />
             </motion.button>
           </div>
+        </div>
         </div>
       </motion.div>
     </>
   );
 }
 
+// Groups View Component - shows list of groups to join/chat
+interface GroupsViewProps {
+  onOpenGroupChat?: (groupId: string) => void;
+}
+
+interface GroupItem {
+  id: string;
+  name: string;
+  description: string;
+  photo: string;
+  memberCount: number;
+  isPrivate: boolean;
+  lastMessage?: string;
+  isMember?: boolean;
+  creatorId?: string;
+}
+
+function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
+  const { user } = useAuth();
+  const [groups, setGroups] = useState<GroupItem[]>([]);
+  const [myGroups, setMyGroups] = useState<GroupItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'discover' | 'mygroups'>('mygroups');
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [newGroupPrivate, setNewGroupPrivate] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    async function loadGroups() {
+      if (!user?.uid) return;
+      try {
+        setLoading(true);
+        // Import and call the group functions
+        const { getGroupsToSwipe, getMyGroups } = await import('@/lib/firebaseServices');
+        
+        const [availableGroups, userGroups] = await Promise.all([
+          getGroupsToSwipe(user.uid),
+          getMyGroups ? getMyGroups(user.uid) : Promise.resolve([])
+        ]);
+
+        setGroups(availableGroups.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          description: g.description || '',
+          photo: g.photo || '',
+          memberCount: g.members?.length || 0,
+          isPrivate: g.isPrivate || false,
+          isMember: false,
+          creatorId: g.creatorId
+        })));
+
+        // Sort user groups - created by user first
+        const sortedUserGroups = (userGroups || [])
+          .map((g: any) => ({
+            id: g.id,
+            name: g.name,
+            description: g.description || '',
+            photo: g.photo || '',
+            memberCount: g.members?.length || 0,
+            isPrivate: g.isPrivate || false,
+            lastMessage: g.lastMessage || '',
+            isMember: true,
+            creatorId: g.creatorId
+          }))
+          .sort((a: GroupItem, b: GroupItem) => {
+            // Groups created by user come first
+            const aIsCreator = a.creatorId === user.uid;
+            const bIsCreator = b.creatorId === user.uid;
+            if (aIsCreator && !bIsCreator) return -1;
+            if (!aIsCreator && bIsCreator) return 1;
+            return 0;
+          });
+
+        setMyGroups(sortedUserGroups);
+      } catch (error) {
+        console.error('Error loading groups:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadGroups();
+  }, [user?.uid]);
+
+  const handleJoinGroup = async (groupId: string) => {
+    if (!user?.uid) return;
+    try {
+      const { joinGroup } = await import('@/lib/firebaseServices');
+      await joinGroup(groupId, user.uid);
+      toast.success('Joined group successfully!');
+      // Move to my groups
+      const joinedGroup = groups.find(g => g.id === groupId);
+      if (joinedGroup) {
+        setMyGroups(prev => [...prev, { ...joinedGroup, isMember: true }]);
+        setGroups(prev => prev.filter(g => g.id !== groupId));
+      }
+    } catch (error) {
+      console.error('Error joining group:', error);
+      toast.error('Failed to join group');
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!user?.uid || !newGroupName.trim()) return;
+    try {
+      setCreating(true);
+      const { createGroup } = await import('@/lib/firebaseServices');
+      const newGroupId = await createGroup(user.uid, {
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim(),
+        photo: '',
+        activity: '',
+        location: '',
+        interests: [],
+        isPrivate: newGroupPrivate,
+      });
+      
+      // Add to my groups at the top
+      setMyGroups(prev => [{
+        id: newGroupId,
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim(),
+        photo: '',
+        memberCount: 1,
+        isPrivate: newGroupPrivate,
+        isMember: true,
+        creatorId: user.uid
+      }, ...prev]);
+      
+      // Reset form
+      setNewGroupName('');
+      setNewGroupDescription('');
+      setNewGroupPrivate(false);
+      setShowCreateGroup(false);
+      toast.success('Group created successfully!');
+    } catch (error) {
+      console.error('Error creating group:', error);
+      toast.error('Failed to create group');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className='flex items-center justify-center h-64'>
+        <Loader2 className='w-8 h-8 animate-spin text-frinder-orange' />
+      </div>
+    );
+  }
+
+  return (
+    <div className='px-4 pb-24 relative min-h-full'>
+      {/* View Toggle */}
+      <div className='flex gap-2 mb-4 p-1 bg-black/20 rounded-full'>
+        <button
+          onClick={() => setViewMode('mygroups')}
+          className={`flex-1 py-2 px-4 rounded-full text-sm font-semibold transition-all ${
+            viewMode === 'mygroups'
+              ? 'bg-frinder-orange text-white'
+              : 'text-white/70'
+          }`}
+        >
+          My Groups
+        </button>
+        <button
+          onClick={() => setViewMode('discover')}
+          className={`flex-1 py-2 px-4 rounded-full text-sm font-semibold transition-all ${
+            viewMode === 'discover'
+              ? 'bg-frinder-orange text-white'
+              : 'text-white/70'
+          }`}
+        >
+          Discover
+        </button>
+      </div>
+
+      {/* Groups List */}
+      <div className='space-y-4'>
+        {viewMode === 'mygroups' ? (
+          myGroups.length > 0 ? (
+            myGroups.map((group, index) => (
+              <motion.div
+                key={group.id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+                className='rounded-3xl overflow-hidden shadow-xl cursor-pointer active:scale-[0.98] transition-transform'
+                style={{
+                  background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                  border: '2px solid rgba(255, 138, 76, 0.3)',
+                }}
+                onClick={() => onOpenGroupChat?.(group.id)}
+              >
+                {/* Group Photo Section */}
+                <div className='relative h-32 overflow-hidden'>
+                  {group.photo ? (
+                    <img src={group.photo} alt={group.name} className='w-full h-full object-cover' />
+                  ) : (
+                    <div className='w-full h-full bg-gradient-to-br from-frinder-orange/30 to-frinder-orange/10 flex items-center justify-center'>
+                      <Users className='w-12 h-12 text-frinder-orange/70' />
+                    </div>
+                  )}
+                  {/* Gradient overlay */}
+                  <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
+                  
+                  {/* Creator badge */}
+                  {group.creatorId === user?.uid && (
+                    <div className='absolute top-3 left-3 px-2 py-1 bg-frinder-orange rounded-full flex items-center gap-1'>
+                      <span className='text-white text-xs font-semibold'>Creator</span>
+                    </div>
+                  )}
+                  
+                  {/* Private badge */}
+                  {group.isPrivate && (
+                    <div className='absolute top-3 right-3 p-1.5 bg-black/40 rounded-full backdrop-blur-sm'>
+                      <Lock className='w-3.5 h-3.5 text-white' />
+                    </div>
+                  )}
+                  
+                  {/* Group name overlay */}
+                  <div className='absolute bottom-3 left-4 right-4'>
+                    <h3 className='font-bold text-white text-lg drop-shadow-lg'>{group.name}</h3>
+                  </div>
+                </div>
+                
+                {/* Group Info Section */}
+                <div className='p-4 bg-black/20 backdrop-blur-sm'>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-gray-300 text-sm truncate'>{group.lastMessage || group.description}</p>
+                      <div className='flex items-center gap-2 mt-1.5'>
+                        <Users className='w-3.5 h-3.5 text-frinder-orange' />
+                        <span className='text-gray-400 text-xs'>{group.memberCount} members</span>
+                      </div>
+                    </div>
+                    <div className='w-10 h-10 rounded-full bg-frinder-orange flex items-center justify-center flex-shrink-0 ml-3'>
+                      <MessageCircle className='w-5 h-5 text-white' />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <div className='text-center py-12'>
+              <Users className='w-12 h-12 text-white/30 mx-auto mb-3' />
+              <p className='text-gray-300'>You haven't joined any groups yet</p>
+              <button
+                onClick={() => setViewMode('discover')}
+                className='mt-3 px-4 py-2 bg-frinder-orange text-white rounded-full text-sm font-medium'
+              >
+                Discover Groups
+              </button>
+            </div>
+          )
+        ) : (
+          groups.length > 0 ? (
+            groups.map((group, index) => (
+              <motion.div
+                key={group.id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+                className='rounded-3xl overflow-hidden shadow-xl'
+                style={{
+                  background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                  border: '2px solid rgba(255, 138, 76, 0.3)',
+                }}
+              >
+                {/* Group Photo Section */}
+                <div className='relative h-32 overflow-hidden'>
+                  {group.photo ? (
+                    <img src={group.photo} alt={group.name} className='w-full h-full object-cover' />
+                  ) : (
+                    <div className='w-full h-full bg-gradient-to-br from-frinder-orange/30 to-frinder-orange/10 flex items-center justify-center'>
+                      <Users className='w-12 h-12 text-frinder-orange/70' />
+                    </div>
+                  )}
+                  {/* Gradient overlay */}
+                  <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
+                  
+                  {/* Private badge */}
+                  {group.isPrivate && (
+                    <div className='absolute top-3 right-3 p-1.5 bg-black/40 rounded-full backdrop-blur-sm'>
+                      <Lock className='w-3.5 h-3.5 text-white' />
+                    </div>
+                  )}
+                  
+                  {/* Group name overlay */}
+                  <div className='absolute bottom-3 left-4 right-4'>
+                    <h3 className='font-bold text-white text-lg drop-shadow-lg'>{group.name}</h3>
+                  </div>
+                </div>
+                
+                {/* Group Info Section */}
+                <div className='p-4 bg-black/20 backdrop-blur-sm'>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-gray-300 text-sm line-clamp-1'>{group.description}</p>
+                      <div className='flex items-center gap-2 mt-1.5'>
+                        <Users className='w-3.5 h-3.5 text-frinder-orange' />
+                        <span className='text-gray-400 text-xs'>{group.memberCount} members</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleJoinGroup(group.id)}
+                      className='px-5 py-2.5 bg-frinder-orange text-white rounded-full text-sm font-semibold flex-shrink-0 ml-3 shadow-lg hover:bg-frinder-orange/90 transition-colors'
+                    >
+                      {group.isPrivate ? 'Request' : 'Join'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <div className='text-center py-12'>
+              <Users className='w-12 h-12 text-white/30 mx-auto mb-3' />
+              <p className='text-gray-300'>No groups to discover</p>
+              <p className='text-gray-500 text-sm'>Check back later for new groups!</p>
+            </div>
+          )
+        )}
+      </div>
+
+      {/* Floating Plus Button - only in My Groups */}
+      {viewMode === 'mygroups' && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.3, type: 'spring', stiffness: 400, damping: 20 }}
+          onClick={() => setShowCreateGroup(true)}
+          className='fixed bottom-24 right-6 w-14 h-14 bg-frinder-orange rounded-full shadow-2xl flex items-center justify-center z-50'
+          style={{
+            boxShadow: '0 4px 20px rgba(255, 138, 76, 0.5)'
+          }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <Plus className='w-7 h-7 text-white' />
+        </motion.button>
+      )}
+
+      {/* Create Group Modal */}
+      <AnimatePresence>
+        {showCreateGroup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center'
+            onClick={() => setShowCreateGroup(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className='w-full max-w-lg bg-zinc-900 rounded-t-3xl p-6'
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className='w-12 h-1 bg-white/20 rounded-full mx-auto mb-6' />
+              
+              <h2 className='text-xl font-bold text-white mb-6'>Create New Group</h2>
+              
+              <div className='space-y-4'>
+                <div>
+                  <label className='text-sm text-gray-400 mb-1.5 block'>Group Name</label>
+                  <input
+                    type='text'
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder='Enter group name...'
+                    className='w-full px-4 py-3 bg-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-frinder-orange'
+                  />
+                </div>
+                
+                <div>
+                  <label className='text-sm text-gray-400 mb-1.5 block'>Description</label>
+                  <textarea
+                    value={newGroupDescription}
+                    onChange={(e) => setNewGroupDescription(e.target.value)}
+                    placeholder='What is this group about?'
+                    rows={3}
+                    className='w-full px-4 py-3 bg-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-frinder-orange resize-none'
+                  />
+                </div>
+                
+                <div className='flex items-center justify-between py-2'>
+                  <div>
+                    <p className='text-white font-medium'>Private Group</p>
+                    <p className='text-sm text-gray-500'>Only invited members can join</p>
+                  </div>
+                  <button
+                    onClick={() => setNewGroupPrivate(!newGroupPrivate)}
+                    className={`w-12 h-7 rounded-full transition-colors ${
+                      newGroupPrivate ? 'bg-frinder-orange' : 'bg-white/20'
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ x: newGroupPrivate ? 22 : 2 }}
+                      className='w-5 h-5 bg-white rounded-full shadow'
+                    />
+                  </button>
+                </div>
+              </div>
+              
+              <div className='flex gap-3 mt-6'>
+                <button
+                  onClick={() => setShowCreateGroup(false)}
+                  className='flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold'
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateGroup}
+                  disabled={!newGroupName.trim() || creating}
+                  className='flex-1 py-3 rounded-xl bg-frinder-orange text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2'
+                >
+                  {creating ? (
+                    <Loader2 className='w-5 h-5 animate-spin' />
+                  ) : (
+                    <>
+                      <Plus className='w-5 h-5' />
+                      Create
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 interface SwipePeopleProps {
   onGoToShop?: () => void;
   onGoToProfile?: () => void;
+  onOpenGroupChat?: (groupId: string) => void;
 }
 
-export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeopleProps) {
+export default function SwipePeople({ onGoToShop, onGoToProfile, onOpenGroupChat }: SwipePeopleProps) {
   const { user, userProfile } = useAuth();
   useSettings();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -967,7 +1440,7 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
   const [showMatchCelebration, setShowMatchCelebration] = useState(false);
   const [useFullScreenMatch, setUseFullScreenMatch] = useState(true);
   const [showSuperLikeStars, setShowSuperLikeStars] = useState(false);
-  const [activeTab, setActiveTab] = useState<'foryou' | 'nearby'>('foryou');
+  const [activeTab, setActiveTab] = useState<'groups' | 'foryou' | 'nearby'>('foryou');
 
   // Credits & Subscription state
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
@@ -1027,28 +1500,39 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
         setLoading(true);
         const users = await getUsersToSwipe(user.uid, userProfile);
 
+        // Import story function
+        const { getActiveStoryForUser } = await import('@/lib/firebaseServices');
+
         // Map Firebase user profiles to our Profile interface
         // Filter out users without valid photos
-        const mappedProfiles: Profile[] = users
+        const mappedProfilesPromises: Promise<Profile | null>[] = users
           .filter((u: any) => {
             // Check if user has at least one valid photo URL
             const photos = u.photos || [];
             const validPhotos = photos.filter((p: string) => p && p.trim() !== '' && !p.includes('placeholder'));
             return validPhotos.length > 0;
           })
-          .map((u: any) => ({
-            id: u.uid || u.id,
-            name: u.displayName || u.name,
-            age: u.age,
-            bio: u.bio,
-            photos: (u.photos || []).filter((p: string) => p && p.trim() !== ''),
-            interests: u.interests || [],
-            course: u.city ? `${u.city}, ${u.country}` : '',
-            distance: u.city === userProfile.city ? 'Same city' : u.country === userProfile.country ? 'Same country' : '',
-            relationshipGoal: u.relationshipGoal,
-            gender: u.gender,
-            university: u.university
-          }));
+          .map(async (u: any) => {
+            // Fetch active story for this user (exclude matchesOnly stories in discover)
+            const storyPhoto = await getActiveStoryForUser(u.uid || u.id, false);
+            
+            return {
+              id: u.uid || u.id,
+              name: u.displayName || u.name,
+              age: u.age,
+              bio: u.bio,
+              photos: (u.photos || []).filter((p: string) => p && p.trim() !== ''),
+              interests: u.interests || [],
+              course: u.city ? `${u.city}, ${u.country}` : '',
+              distance: u.city === userProfile.city ? 'Same city' : u.country === userProfile.country ? 'Same country' : '',
+              relationshipGoal: u.relationshipGoal,
+              gender: u.gender,
+              university: u.university,
+              storyPhoto: storyPhoto || undefined
+            } as Profile;
+          });
+
+        const mappedProfiles = (await Promise.all(mappedProfilesPromises)).filter((p): p is Profile => p !== null);
 
         // Separate profiles by gender priority (opposite gender first)
         const currentUserGender = userProfile.gender;
@@ -1253,21 +1737,30 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
 
   return (
     <div className='h-full flex flex-col bg-background dark:bg-black relative'>
-      {/* Header with hamburger, tabs, and icons */}
+      {/* Header with tabs and profile icon */}
       <div className='absolute top-0 left-0 right-0 z-40 pt-3 pb-2 px-4'>
         <div className='flex items-center justify-between'>
-          {/* Left - Menu */}
-          <button className='w-10 h-10 rounded-full flex items-center justify-center'>
-            <Menu className='w-6 h-6 text-white/80' />
-          </button>
+          {/* Left spacer for balance */}
+          <div className='w-10 h-10' />
 
           {/* Center - Tabs */}
-          <div className='flex items-center gap-1 p-1 rounded-full bg-black/30 dark:bg-white/10 backdrop-blur-xl'>
+          <div className='flex items-center gap-1 p-1 rounded-full bg-black/40 backdrop-blur-xl'>
+            <button
+              onClick={() => setActiveTab('groups')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-all ${
+                activeTab === 'groups'
+                  ? 'bg-frinder-orange text-white'
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <Users className='w-4 h-4' />
+              Groups
+            </button>
             <button
               onClick={() => setActiveTab('foryou')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-all ${
                 activeTab === 'foryou'
-                  ? 'bg-frinder-orange text-white shadow-lg'
+                  ? 'bg-frinder-orange text-white'
                   : 'text-white/70 hover:text-white'
               }`}
             >
@@ -1276,9 +1769,9 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
             </button>
             <button
               onClick={() => setActiveTab('nearby')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-all ${
                 activeTab === 'nearby'
-                  ? 'bg-frinder-orange text-white shadow-lg'
+                  ? 'bg-frinder-orange text-white'
                   : 'text-white/70 hover:text-white'
               }`}
             >
@@ -1290,7 +1783,7 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
           {/* Right - Profile */}
           <button 
             onClick={onGoToProfile}
-            className='w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/30'
+            className='w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/30 bg-black/20 backdrop-blur-sm'
           >
             {userProfile?.photos?.[0] ? (
               <img
@@ -1322,22 +1815,29 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
         useFullScreen={useFullScreenMatch}
       />
 
-      {/* Cards stack - fills entire screen */}
-      <div className='flex-1 relative overflow-hidden'>
+      {/* Content based on active tab */}
+      {activeTab === 'groups' ? (
+        /* Groups View */
+        <div className='flex-1 pt-16 overflow-y-auto'>
+          <GroupsView onOpenGroupChat={onOpenGroupChat} />
+        </div>
+      ) : (
+        /* Cards stack - fills entire screen */
+        <div className='flex-1 relative overflow-hidden'>
         {profiles.length > 0 ? (
           <div className='absolute inset-0'>
-            <AnimatePresence mode='popLayout'>
-              {/* Render second card behind - visible peeking from top */}
+            {/* Render card behind - stacked effect */}
+            <AnimatePresence>
               {profiles.length > 1 && (
                 <motion.div
                   key={`second-${profiles[1].id}`}
-                  className='absolute left-4 right-4 top-14 bottom-8 z-[5] pointer-events-none'
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  className='absolute left-5 right-5 top-18 bottom-22 z-[5] pointer-events-none'
+                  initial={{ opacity: 0, scale: 0.92, y: 15 }}
+                  animate={{ opacity: 0.8, scale: 0.96, y: 5 }}
+                  exit={{ opacity: 0, scale: 1, y: -20 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                 >
-                  <div className='w-full h-full rounded-[2rem] overflow-hidden shadow-xl ring-[3px] ring-frinder-orange/50'>
+                  <div className='w-full h-full rounded-[2rem] overflow-hidden shadow-xl'>
                     <div className='relative h-full'>
                       {profiles[1].photos[0] ? (
                         <img
@@ -1347,10 +1847,10 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
                         />
                       ) : (
                         <div className='w-full h-full flex items-center justify-center bg-gradient-to-br from-frinder-orange to-frinder-burnt'>
-                          <User className='w-32 h-32 text-white/60' />
+                          <User className='w-28 h-28 text-white/50' />
                         </div>
                       )}
-                      <div className='absolute inset-0 bg-black/30' />
+                      <div className='absolute inset-0 bg-black/20' />
                     </div>
                   </div>
                 </motion.div>
@@ -1395,6 +1895,7 @@ export default function SwipePeople({ onGoToShop, onGoToProfile }: SwipePeoplePr
           </div>
         )}
       </div>
+      )}
 
       {/* No Super Likes Dialog */}
       <Dialog open={showNoSuperLikesDialog} onOpenChange={setShowNoSuperLikesDialog}>

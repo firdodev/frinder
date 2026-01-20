@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,9 @@ import {
   subscribeToUserCredits,
   subscribeToUserSubscription,
   isDisplayNameTaken,
+  getUserStories,
+  createStory,
+  deleteStory,
   type UserCredits,
   type UserSubscription
 } from '@/lib/firebaseServices';
@@ -41,6 +45,7 @@ import {
   MapPin,
   LogOut,
   ChevronRight,
+  ChevronLeft,
   Shield,
   Bell,
   HelpCircle,
@@ -58,7 +63,9 @@ import {
   Users,
   AlertCircle,
   CheckCircle,
-  ArrowLeft
+  ArrowLeft,
+  Lock,
+  Globe
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -101,6 +108,21 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
 
+  // Stories state
+  const [stories, setStories] = useState<Array<{ id: string; photoUrl: string; createdAt: Date; expiresAt: Date; matchesOnly: boolean }>>([]);
+  const [loadingStories, setLoadingStories] = useState(true);
+  const [uploadingStory, setUploadingStory] = useState(false);
+  const [deletingStory, setDeletingStory] = useState<string | null>(null);
+  const [showStoryModal, setShowStoryModal] = useState(false);
+  const [viewingStory, setViewingStory] = useState<{ id: string; photoUrl: string; createdAt: Date; expiresAt: Date; matchesOnly: boolean } | null>(null);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [storyDirection, setStoryDirection] = useState<'next' | 'prev'>('next');
+  const storyInputRef = useRef<HTMLInputElement>(null);
+  
+  // Story preview state (before uploading)
+  const [storyPreview, setStoryPreview] = useState<{ url: string; file: File } | null>(null);
+  const [storyMatchesOnly, setStoryMatchesOnly] = useState(false);
+
   const [editData, setEditData] = useState({
     displayName: userProfile?.displayName || 'John Doe',
     bio: userProfile?.bio || 'Coffee lover | Adventure seeker | Looking for meaningful connections',
@@ -142,6 +164,25 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
     if (!user?.uid) return;
     const unsubscribe = subscribeToUserSubscription(user.uid, setUserSubscription);
     return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Fetch user stories
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchStories = async () => {
+      setLoadingStories(true);
+      try {
+        const userStories = await getUserStories(user.uid);
+        setStories(userStories);
+      } catch (error) {
+        console.error('Error fetching stories:', error);
+      } finally {
+        setLoadingStories(false);
+      }
+    };
+
+    fetchStories();
   }, [user?.uid]);
 
   const profile = {
@@ -296,9 +337,102 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
     }
   };
 
+  // Story handling functions
+  const handleStoryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user) return;
+
+    const file = files[0];
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be less than 10MB');
+      return;
+    }
+
+    // Create a preview URL and show the preview modal
+    const previewUrl = URL.createObjectURL(file);
+    setStoryPreview({ url: previewUrl, file });
+    setStoryMatchesOnly(false); // Reset to public by default
+    
+    // Clear the input
+    if (storyInputRef.current) storyInputRef.current.value = '';
+  };
+
+  // Cancel story preview
+  const handleCancelStoryPreview = () => {
+    if (storyPreview?.url) {
+      URL.revokeObjectURL(storyPreview.url);
+    }
+    setStoryPreview(null);
+    setStoryMatchesOnly(false);
+  };
+
+  // Confirm and upload story
+  const handleConfirmStoryUpload = async () => {
+    if (!storyPreview || !user) return;
+
+    try {
+      setUploadingStory(true);
+      const compressedFile = await compressImage(storyPreview.file, 1024, 0.8);
+      // Upload to a different path for stories
+      const { uploadStoryPhoto } = await import('@/lib/storageService');
+      const photoUrl = await uploadStoryPhoto(user.uid, compressedFile);
+      await createStory(user.uid, photoUrl, storyMatchesOnly);
+      
+      // Refresh stories
+      const userStories = await getUserStories(user.uid);
+      setStories(userStories);
+      
+      toast.success(storyMatchesOnly 
+        ? 'Story added! Only your matches can see it.' 
+        : 'Story added! It will be visible for 24 hours.'
+      );
+      
+      // Clean up preview
+      URL.revokeObjectURL(storyPreview.url);
+      setStoryPreview(null);
+      setStoryMatchesOnly(false);
+    } catch (error) {
+      console.error('Error uploading story:', error);
+      toast.error('Failed to upload story');
+    } finally {
+      setUploadingStory(false);
+    }
+  };
+
+  const handleDeleteStory = async (storyId: string) => {
+    try {
+      setDeletingStory(storyId);
+      await deleteStory(storyId);
+      setStories(prev => prev.filter(s => s.id !== storyId));
+      setViewingStory(null);
+      toast.success('Story deleted!');
+    } catch (error) {
+      console.error('Error deleting story:', error);
+      toast.error('Failed to delete story');
+    } finally {
+      setDeletingStory(null);
+    }
+  };
+
+  const getTimeRemaining = (expiresAt: Date) => {
+    const now = new Date();
+    const diff = expiresAt.getTime() - now.getTime();
+    if (diff <= 0) return 'Expired';
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m left`;
+  };
+
   return (
     <div className='h-full overflow-y-auto bg-[#fff7ed] dark:bg-black'>
       <input ref={fileInputRef} type='file' accept='image/*' onChange={handlePhotoUpload} className='hidden' />
+      <input ref={storyInputRef} type='file' accept='image/*' onChange={handleStoryUpload} className='hidden' />
 
       <div className='relative h-56 sm:h-64'>
         <div className='absolute inset-0 bg-frinder-orange' />
@@ -319,20 +453,36 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
           </div>
 
           <div className='relative'>
-            <Avatar className='w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-xl'>
-              <AvatarImage src={profile.photos[0]} alt={profile.displayName} />
-              <AvatarFallback className='text-2xl sm:text-3xl bg-frinder-burnt text-white'>
-                {profile.displayName[0]}
-              </AvatarFallback>
-            </Avatar>
+            {/* Avatar with story ring indicator */}
+            <div className={`rounded-full p-1 ${stories.length > 0 ? 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600' : ''}`}>
+              <Avatar className={`w-24 h-24 sm:w-28 sm:h-28 border-4 ${stories.length > 0 ? 'border-white' : 'border-white'} shadow-xl`}>
+                <AvatarImage src={profile.photos[0]} alt={profile.displayName} />
+                <AvatarFallback className='text-2xl sm:text-3xl bg-frinder-burnt text-white'>
+                  {profile.displayName[0]}
+                </AvatarFallback>
+              </Avatar>
+            </div>
             {profile.verified && (
               <div className='absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500 flex items-center justify-center border-2 border-white'>
                 <Verified className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
               </div>
             )}
+            {/* Add Story Button */}
+            <button
+              onClick={() => storyInputRef.current?.click()}
+              disabled={uploadingStory}
+              className='absolute -bottom-1 -left-1 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-frinder-orange shadow-lg flex items-center justify-center hover:scale-110 transition-transform border-2 border-white disabled:opacity-50'
+            >
+              {uploadingStory ? (
+                <Loader2 className='w-4 h-4 text-white animate-spin' />
+              ) : (
+                <Plus className='w-4 h-4 sm:w-5 sm:h-5 text-white' />
+              )}
+            </button>
+            {/* Camera button for profile photo */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className='absolute bottom-0 left-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform'
+              className='absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform'
             >
               <Camera className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-frinder-orange' />
             </button>
@@ -721,6 +871,339 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* My Stories Section */}
+      <div className='px-3 sm:px-4 mt-3 sm:mt-4'>
+        <Card className='border-0 shadow-md dark:bg-black dark:border-frinder-orange/20'>
+          <CardContent className='p-3 sm:p-4'>
+            <div className='flex items-center justify-between mb-2 sm:mb-3'>
+              <div className='flex items-center gap-2'>
+                <h2 className='font-semibold text-sm sm:text-base dark:text-white'>My Stories</h2>
+                {stories.length > 0 && (
+                  <Badge className='bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 text-white text-[10px]'>
+                    {stories.length} active
+                  </Badge>
+                )}
+              </div>
+              <button
+                onClick={() => storyInputRef.current?.click()}
+                disabled={uploadingStory}
+                className='text-xs sm:text-sm text-frinder-orange font-medium flex items-center gap-1'
+              >
+                {uploadingStory ? <Loader2 className='w-3 h-3 animate-spin' /> : <Plus className='w-3 h-3' />}
+                Add Story
+              </button>
+            </div>
+            
+            {loadingStories ? (
+              <div className='flex justify-center py-4'>
+                <Loader2 className='w-6 h-6 text-frinder-orange animate-spin' />
+              </div>
+            ) : stories.length > 0 ? (
+              <div className='flex gap-3 overflow-x-auto pb-2'>
+                {stories.map((story, index) => (
+                  <motion.div
+                    key={story.id}
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => {
+                      setCurrentStoryIndex(index);
+                      setViewingStory(story);
+                    }}
+                    className='relative flex-shrink-0 w-20 cursor-pointer'
+                  >
+                    <div className='aspect-3/4 rounded-xl overflow-hidden ring-2 ring-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 p-0.5'>
+                      <div className='w-full h-full rounded-xl overflow-hidden bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-0.5'>
+                        <img 
+                          src={story.photoUrl} 
+                          alt='Story' 
+                          className='w-full h-full object-cover rounded-lg'
+                        />
+                      </div>
+                    </div>
+                    {/* Matches Only indicator */}
+                    {story.matchesOnly && (
+                      <div className='absolute top-1 right-1 w-5 h-5 bg-frinder-orange rounded-full flex items-center justify-center'>
+                        <Lock className='w-3 h-3 text-white' />
+                      </div>
+                    )}
+                    <p className='text-[10px] text-center text-muted-foreground mt-1 truncate'>
+                      {getTimeRemaining(story.expiresAt)}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className='text-center py-4'>
+                <div className='w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400/20 via-pink-500/20 to-purple-600/20 flex items-center justify-center mx-auto mb-2'>
+                  <Plus className='w-6 h-6 text-pink-500' />
+                </div>
+                <p className='text-sm text-muted-foreground'>No active stories</p>
+                <p className='text-xs text-muted-foreground mt-1'>Add a story visible for 24 hours</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Story Preview Modal (before uploading) */}
+      <AnimatePresence>
+        {storyPreview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 bg-black z-50 flex flex-col'
+          >
+            {/* Header */}
+            <div className='absolute top-0 left-0 right-0 p-4 z-10 bg-gradient-to-b from-black/50 to-transparent'>
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center gap-3'>
+                  {/* Back/Close button */}
+                  <button
+                    onClick={handleCancelStoryPreview}
+                    className='w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors'
+                  >
+                    <X className='w-5 h-5 text-white' />
+                  </button>
+                  <div>
+                    <p className='text-white font-semibold text-sm'>New Story</p>
+                    <p className='text-white/70 text-xs'>Preview before sharing</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Story Preview Image */}
+            <div className='flex-1 flex items-center justify-center p-4 pt-20'>
+              <img 
+                src={storyPreview.url} 
+                alt='Story Preview' 
+                className='max-w-full max-h-full object-contain rounded-2xl'
+              />
+            </div>
+
+            {/* Bottom Controls */}
+            <div className='absolute bottom-0 left-0 right-0 p-6 z-10 bg-gradient-to-t from-black/80 to-transparent'>
+              {/* Matches Only Toggle */}
+              <div className='bg-white/10 backdrop-blur-xl rounded-2xl p-4 mb-4'>
+                <div className='flex items-center justify-between'>
+                  <div className='flex items-center gap-3'>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      storyMatchesOnly 
+                        ? 'bg-frinder-orange/20 text-frinder-orange' 
+                        : 'bg-white/10 text-white/70'
+                    }`}>
+                      {storyMatchesOnly ? <Lock className='w-5 h-5' /> : <Globe className='w-5 h-5' />}
+                    </div>
+                    <div>
+                      <p className='text-white font-medium text-sm'>Matches Only</p>
+                      <p className='text-white/60 text-xs'>
+                        {storyMatchesOnly 
+                          ? 'Only your matches can see this story' 
+                          : 'Everyone in discover can see this story'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={storyMatchesOnly}
+                    onCheckedChange={setStoryMatchesOnly}
+                    className='data-[state=checked]:bg-frinder-orange'
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className='flex gap-3'>
+                <button
+                  onClick={handleCancelStoryPreview}
+                  className='flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors'
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmStoryUpload}
+                  disabled={uploadingStory}
+                  className='flex-1 py-3 rounded-xl bg-frinder-orange hover:bg-frinder-burnt text-white font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50'
+                >
+                  {uploadingStory ? (
+                    <Loader2 className='w-5 h-5 animate-spin' />
+                  ) : (
+                    <>
+                      <Check className='w-5 h-5' />
+                      Share Story
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Story Viewer Modal */}
+      <AnimatePresence>
+        {viewingStory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 bg-black z-50 flex flex-col'
+            onClick={() => setViewingStory(null)}
+          >
+            {/* Progress bars for multiple stories */}
+            {stories.length > 1 && (
+              <div className='absolute top-2 left-4 right-4 z-20 flex gap-1.5'>
+                {stories.map((_, index) => (
+                  <div 
+                    key={index} 
+                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                      index === currentStoryIndex 
+                        ? 'bg-frinder-orange shadow-[0_0_8px_rgba(255,140,0,0.6)]' 
+                        : 'bg-white/20 backdrop-blur-md'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Header - Blurry Card Style */}
+            <div className='absolute top-4 left-4 right-4 z-10 flex items-start justify-between'>
+              {/* User Info Card */}
+              <div className='bg-black/25 backdrop-blur-2xl rounded-2xl px-3 py-2.5 flex items-center gap-3 border border-white/10 shadow-lg'>
+                {/* Back/Close button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewingStory(null);
+                  }}
+                  className='w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors'
+                >
+                  <ArrowLeft className='w-4 h-4 text-white' />
+                </button>
+                {/* Profile Picture */}
+                <Avatar className='w-10 h-10 border-2 border-white/30'>
+                  <AvatarImage src={profile.photos[0]} alt={profile.displayName} />
+                  <AvatarFallback className='bg-frinder-burnt text-white'>
+                    {profile.displayName[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className='text-white font-semibold text-base'>
+                    {profile.displayName}{profile.age ? <span className='font-medium text-white ml-1.5'>{profile.age}</span> : ''}
+                  </p>
+                  {/* Matches Only badge inside card */}
+                  {viewingStory.matchesOnly && (
+                    <p className='text-frinder-orange text-xs flex items-center gap-1 mt-0.5'>
+                      <Lock className='w-3 h-3' />
+                      Matches only
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Story counter */}
+              {stories.length > 1 && (
+                <div className='bg-black/25 backdrop-blur-2xl rounded-full px-3 py-1.5 border border-white/10 shadow-lg'>
+                  <span className='text-white text-sm font-medium'>{currentStoryIndex + 1}/{stories.length}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Navigation Arrows */}
+            {stories.length > 1 && (
+              <>
+                {/* Previous Story Button */}
+                {currentStoryIndex > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStoryDirection('prev');
+                      const newIndex = currentStoryIndex - 1;
+                      setCurrentStoryIndex(newIndex);
+                      setViewingStory(stories[newIndex]);
+                    }}
+                    className='absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors'
+                  >
+                    <ChevronLeft className='w-6 h-6 text-white' />
+                  </button>
+                )}
+                
+                {/* Next Story Button */}
+                {currentStoryIndex < stories.length - 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStoryDirection('next');
+                      const newIndex = currentStoryIndex + 1;
+                      setCurrentStoryIndex(newIndex);
+                      setViewingStory(stories[newIndex]);
+                    }}
+                    className='absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors'
+                  >
+                    <ChevronRight className='w-6 h-6 text-white' />
+                  </button>
+                )}
+              </>
+            )}
+            
+            {/* Story Image with Cube Animation */}
+            <div className='flex-1 flex items-center justify-center p-4 overflow-hidden' style={{ perspective: '1000px' }}>
+              <AnimatePresence mode='wait' initial={false}>
+                <motion.img 
+                  key={viewingStory.id}
+                  src={viewingStory.photoUrl} 
+                  alt='Story' 
+                  className='max-w-full max-h-full object-contain rounded-2xl'
+                  onClick={(e) => e.stopPropagation()}
+                  initial={{ 
+                    rotateY: storyDirection === 'next' ? 45 : -45,
+                    opacity: 0,
+                    x: storyDirection === 'next' ? 100 : -100
+                  }}
+                  animate={{ 
+                    rotateY: 0,
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{ 
+                    rotateY: storyDirection === 'next' ? -45 : 45,
+                    opacity: 0,
+                    x: storyDirection === 'next' ? -100 : 100
+                  }}
+                  transition={{ 
+                    type: 'tween',
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                    duration: 0.25
+                  }}
+                  style={{ transformStyle: 'preserve-3d' }}
+                />
+              </AnimatePresence>
+            </div>
+
+            {/* Delete Button at Bottom */}
+            <div className='absolute bottom-0 left-0 right-0 p-6 z-10 bg-gradient-to-t from-black/50 to-transparent'>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteStory(viewingStory.id);
+                }}
+                disabled={deletingStory === viewingStory.id}
+                className='w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50'
+              >
+                {deletingStory === viewingStory.id ? (
+                  <Loader2 className='w-5 h-5 animate-spin' />
+                ) : (
+                  <>
+                    <X className='w-5 h-5' />
+                    Delete Story
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className='px-3 sm:px-4 mt-3 sm:mt-4 pb-6'>
         <Card className='border-0 shadow-md dark:bg-black dark:border-frinder-orange/20'>

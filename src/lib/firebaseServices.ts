@@ -791,6 +791,23 @@ export async function getGroupsToSwipe(currentUserId: string, limitCount: number
   }
 }
 
+// Get groups user is a member of
+export async function getMyGroups(currentUserId: string): Promise<Group[]> {
+  try {
+    const groupsRef = collection(db, 'groups');
+    const groupsQuery = query(groupsRef, where('members', 'array-contains', currentUserId));
+    const groupsSnapshot = await getDocs(groupsQuery);
+
+    return groupsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Group));
+  } catch (error) {
+    console.error('Error getting my groups:', error);
+    return [];
+  }
+}
+
 // Join a group (public) or request to join (private)
 export async function joinGroup(groupId: string, userId: string): Promise<'joined' | 'requested'> {
   try {
@@ -983,7 +1000,7 @@ export async function createGroup(
       activity: sanitizeInput(groupData.activity, { maxLength: 100, allowNewlines: false }),
       location: groupData.location
         ? sanitizeInput(groupData.location, { maxLength: 100, allowNewlines: false })
-        : undefined,
+        : '',
       interests: sanitizeInterests(groupData.interests),
       isPrivate: groupData.isPrivate || false
     };
@@ -1363,6 +1380,88 @@ export async function searchUsers(
     return users;
   } catch (error) {
     console.error('Error searching users:', error);
+    return [];
+  }
+}
+
+// Advanced search for users with multiple filters
+interface SearchFilters {
+  name: string;
+  interests: string[];
+  ageMin: number | null;
+  ageMax: number | null;
+  university: string;
+}
+
+export async function searchUsersAdvanced(
+  currentUserId: string,
+  filters: SearchFilters,
+  limitCount: number = 50
+): Promise<(UserProfile & { id: string })[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+
+    const users = usersSnapshot.docs
+      .map(
+        doc =>
+          ({
+            ...doc.data(),
+            id: doc.id
+          } as UserProfile & { id: string })
+      )
+      .filter(user => {
+        // Exclude current user
+        if (user.id === currentUserId) return false;
+        
+        // Exclude incomplete profiles
+        if (!user.isProfileComplete) return false;
+        
+        // Exclude banned users
+        if (user.isBanned) return false;
+
+        // Filter by name (case-insensitive, partial match)
+        if (filters.name) {
+          const nameLower = filters.name.toLowerCase();
+          if (!user.displayName?.toLowerCase().includes(nameLower)) {
+            return false;
+          }
+        }
+
+        // Filter by age range
+        if (filters.ageMin !== null && user.age && user.age < filters.ageMin) {
+          return false;
+        }
+        if (filters.ageMax !== null && user.age && user.age > filters.ageMax) {
+          return false;
+        }
+
+        // Filter by university (case-insensitive, partial match)
+        if (filters.university) {
+          const uniLower = filters.university.toLowerCase();
+          if (!user.university?.toLowerCase().includes(uniLower)) {
+            return false;
+          }
+        }
+
+        // Filter by interests (user must have at least one of the selected interests)
+        if (filters.interests.length > 0) {
+          const userInterests = (user.interests || []).map(i => i.toLowerCase());
+          const hasMatchingInterest = filters.interests.some(interest => 
+            userInterests.includes(interest.toLowerCase())
+          );
+          if (!hasMatchingInterest) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .slice(0, limitCount);
+
+    return users;
+  } catch (error) {
+    console.error('Error in advanced search:', error);
     return [];
   }
 }
@@ -2368,4 +2467,113 @@ export async function recordPurchase(
     transactionId: transactionId || null,
     createdAt: serverTimestamp()
   });
+}
+
+// =====================================
+// STORY FUNCTIONS
+// =====================================
+
+/**
+ * Create a new story (auto-expires after 24 hours)
+ */
+export async function createStory(userId: string, photoUrl: string, matchesOnly: boolean = false): Promise<string> {
+  try {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+    const storyRef = doc(collection(db, 'stories'));
+    await setDoc(storyRef, {
+      userId,
+      photoUrl,
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromDate(expiresAt),
+      matchesOnly
+    });
+
+    return storyRef.id;
+  } catch (error) {
+    console.error('Error creating story:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all active (non-expired) stories for a user
+ */
+export async function getUserStories(userId: string): Promise<Array<{ id: string; photoUrl: string; createdAt: Date; expiresAt: Date; matchesOnly: boolean }>> {
+  try {
+    // Simple query - just filter by userId, then filter expired in memory
+    const storiesQuery = query(
+      collection(db, 'stories'),
+      where('userId', '==', userId)
+    );
+
+    const snapshot = await getDocs(storiesQuery);
+    const now = new Date();
+    
+    return snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          photoUrl: data.photoUrl,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          expiresAt: data.expiresAt?.toDate() || new Date(),
+          matchesOnly: data.matchesOnly || false
+        };
+      })
+      .filter(story => story.expiresAt > now) // Filter expired stories
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Sort by newest first
+  } catch (error) {
+    console.error('Error getting user stories:', error);
+    return [];
+  }
+}
+
+/**
+ * Get the most recent active story for a user (for displaying in discover or matches)
+ * @param userId - The user whose story to fetch
+ * @param includeMatchesOnly - If true, include matchesOnly stories (for matched users viewing)
+ */
+export async function getActiveStoryForUser(userId: string, includeMatchesOnly: boolean = true): Promise<string | null> {
+  try {
+    // Simple query - filter by userId, then check expiry in memory
+    const storiesQuery = query(
+      collection(db, 'stories'),
+      where('userId', '==', userId)
+    );
+
+    const snapshot = await getDocs(storiesQuery);
+    if (snapshot.empty) return null;
+
+    const now = new Date();
+    const activeStories = snapshot.docs
+      .map(doc => ({
+        photoUrl: doc.data().photoUrl,
+        expiresAt: doc.data().expiresAt?.toDate() || new Date(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        matchesOnly: doc.data().matchesOnly || false
+      }))
+      .filter(story => story.expiresAt > now)
+      // If not including matchesOnly, filter them out (for discover page)
+      .filter(story => includeMatchesOnly || !story.matchesOnly)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return activeStories.length > 0 ? activeStories[0].photoUrl : null;
+  } catch (error) {
+    console.error('Error getting active story:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete a story
+ */
+export async function deleteStory(storyId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'stories', storyId));
+  } catch (error) {
+    console.error('Error deleting story:', error);
+    throw error;
+  }
 }

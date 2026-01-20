@@ -201,3 +201,37 @@ export async function uploadGroupPhoto(groupId: string, file: File): Promise<str
     throw new Error('Failed to upload group photo. Please try again.');
   }
 }
+
+/**
+ * Upload a story photo to Firebase Storage
+ * @param userId - The user's ID
+ * @param file - The file to upload
+ * @returns The download URL of the uploaded photo
+ */
+export async function uploadStoryPhoto(userId: string, file: File): Promise<string> {
+  try {
+    // Create a unique filename
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filename = `story_${timestamp}.${extension}`;
+
+    // Create reference to storage location
+    const photoRef = ref(storage, `users/${userId}/stories/${filename}`);
+
+    // Upload the file
+    const snapshot = await uploadBytes(photoRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        uploadedAt: new Date().toISOString()
+      }
+    });
+
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading story photo:', error);
+    throw new Error('Failed to upload story. Please try again.');
+  }
+}

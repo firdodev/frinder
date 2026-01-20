@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { UserAvatar, getAvatarColor } from '@/components/ui/user-avatar';
+import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { getAvatarColor } from '@/components/ui/user-avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 import {
   Search as SearchIcon,
   Heart,
@@ -15,22 +16,29 @@ import {
   Loader2,
   MapPin,
   Sparkles,
-  Check,
-  UserPlus,
   MessageCircle,
   Star,
-  Users,
-  User
+  User,
+  ArrowLeft,
+  SlidersHorizontal,
+  GraduationCap
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  searchUsers,
+  searchUsersAdvanced,
   sendMatchRequest,
   checkIfMatched,
   checkSwipeStatus,
   cancelPendingRequest
 } from '@/lib/firebaseServices';
 import { toast } from 'sonner';
+
+// Pre-defined interests for selection
+const AVAILABLE_INTERESTS = [
+  'Music', 'Sports', 'Gaming', 'Travel', 'Photography', 'Art', 'Cooking', 'Reading',
+  'Movies', 'Fitness', 'Dancing', 'Nature', 'Technology', 'Fashion', 'Yoga', 'Coffee',
+  'Wine', 'Hiking', 'Beach', 'Nightlife', 'Animals', 'Volunteering', 'Writing', 'Concerts'
+];
 
 interface SearchResult {
   id: string;
@@ -41,11 +49,21 @@ interface SearchResult {
   bio?: string;
   city?: string;
   country?: string;
+  university?: string;
   interests?: string[];
   lookingFor?: 'people' | 'groups' | 'both';
   swipeStatus: 'none' | 'left' | 'right' | 'superlike';
   isMatched: boolean;
   matchId?: string;
+}
+
+interface SearchFilters {
+  name: string;
+  interests: string[];
+  ageMin: number | null;
+  ageMax: number | null;
+  university: string;
+  notMatched: boolean;
 }
 
 interface SearchProps {
@@ -54,117 +72,162 @@ interface SearchProps {
 
 export default function Search({ onStartChat }: SearchProps) {
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<SearchResult | null>(null);
   const [sendingRequest, setSendingRequest] = useState<string | null>(null);
   const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const cacheRef = useRef<Map<string, SearchResult[]>>(new Map());
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Filter state
+  const [filters, setFilters] = useState<SearchFilters>({
+    name: '',
+    interests: [],
+    ageMin: null,
+    ageMax: null,
+    university: '',
+    notMatched: false
+  });
+  
+  // Temp filter state for the sheet
+  const [tempFilters, setTempFilters] = useState<SearchFilters>({
+    name: '',
+    interests: [],
+    ageMin: null,
+    ageMax: null,
+    university: '',
+    notMatched: false
+  });
 
-  const performSearch = useCallback(
-    async (query: string) => {
-      if (!user?.uid || !query.trim()) {
-        setResults([]);
-        return;
-      }
+  // Check if any filters are active
+  const hasActiveFilters = filters.name || filters.interests.length > 0 || 
+    filters.ageMin !== null || filters.ageMax !== null || filters.university || filters.notMatched;
 
-      const trimmedQuery = query.trim().toLowerCase();
+  // Load all users initially and when filters change
+  const loadUsers = useCallback(async () => {
+    if (!user?.uid) return;
+
+    setLoading(true);
+    try {
+      const users = await searchUsersAdvanced(user.uid, filters);
+
+      // Check match and swipe status for each user in parallel batches
+      const batchSize = 10;
+      const resultsWithStatus: SearchResult[] = [];
       
-      // Check cache first
-      if (cacheRef.current.has(trimmedQuery)) {
-        setResults(cacheRef.current.get(trimmedQuery)!);
-        return;
+      for (let i = 0; i < users.length; i += batchSize) {
+        const batch = users.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(async u => {
+            const [matchStatus, swipeStatus] = await Promise.all([
+              checkIfMatched(user.uid, u.id),
+              checkSwipeStatus(user.uid, u.id)
+            ]);
+
+            return {
+              id: u.id,
+              displayName: u.displayName || 'Unknown',
+              age: u.age,
+              photo: u.photos?.[0] || '',
+              photos: u.photos || [],
+              bio: u.bio,
+              city: u.city,
+              country: u.country,
+              university: u.university,
+              interests: u.interests || [],
+              lookingFor: u.lookingFor,
+              swipeStatus,
+              isMatched: matchStatus.isMatched,
+              matchId: matchStatus.matchId
+            };
+          })
+        );
+        resultsWithStatus.push(...batchResults);
       }
 
-      // Cancel any pending request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
+      // Apply notMatched filter if enabled
+      const filteredResults = filters.notMatched 
+        ? resultsWithStatus.filter(r => !r.isMatched)
+        : resultsWithStatus;
 
-      setLoading(true);
-      try {
-        const users = await searchUsers(user.uid, query);
+      setResults(filteredResults);
+    } catch (error) {
+      console.error('Load users error:', error);
+      toast.error('Failed to load users');
+    } finally {
+      setLoading(false);
+      setInitialLoading(false);
+    }
+  }, [user?.uid, filters]);
 
-        // Check match and swipe status for each user in parallel batches
-        const batchSize = 5;
-        const resultsWithStatus: SearchResult[] = [];
-        
-        for (let i = 0; i < users.length; i += batchSize) {
-          const batch = users.slice(i, i + batchSize);
-          const batchResults = await Promise.all(
-            batch.map(async u => {
-              const [matchStatus, swipeStatus] = await Promise.all([
-                checkIfMatched(user.uid, u.id),
-                checkSwipeStatus(user.uid, u.id)
-              ]);
-
-              return {
-                id: u.id,
-                displayName: u.displayName || 'Unknown',
-                age: u.age,
-                photo: u.photos?.[0] || '',
-                photos: u.photos || [],
-                bio: u.bio,
-                city: u.city,
-                country: u.country,
-                interests: u.interests || [],
-                lookingFor: u.lookingFor,
-                swipeStatus,
-                isMatched: matchStatus.isMatched,
-                matchId: matchStatus.matchId
-              };
-            })
-          );
-          resultsWithStatus.push(...batchResults);
-        }
-
-        // Cache the results
-        cacheRef.current.set(trimmedQuery, resultsWithStatus);
-        // Limit cache size
-        if (cacheRef.current.size > 20) {
-          const firstKey = cacheRef.current.keys().next().value;
-          if (firstKey) cacheRef.current.delete(firstKey);
-        }
-
-        setResults(resultsWithStatus);
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          console.error('Search error:', error);
-          toast.error('Failed to search');
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user?.uid]
-  );
-
-  // Debounced search with longer delay for optimization
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
+    loadUsers();
+  }, [loadUsers]);
 
-    if (searchQuery.trim()) {
-      // Use shorter delay for cached queries
-      const delay = cacheRef.current.has(searchQuery.trim().toLowerCase()) ? 100 : 400;
-      debounceRef.current = setTimeout(() => {
-        performSearch(searchQuery);
-      }, delay);
-    } else {
-      setResults([]);
+  const handleApplyFilters = () => {
+    // Validate age range
+    if (tempFilters.ageMin !== null && tempFilters.ageMin < 18) {
+      toast.error('Minimum age must be at least 18');
+      return;
     }
+    if (tempFilters.ageMax !== null && tempFilters.ageMax < 18) {
+      toast.error('Maximum age must be at least 18');
+      return;
+    }
+    if (tempFilters.ageMax !== null && tempFilters.ageMax > 99) {
+      toast.error('Maximum age must be at most 99');
+      return;
+    }
+    if (tempFilters.ageMin !== null && tempFilters.ageMax !== null && tempFilters.ageMin > tempFilters.ageMax) {
+      toast.error('Minimum age cannot be greater than maximum age');
+      return;
+    }
+    
+    setFilters(tempFilters);
+    setShowFilters(false);
+  };
 
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+  const handleClearFilters = () => {
+    const cleared: SearchFilters = {
+      name: '',
+      interests: [],
+      ageMin: null,
+      ageMax: null,
+      university: '',
+      notMatched: false
     };
-  }, [searchQuery, performSearch]);
+    setTempFilters(cleared);
+    setFilters(cleared);
+    setShowFilters(false);
+  };
+
+  const removeFilter = (type: 'name' | 'interest' | 'age' | 'university' | 'notMatched', value?: string) => {
+    setFilters(prev => {
+      const updated = { ...prev };
+      if (type === 'name') updated.name = '';
+      if (type === 'interest' && value) {
+        updated.interests = prev.interests.filter(i => i !== value);
+      }
+      if (type === 'age') {
+        updated.ageMin = null;
+        updated.ageMax = null;
+      }
+      if (type === 'university') updated.university = '';
+      if (type === 'notMatched') updated.notMatched = false;
+      return updated;
+    });
+  };
+
+  const toggleInterest = (interest: string) => {
+    setTempFilters(prev => ({
+      ...prev,
+      interests: prev.interests.includes(interest)
+        ? prev.interests.filter(i => i !== interest)
+        : [...prev.interests, interest]
+    }));
+  };
 
   const handleSendRequest = async (targetUser: SearchResult) => {
     if (!user?.uid) return;
@@ -177,7 +240,6 @@ export default function Search({ onStartChat }: SearchProps) {
         toast.success(`It's a match! You and ${targetUser.displayName} liked each other!`, {
           icon: '💕'
         });
-        // Update the result to show as matched
         setResults(prev =>
           prev.map(r =>
             r.id === targetUser.id
@@ -192,7 +254,6 @@ export default function Search({ onStartChat }: SearchProps) {
         }
       } else {
         toast.success(`Request sent to ${targetUser.displayName}!`);
-        // Update swipe status
         setResults(prev => prev.map(r => (r.id === targetUser.id ? { ...r, swipeStatus: 'right' as const } : r)));
         if (selectedUser?.id === targetUser.id) {
           setSelectedUser(prev => (prev ? { ...prev, swipeStatus: 'right' } : null));
@@ -212,7 +273,6 @@ export default function Search({ onStartChat }: SearchProps) {
     try {
       await cancelPendingRequest(user.uid, targetUser.id);
       toast.success('Request cancelled');
-      // Update swipe status back to none
       setResults(prev => prev.map(r => (r.id === targetUser.id ? { ...r, swipeStatus: 'none' as const } : r)));
       if (selectedUser?.id === targetUser.id) {
         setSelectedUser(prev => (prev ? { ...prev, swipeStatus: 'none' } : null));
@@ -224,340 +284,361 @@ export default function Search({ onStartChat }: SearchProps) {
     }
   };
 
-  const getActionButton = (result: SearchResult) => {
-    if (result.isMatched) {
-      return (
-        <Button
-          size='sm'
-          onClick={e => {
-            e.stopPropagation();
-            if (result.matchId && onStartChat) {
-              onStartChat(result.matchId, result.displayName, result.photo, result.id);
-            }
-          }}
-          className='bg-frinder-orange hover:bg-frinder-burnt text-white'
-        >
-          <MessageCircle className='w-4 h-4 mr-1' />
-          Chat
-        </Button>
-      );
-    }
-
-    if (result.swipeStatus === 'right' || result.swipeStatus === 'superlike') {
-      return (
-        <Button
-          size='sm'
-          variant='outline'
-          onClick={e => {
-            e.stopPropagation();
-            handleCancelRequest(result);
-          }}
-          disabled={cancelingRequest === result.id}
-          className='text-red-500 border-red-300 hover:bg-red-50 dark:hover:bg-red-950'
-        >
-          {cancelingRequest === result.id ? (
-            <Loader2 className='w-4 h-4 animate-spin' />
-          ) : (
-            <>
-              <X className='w-4 h-4 mr-1' />
-              Cancel
-            </>
-          )}
-        </Button>
-      );
-    }
-
+  // Profile detail view
+  if (selectedUser) {
     return (
-      <Button
-        size='sm'
-        onClick={e => {
-          e.stopPropagation();
-          handleSendRequest(result);
-        }}
-        disabled={sendingRequest === result.id}
-        className='bg-frinder-orange hover:bg-frinder-burnt text-white'
-      >
-        {sendingRequest === result.id ? (
-          <Loader2 className='w-4 h-4 animate-spin' />
-        ) : (
-          <>
-            <Heart className='w-4 h-4 mr-1' />
-            Like
-          </>
-        )}
-      </Button>
-    );
-  };
+      <div className='h-full flex flex-col dark:bg-black'>
+        {/* Full screen profile */}
+        <div className='relative flex-1'>
+          {/* Photo with swipe for multiple */}
+          <div className='relative h-full'>
+            {selectedUser.photos.length > 0 ? (
+              <>
+                <img
+                  src={selectedUser.photos[currentPhotoIndex] || selectedUser.photo}
+                  alt={selectedUser.displayName}
+                  className='w-full h-full object-cover'
+                />
+                {/* Photo indicators */}
+                {selectedUser.photos.length > 1 && (
+                  <div className='absolute top-4 left-4 right-4 flex gap-1'>
+                    {selectedUser.photos.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex-1 h-1 rounded-full transition-all ${
+                          idx === currentPhotoIndex ? 'bg-white' : 'bg-white/40'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+                {/* Tap areas for photo navigation */}
+                {selectedUser.photos.length > 1 && (
+                  <>
+                    <div
+                      className='absolute left-0 top-0 w-1/3 h-full cursor-pointer'
+                      onClick={() => setCurrentPhotoIndex(prev => Math.max(0, prev - 1))}
+                    />
+                    <div
+                      className='absolute right-0 top-0 w-1/3 h-full cursor-pointer'
+                      onClick={() => setCurrentPhotoIndex(prev => Math.min(selectedUser.photos.length - 1, prev + 1))}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
+              <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedUser.displayName)}`}>
+                <User className='w-32 h-32 text-white/80' />
+              </div>
+            )}
 
-  return (
-    <div className='h-full flex flex-col dark:bg-black'>
-      {/* User Detail Sheet */}
-      <AnimatePresence>
-        {selectedUser && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 z-50 bg-black/50 backdrop-blur-sm'
-            onClick={() => setSelectedUser(null)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              onClick={e => e.stopPropagation()}
-              className='absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white dark:bg-black rounded-t-3xl overflow-hidden'
+            {/* Gradient overlay */}
+            <div className='absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent' />
+
+            {/* Back button */}
+            <button
+              onClick={() => {
+                setSelectedUser(null);
+                setCurrentPhotoIndex(0);
+              }}
+              className='absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors'
             >
-              {/* Profile Header */}
-              <div className='relative h-64'>
-                {selectedUser.photo ? (
-                  <img src={selectedUser.photo} alt={selectedUser.displayName} className='w-full h-full object-cover' />
-                ) : (
-                  <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(selectedUser.displayName)}`}>
-                    <User className='w-24 h-24 text-white/80' />
-                  </div>
-                )}
-                <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
-                <button
-                  onClick={() => setSelectedUser(null)}
-                  className='absolute top-4 right-4 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors'
-                >
-                  <X className='w-5 h-5' />
-                </button>
+              <ArrowLeft className='w-5 h-5' />
+            </button>
 
-                {/* Match indicator */}
-                {selectedUser.isMatched && (
-                  <div className='absolute top-4 left-4 flex items-center gap-1 bg-frinder-orange px-3 py-1.5 rounded-full'>
-                    <Sparkles className='w-4 h-4 text-white' />
-                    <span className='text-sm font-medium text-white'>Matched</span>
-                  </div>
-                )}
+            {/* Match indicator */}
+            {selectedUser.isMatched && (
+              <div className='absolute top-4 right-4 flex items-center gap-1 bg-frinder-orange px-3 py-1.5 rounded-full'>
+                <Sparkles className='w-4 h-4 text-white' />
+                <span className='text-sm font-medium text-white'>Matched</span>
+              </div>
+            )}
 
-                <div className='absolute bottom-4 left-4 right-4'>
-                  <h2 className='text-2xl font-bold text-white'>
-                    {selectedUser.displayName}
-                    {selectedUser.age ? `, ${selectedUser.age}` : ''}
-                  </h2>
-                  {(selectedUser.city || selectedUser.country) && (
-                    <div className='flex items-center gap-1 text-white/80 mt-1'>
-                      <MapPin className='w-4 h-4' />
-                      <span className='text-sm'>
-                        {[selectedUser.city, selectedUser.country].filter(Boolean).join(', ')}
-                      </span>
-                    </div>
+            {/* User info at bottom */}
+            <div className='absolute bottom-0 left-0 right-0 p-4 pb-6'>
+              <h2 className='text-3xl font-bold text-white'>
+                {selectedUser.displayName}
+                {selectedUser.age ? `, ${selectedUser.age}` : ''}
+              </h2>
+              
+              {(selectedUser.city || selectedUser.country) && (
+                <div className='flex items-center gap-1 text-white/80 mt-1'>
+                  <MapPin className='w-4 h-4' />
+                  <span>{[selectedUser.city, selectedUser.country].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+
+              {selectedUser.university && (
+                <div className='flex items-center gap-1 text-white/80 mt-1'>
+                  <GraduationCap className='w-4 h-4' />
+                  <span>{selectedUser.university}</span>
+                </div>
+              )}
+
+              {/* Bio */}
+              {selectedUser.bio && (
+                <p className='text-white/90 text-sm mt-3 line-clamp-3'>{selectedUser.bio}</p>
+              )}
+
+              {/* Interests */}
+              {selectedUser.interests && selectedUser.interests.length > 0 && (
+                <div className='flex flex-wrap gap-2 mt-3'>
+                  {selectedUser.interests.filter(Boolean).slice(0, 5).map((interest, index) => (
+                    <Badge
+                      key={`${interest}-${index}`}
+                      className='bg-white/20 backdrop-blur-sm text-white border-0'
+                    >
+                      {interest}
+                    </Badge>
+                  ))}
+                  {selectedUser.interests.length > 5 && (
+                    <Badge className='bg-white/20 backdrop-blur-sm text-white border-0'>
+                      +{selectedUser.interests.length - 5}
+                    </Badge>
                   )}
                 </div>
-              </div>
+              )}
 
-              {/* Content */}
-              <div className='p-4 overflow-y-auto max-h-[calc(85vh-256px)]'>
-                {/* Action Buttons */}
-                <div className='flex gap-3 mb-6'>
-                  {selectedUser.isMatched ? (
+              {/* Action buttons */}
+              <div className='flex gap-3 mt-4'>
+                {selectedUser.isMatched ? (
+                  <Button
+                    onClick={() => {
+                      if (selectedUser.matchId && onStartChat) {
+                        onStartChat(
+                          selectedUser.matchId,
+                          selectedUser.displayName,
+                          selectedUser.photo,
+                          selectedUser.id
+                        );
+                        setSelectedUser(null);
+                      }
+                    }}
+                    className='flex-1 bg-frinder-orange hover:bg-frinder-burnt h-14 text-lg'
+                  >
+                    <MessageCircle className='w-6 h-6 mr-2' />
+                    Message
+                  </Button>
+                ) : selectedUser.swipeStatus === 'right' || selectedUser.swipeStatus === 'superlike' ? (
+                  <Button
+                    variant='outline'
+                    onClick={() => handleCancelRequest(selectedUser)}
+                    disabled={cancelingRequest === selectedUser.id}
+                    className='flex-1 h-14 text-lg bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20'
+                  >
+                    {cancelingRequest === selectedUser.id ? (
+                      <Loader2 className='w-6 h-6 animate-spin' />
+                    ) : (
+                      <>
+                        <X className='w-6 h-6 mr-2' />
+                        Cancel Request
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <>
                     <Button
-                      onClick={() => {
-                        if (selectedUser.matchId && onStartChat) {
-                          onStartChat(
-                            selectedUser.matchId,
-                            selectedUser.displayName,
-                            selectedUser.photo,
-                            selectedUser.id
-                          );
-                          setSelectedUser(null);
-                        }
-                      }}
-                      className='flex-1 bg-frinder-orange hover:bg-frinder-burnt h-12'
+                      onClick={() => handleSendRequest(selectedUser)}
+                      disabled={sendingRequest === selectedUser.id}
+                      className='flex-1 bg-frinder-orange hover:bg-frinder-burnt h-14 text-lg'
                     >
-                      <MessageCircle className='w-5 h-5 mr-2' />
-                      Message
-                    </Button>
-                  ) : selectedUser.swipeStatus === 'right' || selectedUser.swipeStatus === 'superlike' ? (
-                    <Button
-                      variant='outline'
-                      onClick={() => handleCancelRequest(selectedUser)}
-                      disabled={cancelingRequest === selectedUser.id}
-                      className='flex-1 h-12 text-red-500 border-red-300 hover:bg-red-50 dark:hover:bg-red-950'
-                    >
-                      {cancelingRequest === selectedUser.id ? (
-                        <Loader2 className='w-5 h-5 animate-spin' />
+                      {sendingRequest === selectedUser.id ? (
+                        <Loader2 className='w-6 h-6 animate-spin' />
                       ) : (
                         <>
-                          <X className='w-5 h-5 mr-2' />
-                          Cancel Request
+                          <Heart className='w-6 h-6 mr-2' />
+                          Like
                         </>
                       )}
                     </Button>
-                  ) : (
-                    <>
-                      <Button
-                        onClick={() => handleSendRequest(selectedUser)}
-                        disabled={sendingRequest === selectedUser.id}
-                        className='flex-1 bg-frinder-orange hover:bg-frinder-burnt h-12'
-                      >
-                        {sendingRequest === selectedUser.id ? (
-                          <Loader2 className='w-5 h-5 animate-spin' />
-                        ) : (
-                          <>
-                            <Heart className='w-5 h-5 mr-2' />
-                            Send Like
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant='outline'
-                        onClick={() => handleSendRequest(selectedUser)}
-                        disabled={sendingRequest === selectedUser.id}
-                        className='h-12 px-4 border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                      >
-                        <Star className='w-5 h-5' fill='currentColor' />
-                      </Button>
-                    </>
+                    <Button
+                      variant='outline'
+                      onClick={() => handleSendRequest(selectedUser)}
+                      disabled={sendingRequest === selectedUser.id}
+                      className='h-14 px-6 bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20'
+                    >
+                      <Star className='w-6 h-6' fill='currentColor' />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className='h-full flex flex-col dark:bg-black overflow-hidden'>
+      {/* Scrollable content area */}
+      <div className='flex-1 overflow-y-auto'>
+        {/* Header - part of scrollable content */}
+        <div className='px-4 pt-4 pb-3'>
+          <div className='flex items-center justify-between'>
+            <h1 className='text-2xl font-bold dark:text-white'>Explore</h1>
+            <Button
+              variant='ghost'
+              size='icon'
+              onClick={() => {
+                setTempFilters(filters);
+                setShowFilters(true);
+              }}
+              className='relative'
+            >
+              <SlidersHorizontal className='w-5 h-5' />
+              {hasActiveFilters && (
+                <span className='absolute -top-1 -right-1 w-2 h-2 rounded-full bg-frinder-orange' />
+              )}
+            </Button>
+          </div>
+
+          {/* Active filters as removable pills */}
+          {hasActiveFilters && (
+          <div className='flex flex-wrap gap-2 mt-3 overflow-x-auto pb-1'>
+            {filters.name && (
+              <Badge
+                variant='secondary'
+                className='bg-zinc-800 text-white border-0 pr-1 flex items-center gap-1'
+              >
+                <span>"{filters.name}"</span>
+                <button onClick={() => removeFilter('name')} className='p-0.5 hover:bg-white/20 rounded-full'>
+                  <X className='w-3 h-3' />
+                </button>
+              </Badge>
+            )}
+            {(filters.ageMin !== null || filters.ageMax !== null) && (
+              <Badge
+                variant='secondary'
+                className='bg-zinc-800 text-white border-0 pr-1 flex items-center gap-1'
+              >
+                <span>{filters.ageMin || 18}-{filters.ageMax || 99} y.o.</span>
+                <button onClick={() => removeFilter('age')} className='p-0.5 hover:bg-white/20 rounded-full'>
+                  <X className='w-3 h-3' />
+                </button>
+              </Badge>
+            )}
+            {filters.university && (
+              <Badge
+                variant='secondary'
+                className='bg-zinc-800 text-white border-0 pr-1 flex items-center gap-1'
+              >
+                <span>{filters.university}</span>
+                <button onClick={() => removeFilter('university')} className='p-0.5 hover:bg-white/20 rounded-full'>
+                  <X className='w-3 h-3' />
+                </button>
+              </Badge>
+            )}
+            {filters.interests.map(interest => (
+              <Badge
+                key={interest}
+                variant='secondary'
+                className='bg-zinc-800 text-white border-0 pr-1 flex items-center gap-1'
+              >
+                <span>{interest}</span>
+                <button onClick={() => removeFilter('interest', interest)} className='p-0.5 hover:bg-white/20 rounded-full'>
+                  <X className='w-3 h-3' />
+                </button>
+              </Badge>
+            ))}
+            {filters.notMatched && (
+              <Badge
+                variant='secondary'
+                className='bg-zinc-800 text-white border-0 pr-1 flex items-center gap-1'
+              >
+                <span>Not Matched</span>
+                <button onClick={() => removeFilter('notMatched')} className='p-0.5 hover:bg-white/20 rounded-full'>
+                  <X className='w-3 h-3' />
+                </button>
+              </Badge>
+            )}
+          </div>
+        )}
+        </div>
+
+        {/* Results Grid - continuous with header */}
+        <div className='px-2 pb-24'>
+          {initialLoading ? (
+            <div className='flex items-center justify-center h-48'>
+              <Loader2 className='w-8 h-8 animate-spin text-frinder-orange' />
+            </div>
+          ) : results.length > 0 ? (
+            <div className='grid grid-cols-2 gap-2'>
+              {results.map(result => (
+              <motion.div
+                key={result.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className='relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer'
+                onClick={() => setSelectedUser(result)}
+              >
+                {result.photo ? (
+                  <img
+                    src={result.photo}
+                    alt={result.displayName}
+                    className='w-full h-full object-cover'
+                  />
+                ) : (
+                  <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(result.displayName)}`}>
+                    <User className='w-16 h-16 text-white/80' />
+                  </div>
+                )}
+                
+                {/* Gradient overlay */}
+                <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent' />
+                
+                {/* Match indicator */}
+                {result.isMatched && (
+                  <div className='absolute top-2 right-2'>
+                    <Sparkles className='w-5 h-5 text-frinder-orange drop-shadow-lg' />
+                  </div>
+                )}
+
+                {/* Pending indicator */}
+                {(result.swipeStatus === 'right' || result.swipeStatus === 'superlike') && !result.isMatched && (
+                  <div className='absolute top-2 right-2'>
+                    <Heart className='w-5 h-5 text-frinder-orange fill-frinder-orange drop-shadow-lg' />
+                  </div>
+                )}
+                
+                {/* Name and age */}
+                <div className='absolute bottom-0 left-0 right-0 p-3'>
+                  <h3 className='text-white font-semibold text-lg leading-tight'>
+                    {result.displayName.split(' ')[0]}
+                  </h3>
+                  {result.age && (
+                    <span className='text-white/80 text-sm'>{result.age}</span>
                   )}
                 </div>
 
-                {/* Looking For */}
-                {selectedUser.lookingFor && (
-                  <div className='mb-6'>
-                    <h3 className='font-semibold dark:text-white mb-2'>Looking For</h3>
-                    <Badge className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'>
-                      <Users className='w-3 h-3 mr-1.5' />
-                      {selectedUser.lookingFor === 'people' && 'People to meet'}
-                      {selectedUser.lookingFor === 'groups' && 'Groups to join'}
-                      {selectedUser.lookingFor === 'both' && 'People & Groups'}
-                    </Badge>
-                  </div>
-                )}
-
-                {/* Bio */}
-                {selectedUser.bio && (
-                  <div className='mb-6'>
-                    <h3 className='font-semibold dark:text-white mb-2'>About</h3>
-                    <p className='text-muted-foreground text-sm leading-relaxed'>{selectedUser.bio}</p>
-                  </div>
-                )}
-
-                {/* Interests */}
-                {selectedUser.interests && selectedUser.interests.length > 0 && (
-                  <div className='mb-6'>
-                    <h3 className='font-semibold dark:text-white mb-2'>Interests</h3>
-                    <div className='flex flex-wrap gap-2'>
-                      {selectedUser.interests.filter(Boolean).map((interest, index) => (
-                        <Badge
-                          key={`${interest}-${index}`}
-                          className='bg-frinder-orange/10 text-frinder-orange border border-frinder-orange/20'
-                        >
-                          {interest}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Photos Gallery */}
-                {selectedUser.photos.length > 1 && (
-                  <div>
-                    <h3 className='font-semibold dark:text-white mb-2'>Photos</h3>
-                    <div className='grid grid-cols-3 gap-2'>
-                      {selectedUser.photos.slice(1).map((photo, index) => (
-                        <div key={index} className='aspect-square rounded-xl overflow-hidden'>
-                          <img src={photo} alt={`Photo ${index + 2}`} className='w-full h-full object-cover' />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Header */}
-      <div className='px-4 pt-4 pb-3 border-b dark:border-frinder-orange/20 bg-white dark:bg-black'>
-        <div className='flex items-center gap-2 mb-4'>
-          <SearchIcon className='w-6 h-6 text-frinder-orange' />
-          <h1 className='text-xl font-bold dark:text-white'>Find People</h1>
-        </div>
-
-        {/* Search Input */}
-        <div className='relative'>
-          <SearchIcon className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
-          <Input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder='Search by name or city...'
-            className='pl-10 dark:bg-black dark:border-frinder-orange/20'
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
-            >
-              <X className='w-4 h-4' />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Results */}
-      <div className='flex-1 overflow-y-auto p-4'>
-        {loading ? (
-          <div className='flex items-center justify-center h-48'>
-            <Loader2 className='w-8 h-8 animate-spin text-frinder-orange' />
-          </div>
-        ) : results.length > 0 ? (
-          <div className='space-y-3'>
-            {results.map(result => (
-              <motion.div key={result.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <Card
-                  className='overflow-hidden cursor-pointer hover:shadow-lg transition-shadow dark:bg-black dark:border-frinder-orange/20'
-                  onClick={() => setSelectedUser(result)}
+                {/* Like button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!result.isMatched && result.swipeStatus === 'none') {
+                      handleSendRequest(result);
+                    }
+                  }}
+                  className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center transition-all
+                    ${result.isMatched || result.swipeStatus !== 'none' 
+                      ? 'bg-white/20 backdrop-blur-sm' 
+                      : 'bg-white/90 hover:bg-white'}`}
+                  disabled={result.isMatched || result.swipeStatus !== 'none' || sendingRequest === result.id}
                 >
-                  <CardContent className='p-3'>
-                    <div className='flex items-center gap-3'>
-                      <div className='relative'>
-                        <UserAvatar
-                          src={result.photo}
-                          name={result.displayName}
-                          className='w-14 h-14'
-                          showInitial={!!result.photo}
-                        />
-                        {result.isMatched && (
-                          <span className='absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-frinder-orange flex items-center justify-center'>
-                            <Sparkles className='w-3 h-3 text-white' />
-                          </span>
-                        )}
-                      </div>
-                      <div className='flex-1 min-w-0'>
-                        <div className='flex items-center gap-2'>
-                          <h3 className='font-semibold dark:text-white truncate'>
-                            {result.displayName}
-                            {result.age ? `, ${result.age}` : ''}
-                          </h3>
-                          {result.isMatched && (
-                            <Badge className='bg-frinder-orange/10 text-frinder-orange text-xs'>Matched</Badge>
-                          )}
-                        </div>
-                        {(result.city || result.country) && (
-                          <div className='flex items-center gap-1 text-muted-foreground text-sm'>
-                            <MapPin className='w-3 h-3' />
-                            <span className='truncate'>{[result.city, result.country].filter(Boolean).join(', ')}</span>
-                          </div>
-                        )}
-                        {result.bio && <p className='text-xs text-muted-foreground truncate mt-0.5'>{result.bio}</p>}
-                      </div>
-                      {getActionButton(result)}
-                    </div>
-                  </CardContent>
-                </Card>
+                  {sendingRequest === result.id ? (
+                    <Loader2 className='w-5 h-5 animate-spin text-frinder-orange' />
+                  ) : (
+                    <Heart
+                      className={`w-5 h-5 ${
+                        result.isMatched || result.swipeStatus !== 'none'
+                          ? 'text-frinder-orange fill-frinder-orange'
+                          : 'text-zinc-400'
+                      }`}
+                    />
+                  )}
+                </button>
               </motion.div>
             ))}
-          </div>
-        ) : searchQuery ? (
-          <div className='flex flex-col items-center justify-center h-48 text-center'>
-            <SearchIcon className='w-12 h-12 text-muted-foreground mb-3' />
-            <p className='text-muted-foreground'>No users found matching "{searchQuery}"</p>
           </div>
         ) : (
           <div className='flex flex-col items-center justify-center h-48 text-center px-6'>
@@ -566,15 +647,139 @@ export default function Search({ onStartChat }: SearchProps) {
               animate={{ scale: 1 }}
               className='w-16 h-16 rounded-full bg-frinder-orange/10 flex items-center justify-center mb-4'
             >
-              <UserPlus className='w-8 h-8 text-frinder-orange' />
+              <SearchIcon className='w-8 h-8 text-frinder-orange' />
             </motion.div>
-            <h3 className='font-semibold dark:text-white mb-1'>Find New People</h3>
+            <h3 className='font-semibold dark:text-white mb-1'>No Results Found</h3>
             <p className='text-sm text-muted-foreground'>
-              Search by name or city to discover new people to connect with
+              {hasActiveFilters ? 'Try adjusting your filters' : 'No users available'}
             </p>
           </div>
         )}
+        </div>
       </div>
+
+      {/* Filter Sheet */}
+      <Sheet open={showFilters} onOpenChange={setShowFilters}>
+        <SheetContent side='bottom' className='h-[85vh] rounded-t-3xl dark:bg-zinc-900'>
+          <SheetHeader className='text-left'>
+            <SheetTitle className='text-xl'>Search & Filter</SheetTitle>
+          </SheetHeader>
+
+          <div className='mt-6 space-y-6 overflow-y-auto max-h-[calc(85vh-180px)] pb-4'>
+            {/* Name search */}
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>Search by Name</Label>
+              <div className='relative'>
+                <SearchIcon className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+                <Input
+                  value={tempFilters.name}
+                  onChange={e => setTempFilters(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder='Enter name...'
+                  className='pl-10 dark:bg-zinc-800 dark:border-zinc-700'
+                />
+              </div>
+            </div>
+
+            {/* Age range */}
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>Age Range</Label>
+              <div className='flex items-center gap-3'>
+                <Input
+                  type='number'
+                  value={tempFilters.ageMin ?? ''}
+                  onChange={e => setTempFilters(prev => ({ 
+                    ...prev, 
+                    ageMin: e.target.value ? parseInt(e.target.value) : null 
+                  }))}
+                  placeholder='Min'
+                  min={18}
+                  max={99}
+                  className='dark:bg-zinc-800 dark:border-zinc-700'
+                />
+                <span className='text-muted-foreground'>to</span>
+                <Input
+                  type='number'
+                  value={tempFilters.ageMax ?? ''}
+                  onChange={e => setTempFilters(prev => ({ 
+                    ...prev, 
+                    ageMax: e.target.value ? parseInt(e.target.value) : null 
+                  }))}
+                  placeholder='Max'
+                  min={18}
+                  max={99}
+                  className='dark:bg-zinc-800 dark:border-zinc-700'
+                />
+              </div>
+            </div>
+
+            {/* University */}
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>University</Label>
+              <div className='relative'>
+                <GraduationCap className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
+                <Input
+                  value={tempFilters.university}
+                  onChange={e => setTempFilters(prev => ({ ...prev, university: e.target.value }))}
+                  placeholder='Enter university...'
+                  className='pl-10 dark:bg-zinc-800 dark:border-zinc-700'
+                />
+              </div>
+            </div>
+
+            {/* Interests */}
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>Interests</Label>
+              <div className='flex flex-wrap gap-2'>
+                {AVAILABLE_INTERESTS.map(interest => (
+                  <Badge
+                    key={interest}
+                    variant={tempFilters.interests.includes(interest) ? 'default' : 'outline'}
+                    className={`cursor-pointer transition-all ${
+                      tempFilters.interests.includes(interest)
+                        ? 'bg-frinder-orange hover:bg-frinder-burnt text-white border-frinder-orange'
+                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 dark:border-zinc-700'
+                    }`}
+                    onClick={() => toggleInterest(interest)}
+                  >
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Not Matched filter */}
+            <div className='flex items-center justify-between py-2'>
+              <div>
+                <Label className='text-sm font-medium'>Not Matched Only</Label>
+                <p className='text-xs text-muted-foreground'>Show only people you haven't matched with</p>
+              </div>
+              <Switch
+                checked={tempFilters.notMatched}
+                onCheckedChange={(checked) => setTempFilters(prev => ({ ...prev, notMatched: checked }))}
+              />
+            </div>
+          </div>
+
+          {/* Floating action buttons - Dynamic Island style */}
+          <div className='absolute bottom-6 left-4 right-4 pointer-events-none'>
+            <div className='flex gap-3 p-3 bg-white/20 dark:bg-black/30 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl pointer-events-auto'>
+              <Button
+                variant='ghost'
+                onClick={handleClearFilters}
+                className='flex-1 h-12 text-black dark:text-white hover:bg-white/20'
+              >
+                Clear All
+              </Button>
+              <Button
+                onClick={handleApplyFilters}
+                className='flex-1 h-12 bg-frinder-orange hover:bg-frinder-burnt'
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
