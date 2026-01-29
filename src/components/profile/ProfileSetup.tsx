@@ -59,6 +59,31 @@ const COUNTRIES = [
   'Netherlands'
 ];
 
+const UNIVERSITIES = [
+  'University of Tirana',
+  'Polytechnic University of Tirana',
+  'Agricultural University of Tirana',
+  'University of Arts Tirana',
+  'Academy of Sports and Physical Education',
+  'University of Medicine Tirana',
+  'Aleksandër Moisiu University (Durrës)',
+  'Fan S. Noli University (Korçë)',
+  'Ismail Qemali University (Vlorë)',
+  'Luigj Gurakuqi University (Shkodër)',
+  'Aleksandër Xhuvani University (Elbasan)',
+  'Eqrem Çabej University (Gjirokastër)',
+  'Polis University',
+  'European University of Tirana',
+  'Epoka University',
+  'Canadian Institute of Technology',
+  'Albanian University',
+  'Metropolitan University of Tirana',
+  'University College Bedër',
+  'Marin Barleti University',
+  'Wisdom University',
+  'Other'
+];
+
 const CITIES: Record<string, string[]> = {
   Albania: ['Tirana', 'Durrës', 'Vlorë', 'Shkodër', 'Elbasan', 'Korçë', 'Fier', 'Berat'],
   Kosovo: ['Pristina', 'Prizren', 'Ferizaj', 'Peja', 'Gjakova', 'Mitrovica'],
@@ -90,6 +115,7 @@ export default function ProfileSetup() {
     gender: userProfile?.gender || ('other' as 'male' | 'female' | 'other'),
     country: userProfile?.country || '',
     city: userProfile?.city || '',
+    university: userProfile?.university || '',
     interests: userProfile?.interests || [],
     lookingFor: userProfile?.lookingFor || ('both' as 'people' | 'groups' | 'both'),
     photos: userProfile?.photos || ([] as string[])
@@ -354,6 +380,24 @@ export default function ProfileSetup() {
                               {city}
                             </SelectItem>
                           ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>University</Label>
+                    <Select
+                      value={formData.university}
+                      onValueChange={value => setFormData(prev => ({ ...prev, university: value }))}
+                    >
+                      <SelectTrigger className='h-12'>
+                        <SelectValue placeholder='Select your university' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNIVERSITIES.map(uni => (
+                          <SelectItem key={uni} value={uni}>
+                            {uni}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

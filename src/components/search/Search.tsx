@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search as SearchIcon,
   Heart,
@@ -32,6 +33,31 @@ import {
   cancelPendingRequest
 } from '@/lib/firebaseServices';
 import { toast } from 'sonner';
+
+const UNIVERSITIES = [
+  'University of Tirana',
+  'Polytechnic University of Tirana',
+  'Agricultural University of Tirana',
+  'University of Arts Tirana',
+  'Academy of Sports and Physical Education',
+  'University of Medicine Tirana',
+  'Aleksandër Moisiu University (Durrës)',
+  'Fan S. Noli University (Korçë)',
+  'Ismail Qemali University (Vlorë)',
+  'Luigj Gurakuqi University (Shkodër)',
+  'Aleksandër Xhuvani University (Elbasan)',
+  'Eqrem Çabej University (Gjirokastër)',
+  'Polis University',
+  'European University of Tirana',
+  'Epoka University',
+  'Canadian Institute of Technology',
+  'Albanian University',
+  'Metropolitan University of Tirana',
+  'University College Bedër',
+  'Marin Barleti University',
+  'Wisdom University',
+  'Other'
+];
 
 // Pre-defined interests for selection
 const AVAILABLE_INTERESTS = [
@@ -715,15 +741,25 @@ export default function Search({ onStartChat }: SearchProps) {
             {/* University */}
             <div className='space-y-2'>
               <Label className='text-sm font-medium'>University</Label>
-              <div className='relative'>
-                <GraduationCap className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
-                <Input
-                  value={tempFilters.university}
-                  onChange={e => setTempFilters(prev => ({ ...prev, university: e.target.value }))}
-                  placeholder='Enter university...'
-                  className='pl-10 dark:bg-zinc-800 dark:border-zinc-700'
-                />
-              </div>
+              <Select
+                value={tempFilters.university}
+                onValueChange={value => setTempFilters(prev => ({ ...prev, university: value }))}
+              >
+                <SelectTrigger className='dark:bg-zinc-800 dark:border-zinc-700'>
+                  <div className='flex items-center gap-2'>
+                    <GraduationCap className='w-4 h-4 text-muted-foreground' />
+                    <SelectValue placeholder='Select university...' />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=''>Any university</SelectItem>
+                  {UNIVERSITIES.map(uni => (
+                    <SelectItem key={uni} value={uni}>
+                      {uni}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Interests */}

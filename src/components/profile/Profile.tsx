@@ -65,9 +65,35 @@ import {
   CheckCircle,
   ArrowLeft,
   Lock,
-  Globe
+  Globe,
+  GraduationCap
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const UNIVERSITIES = [
+  'University of Tirana',
+  'Polytechnic University of Tirana',
+  'Agricultural University of Tirana',
+  'University of Arts Tirana',
+  'Academy of Sports and Physical Education',
+  'University of Medicine Tirana',
+  'Aleksandër Moisiu University (Durrës)',
+  'Fan S. Noli University (Korçë)',
+  'Ismail Qemali University (Vlorë)',
+  'Luigj Gurakuqi University (Shkodër)',
+  'Aleksandër Xhuvani University (Elbasan)',
+  'Eqrem Çabej University (Gjirokastër)',
+  'Polis University',
+  'European University of Tirana',
+  'Epoka University',
+  'Canadian Institute of Technology',
+  'Albanian University',
+  'Metropolitan University of Tirana',
+  'University College Bedër',
+  'Marin Barleti University',
+  'Wisdom University',
+  'Other'
+];
 
 type ProfileProps = {
   onGoToShop?: () => void;
@@ -130,6 +156,7 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
     gender: userProfile?.gender || ('other' as 'male' | 'female' | 'other'),
     city: userProfile?.city || '',
     country: userProfile?.country || '',
+    university: userProfile?.university || '',
     relationshipGoal: userProfile?.relationshipGoal || ('relationship' as 'relationship' | 'casual' | 'friends')
   });
 
@@ -745,6 +772,28 @@ export default function Profile({ onGoToShop, onBack }: ProfileProps) {
                           className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
                         />
                       </div>
+                    </div>
+
+                    <div className='space-y-1.5 sm:space-y-2'>
+                      <Label className='dark:text-white flex items-center gap-2'>
+                        <GraduationCap className='w-4 h-4' />
+                        University
+                      </Label>
+                      <Select
+                        value={editData.university}
+                        onValueChange={value => setEditData(prev => ({ ...prev, university: value }))}
+                      >
+                        <SelectTrigger className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'>
+                          <SelectValue placeholder='Select your university' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIVERSITIES.map(uni => (
+                            <SelectItem key={uni} value={uni}>
+                              {uni}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className='space-y-1.5 sm:space-y-2'>

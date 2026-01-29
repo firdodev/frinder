@@ -139,7 +139,8 @@ export async function releaseUsername(username: string): Promise<void> {
 export async function getUsersToSwipe(
   currentUserId: string,
   currentUserProfile?: UserProfile,
-  limitCount: number = 20
+  limitCount: number = 20,
+  university?: string
 ): Promise<UserProfile[]> {
   try {
     // Get users the current user has already swiped on
@@ -199,13 +200,23 @@ export async function getUsersToSwipe(
       // Users you disliked will show up again in the feed
     });
 
-    // Get all users with complete profiles
+    // Get all users with complete profiles, optionally filter by university
     const usersRef = collection(db, 'users');
-    const usersQuery = query(
-      usersRef,
-      where('isProfileComplete', '==', true),
-      limit(100) // Fetch more to filter
-    );
+    let usersQuery;
+    if (university) {
+      usersQuery = query(
+        usersRef,
+        where('isProfileComplete', '==', true),
+        where('university', '==', university),
+        limit(100)
+      );
+    } else {
+      usersQuery = query(
+        usersRef,
+        where('isProfileComplete', '==', true),
+        limit(100)
+      );
+    }
     const usersSnapshot = await getDocs(usersQuery);
 
     let users: UserProfile[] = [];
@@ -215,8 +226,6 @@ export async function getUsersToSwipe(
         users.push(userData);
       }
     });
-
-    // No filters applied - show all users regardless of gender, location, or interests
 
     return users.slice(0, limitCount);
   } catch (error) {
@@ -1120,6 +1129,20 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
 }
 
 // Delete a group (admin only) - deletes group, all messages, and associated data
+// Auto-delete expired temporary groups (to be called periodically)
+export async function deleteExpiredTemporaryGroups(): Promise<number> {
+  const now = Date.now();
+  const groupsRef = collection(db, 'groups');
+  // Query for temporary groups with endTime in the past
+  const expiredQuery = query(groupsRef, where('isTemporary', '==', true), where('endTime', '<', now));
+  const expiredSnapshot = await getDocs(expiredQuery);
+  let deletedCount = 0;
+  for (const docSnap of expiredSnapshot.docs) {
+    await deleteDoc(docSnap.ref);
+    deletedCount++;
+  }
+  return deletedCount;
+}
 export async function deleteGroup(groupId: string, adminId: string): Promise<void> {
   try {
     const groupDoc = await getDoc(doc(db, 'groups', groupId));

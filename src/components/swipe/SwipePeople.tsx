@@ -24,7 +24,8 @@ import {
   Flame,
   SlidersHorizontal,
   Lock,
-  Plus
+  Plus,
+  GraduationCap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -1498,7 +1499,9 @@ export default function SwipePeople({ onGoToShop, onGoToProfile, onOpenGroupChat
 
       try {
         setLoading(true);
-        const users = await getUsersToSwipe(user.uid, userProfile);
+        // Pass university filter if Uni tab is active and user has university
+        const universityFilter = activeTab === 'nearby' && userProfile.university ? userProfile.university : undefined;
+        const users = await getUsersToSwipe(user.uid, userProfile, 20, universityFilter);
 
         // Import story function
         const { getActiveStoryForUser } = await import('@/lib/firebaseServices');
@@ -1565,7 +1568,7 @@ export default function SwipePeople({ onGoToShop, onGoToProfile, onOpenGroupChat
     }
 
     loadProfiles();
-  }, [user?.uid, userProfile]);
+  }, [user?.uid, userProfile, activeTab]);
 
   // Filter profiles based on active tab
   useEffect(() => {

@@ -190,6 +190,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
   const [lastAction, setLastAction] = useState<{ group: Group; direction: string } | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showMyGroups, setShowMyGroups] = useState(true);
+  const [activeTab, setActiveTab] = useState<'all' | 'temporary' | 'my'>('all');
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState({
     name: '',
@@ -197,7 +198,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
     interests: [] as string[],
     activity: '',
     location: '',
-    isPrivate: false
+    isPrivate: false,
+    isTemporary: false,
+    maxMembers: 10,
+    endTime: ''
   });
   const [creating, setCreating] = useState(false);
   const [customInterest, setCustomInterest] = useState('');
@@ -307,7 +311,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
           activity: g.activity || 'Weekly meetups',
           location: g.location,
           isPrivate: g.isPrivate || false,
-          creatorId: g.creatorId
+          creatorId: g.creatorId,
+          isTemporary: g.isTemporary || false,
+          maxMembers: g.maxMembers || 10,
+          endTime: g.endTime || null
         }));
 
         setGroups(mappedGroups);
@@ -418,15 +425,18 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
         activity: newGroup.activity,
         location: newGroup.location,
         photo: '',
-        isPrivate: newGroup.isPrivate
+        isPrivate: newGroup.isPrivate,
+        isTemporary: newGroup.isTemporary,
+        maxMembers: newGroup.isTemporary ? newGroup.maxMembers : undefined,
+        endTime: newGroup.isTemporary ? newGroup.endTime : undefined
       });
 
-      toast.success('Group created!', {
+      toast.success(newGroup.isTemporary ? 'Temporary group created!' : 'Group created!', {
         description: newGroup.isPrivate ? 'Your private group has been created.' : 'Your public group has been created.'
       });
 
       setShowCreateDialog(false);
-      setNewGroup({ name: '', description: '', interests: [], activity: '', location: '', isPrivate: false });
+      setNewGroup({ name: '', description: '', interests: [], activity: '', location: '', isPrivate: false, isTemporary: false, maxMembers: 10, endTime: '' });
       setCustomInterest('');
     } catch (error) {
       console.error('Error creating group:', error);
@@ -590,8 +600,26 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
     );
   }
 
+  // Tab UI
+  const filteredGroups = activeTab === 'temporary'
+    ? groups.filter(g => {
+        const isExpired = g.endTime && new Date(g.endTime).getTime() <= Date.now();
+        const isFull = g.maxMembers && g.members.length >= g.maxMembers;
+        return g.isTemporary && !isExpired && !isFull;
+      })
+    : activeTab === 'my'
+      ? myGroups
+      : activeTab === 'discover'
+        ? groups.filter(g => !g.isTemporary)
+        : groups;
+
   return (
     <div className='h-full flex flex-col'>
+      <div className='flex gap-2 justify-center py-4'>
+        <Button variant={activeTab === 'my' ? 'default' : 'outline'} onClick={() => setActiveTab('my')}>My Groups</Button>
+        <Button variant={activeTab === 'discover' ? 'default' : 'outline'} onClick={() => setActiveTab('discover')}>Discover</Button>
+        <Button variant={activeTab === 'temporary' ? 'default' : 'outline'} onClick={() => setActiveTab('temporary')}>Temporary</Button>
+      </div>
       {/* Create Group Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-frinder-orange/20'>
@@ -624,6 +652,50 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
               />
             </div>
+
+            {/* Temporary Group Toggle */}
+            <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-black mb-2'>
+              <div className='flex items-center gap-3'>
+                <Switch
+                  checked={newGroup.isTemporary}
+                  onCheckedChange={(checked) => setNewGroup({ ...newGroup, isTemporary: checked })}
+                />
+                <div>
+                  <p className='font-medium dark:text-white'>Temporary Group</p>
+                  <p className='text-xs text-muted-foreground'>Swipe to join, auto-deletes at end time</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Max Members for Temporary Groups */}
+            {newGroup.isTemporary && (
+              <div>
+                <Label htmlFor='maxMembers' className='dark:text-white'>Max People</Label>
+                <Input
+                  id='maxMembers'
+                  type='number'
+                  min={2}
+                  max={100}
+                  value={newGroup.maxMembers}
+                  onChange={e => setNewGroup({ ...newGroup, maxMembers: parseInt(e.target.value) })}
+                  placeholder='Max people in group'
+                  className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
+                />
+              </div>
+            )}
+            {/* End Time for Temporary Groups */}
+            {newGroup.isTemporary && (
+              <div>
+                <Label htmlFor='endTime' className='dark:text-white'>End Time <span className='text-red-500'>(group will be deleted)</span></Label>
+                <Input
+                  id='endTime'
+                  type='datetime-local'
+                  value={newGroup.endTime}
+                  onChange={e => setNewGroup({ ...newGroup, endTime: e.target.value })}
+                  className='dark:bg-black dark:border-frinder-orange/20 dark:text-white border-red-500'
+                />
+              </div>
+            )}
 
             {/* Privacy Toggle */}
             <div className='flex items-center justify-between p-4 rounded-lg bg-muted/50 dark:bg-black'>
@@ -744,10 +816,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
             <Button
               className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
               onClick={handleCreateGroup}
-              disabled={creating || !newGroup.name || !newGroup.description}
+              disabled={creating || !newGroup.name || !newGroup.description || (newGroup.isTemporary && (!newGroup.maxMembers || !newGroup.endTime))}
             >
               {creating ? <Loader2 className='w-4 h-4 animate-spin mr-2' /> : null}
-              Create Group
+              {newGroup.isTemporary ? 'Create Temporary Group' : 'Create Group'}
             </Button>
           </div>
         </DialogContent>
@@ -1081,6 +1153,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                             <div className='w-14 h-14 rounded-lg bg-muted dark:bg-black flex items-center justify-center'>
                               <Users className='w-6 h-6 text-muted-foreground' />
                             </div>
+                          )}
+                          {/* Badge for temporary group */}
+                          {group.isTemporary && (
+                            <span className='absolute top-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded'>Temporary</span>
                           )}
                         </button>
                         <button 
