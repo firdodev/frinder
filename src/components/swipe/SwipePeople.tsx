@@ -1023,7 +1023,10 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [newGroupMaxMembers, setNewGroupMaxMembers] = useState<number | undefined>(undefined);
   const [newGroupIsTemporary, setNewGroupIsTemporary] = useState(false);
-  const [newGroupEndTime, setNewGroupEndTime] = useState('');
+  const [newGroupEndDay, setNewGroupEndDay] = useState('');
+  const [newGroupEndMonth, setNewGroupEndMonth] = useState('');
+  const [newGroupEndHour, setNewGroupEndHour] = useState('');
+  const [newGroupEndMinute, setNewGroupEndMinute] = useState('');
 
   useEffect(() => {
     async function loadGroups() {
@@ -1155,17 +1158,20 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
         isPrivate: newGroupPrivate,
         maxMembers: newGroupMaxMembers,
         isTemporary: newGroupIsTemporary,
-        endTime: newGroupIsTemporary ? newGroupEndTime : undefined
+        endTime: newGroupIsTemporary && newGroupEndDay && newGroupEndMonth && newGroupEndHour && newGroupEndMinute ? `${new Date().getFullYear()}-${newGroupEndMonth}-${newGroupEndDay}T${newGroupEndHour}:${newGroupEndMinute}` : undefined
       });
       
-      // Add to my groups at the top
+      // Add to my groups at the top (include same attrs as normal groups)
       setMyGroups(prev => [{
         id: newGroupId,
         name: newGroupName.trim(),
         description: newGroupDescription.trim(),
-        photo: '',
+        photo: photoUrl || '',
         memberCount: 1,
         isPrivate: newGroupPrivate,
+        isTemporary: newGroupIsTemporary,
+        endTime: newGroupIsTemporary && newGroupEndDay && newGroupEndMonth && newGroupEndHour && newGroupEndMinute ? `${new Date().getFullYear()}-${newGroupEndMonth}-${newGroupEndDay}T${newGroupEndHour}:${newGroupEndMinute}` : undefined,
+        maxMembers: newGroupMaxMembers,
         isMember: true,
         creatorId: user.uid
       }, ...prev]);
@@ -1177,7 +1183,10 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
       setSelectedPhoto(null);
       setNewGroupMaxMembers(undefined);
       setNewGroupIsTemporary(false);
-      setNewGroupEndTime('');
+      setNewGroupEndDay('');
+      setNewGroupEndMonth('');
+      setNewGroupEndHour('');
+      setNewGroupEndMinute('');
       setShowCreateGroup(false);
       toast.success('Group created successfully!');
     } catch (error) {
@@ -1312,7 +1321,7 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
           )
         ) : viewMode === 'discover' ? (
           groups.length > 0 ? (
-            groups.map((group, index) => (
+            groups.filter(g => !g.isTemporary).map((group, index) => (
               <motion.div
                 key={group.id}
                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -1503,7 +1512,7 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
                     </div>
                     <input ref={photoInputRef} type='file' accept='image/*' onChange={(e) => { const f = e.target.files?.[0]; if (f) setSelectedPhoto(f); }} className='hidden' />
                     <div className='flex-1'>
-                      <p className='text-sm text-gray-400'>Upload a photo for your group. Recommended size: 400x400px</p>
+                      <p className='text-sm text-muted-foreground'>Upload a photo for your group. Recommended size: 400x400px</p>
                       {selectedPhoto && (
                         <button onClick={() => setSelectedPhoto(null)} className='text-xs text-red-400 hover:text-red-500 mt-1'>Remove selected photo</button>
                       )}
@@ -1512,24 +1521,24 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
                 </div>
 
                 <div>
-                  <label className='text-sm text-gray-400 mb-1.5 block'>Group Name</label>
+                  <label className='text-sm text-muted-foreground mb-1.5 block'>Group Name</label>
                   <input
                     type='text'
                     value={newGroupName}
                     onChange={(e) => setNewGroupName(e.target.value)}
                     placeholder='Enter group name...'
-                    className='w-full px-4 py-3 bg-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-frinder-orange'
+                    className='w-full px-4 py-3 bg-white/10 dark:bg-transparent rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-frinder-orange'
                   />
                 </div>
                 
                 <div>
-                  <label className='text-sm text-gray-400 mb-1.5 block'>Description</label>
+                  <label className='text-sm text-muted-foreground mb-1.5 block'>Description</label>
                   <textarea
                     value={newGroupDescription}
                     onChange={(e) => setNewGroupDescription(e.target.value)}
                     placeholder='What is this group about?'
                     rows={3}
-                    className='w-full px-4 py-3 bg-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-frinder-orange resize-none'
+                    className='w-full px-4 py-3 bg-white/10 dark:bg-transparent rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-frinder-orange resize-none'
                   />
                 </div>
                 
@@ -1541,40 +1550,79 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
                   <button
                     onClick={() => setNewGroupPrivate(!newGroupPrivate)}
                     className={`w-12 h-7 rounded-full transition-colors ${
-                      newGroupPrivate ? 'bg-frinder-orange' : 'bg-white/20'
+                      newGroupPrivate ? 'bg-frinder-orange' : 'bg-white/20 dark:bg-white/10'
                     }`}
                   >
                     <motion.div
                       animate={{ x: newGroupPrivate ? 22 : 2 }}
-                      className='w-5 h-5 bg-white rounded-full shadow'
+                      className='w-5 h-5 bg-white dark:bg-slate-700 rounded-full shadow'
                     />
                   </button>
                 </div>
                 <div className='flex items-center justify-between py-2'>
                   <div>
-                    <p className='text-white font-medium'>Temporary Group</p>
-                    <p className='text-sm text-gray-500'>Swipe to join, auto-deletes at end time</p>
+                    <p className='text-gray-900 dark:text-white font-medium'>Temporary Group</p>
+                    <p className='text-sm text-muted-foreground'>Swipe to join, auto-deletes at end time</p>
                   </div>
                   <Switch checked={newGroupIsTemporary} onCheckedChange={(v) => setNewGroupIsTemporary(!!v)} />
                 </div>
 
                 {newGroupIsTemporary && (
                   <div className='mt-2'>
-                    <label className='text-sm text-gray-400 mb-1.5 block'>End Time <span className='text-xs text-red-400'>(group will be deleted)</span></label>
-                    <input
-                      type='datetime-local'
-                      value={newGroupEndTime}
-                      onChange={(e) => setNewGroupEndTime(e.target.value)}
-                      className='w-full px-4 py-3 bg-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-frinder-orange'
-                    />
+                    <label className='text-sm text-muted-foreground mb-1.5 block'>End Date & Time <span className='text-xs text-red-400'>(group will be deleted)</span></label>
+                    <div className='flex gap-2'>
+                      <select
+                        value={newGroupEndDay}
+                        onChange={(e) => setNewGroupEndDay(e.target.value)}
+                        className='w-1/2 px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border'
+                      >
+                        <option value=''>Day</option>
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                          <option key={d} value={String(d).padStart(2, '0')}>{d}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={newGroupEndMonth}
+                        onChange={(e) => setNewGroupEndMonth(e.target.value)}
+                        className='w-1/3 px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border'
+                      >
+                        <option value=''>Month</option>
+                        {['01','02','03','04','05','06','07','08','09','10','11','12'].map((m, idx) => (
+                          <option key={m} value={m}>{new Date(0, idx).toLocaleString('en-GB', { month: 'long' })}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={newGroupEndHour}
+                        onChange={(e) => setNewGroupEndHour(e.target.value)}
+                        className='w-1/6 px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border'
+                      >
+                        <option value=''>HH</option>
+                        {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={newGroupEndMinute}
+                        onChange={(e) => setNewGroupEndMinute(e.target.value)}
+                        className='w-1/6 px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border'
+                      >
+                        <option value=''>MM</option>
+                        {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {newGroupEndDay && newGroupEndMonth && newGroupEndHour && newGroupEndMinute && (
+                      <p className='text-xs text-muted-foreground mt-2'>Ends: {new Date(`${new Date().getFullYear()}-${newGroupEndMonth}-${newGroupEndDay}T${newGroupEndHour}:${newGroupEndMinute}`).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                    )}
                   </div>
                 )}
                 <div className='flex items-center gap-3'>
-                  <label className='text-sm text-gray-400'>Maximum Users</label>
+                  <label className='text-sm text-muted-foreground'>Maximum Users</label>
                   <button
                     type='button'
                     onClick={() => setNewGroupMaxMembers(prev => prev === undefined ? 10 : undefined)}
-                    className={`flex items-center gap-2 px-3 py-1 rounded ${newGroupMaxMembers === undefined ? 'bg-frinder-orange text-white' : 'bg-white/10 text-white'}`}
+                    className={`flex items-center gap-2 px-3 py-1 rounded ${newGroupMaxMembers === undefined ? 'bg-frinder-orange text-white' : 'bg-white/10 dark:bg-transparent text-gray-900 dark:text-white'}`}
                   >
                     <input type='checkbox' checked={newGroupMaxMembers === undefined} readOnly className='mr-2' />
                     No limit
@@ -1586,22 +1634,22 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
                       max={200}
                       value={newGroupMaxMembers}
                       onChange={e => setNewGroupMaxMembers(parseInt(e.target.value || '2'))}
-                      className='w-28 px-3 py-2 bg-white/10 rounded text-white'
+                      className='w-28 px-3 py-2 bg-white/10 dark:bg-transparent rounded text-gray-900 dark:text-white border'
                     />
                   )}
                 </div>
               </div>
               
-              <div className='flex gap-3 mt-6'>
+                <div className='flex gap-3 mt-6'>
                 <button
                   onClick={() => setShowCreateGroup(false)}
-                  className='flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold'
+                  className='flex-1 py-3 rounded-xl bg-white/10 dark:bg-transparent text-gray-900 dark:text-white font-semibold'
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateGroup}
-                  disabled={!newGroupName.trim() || creating || (newGroupIsTemporary && !newGroupEndTime)}
+                  disabled={!newGroupName.trim() || creating || (newGroupIsTemporary && (!newGroupEndDay || !newGroupEndMonth || !newGroupEndHour || !newGroupEndMinute))}
                   className='flex-1 py-3 rounded-xl bg-frinder-orange text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2'
                 >
                   {creating ? (

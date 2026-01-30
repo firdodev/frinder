@@ -205,6 +205,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
     endTime: '',
     photo: ''
   });
+  const [newGroupEndDay, setNewGroupEndDay] = useState('');
+  const [newGroupEndMonth, setNewGroupEndMonth] = useState('');
+  const [newGroupEndHour, setNewGroupEndHour] = useState('');
+  const [newGroupEndMinute, setNewGroupEndMinute] = useState('');
   const [creating, setCreating] = useState(false);
   const [customInterest, setCustomInterest] = useState('');
   
@@ -445,6 +449,11 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
         setUploadingPhoto(false);
       }
 
+      // compute endTime using selected day/month and current year if temporary
+      const computedEndTime = newGroup.isTemporary && newGroupEndDay && newGroupEndMonth && newGroupEndHour && newGroupEndMinute
+        ? `${new Date().getFullYear()}-${newGroupEndMonth}-${newGroupEndDay}T${newGroupEndHour}:${newGroupEndMinute}`
+        : undefined;
+
       await createGroup(user.uid, {
         name: newGroup.name,
         description: newGroup.description,
@@ -455,7 +464,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
         isPrivate: newGroup.isPrivate,
         isTemporary: newGroup.isTemporary,
         maxMembers: newGroup.isTemporary ? newGroup.maxMembers : undefined,
-        endTime: newGroup.isTemporary ? newGroup.endTime : undefined
+        endTime: computedEndTime
       });
 
       toast.success(newGroup.isTemporary ? 'Temporary group created!' : 'Group created!', {
@@ -464,6 +473,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
 
       setShowCreateDialog(false);
       setNewGroup({ name: '', description: '', interests: [], activity: '', location: '', isPrivate: false, isTemporary: false, maxMembers: undefined, endTime: '', photo: '' });
+      setNewGroupEndDay('');
+      setNewGroupEndMonth('');
+      setNewGroupEndHour('');
+      setNewGroupEndMinute('');
       setSelectedPhoto(null);
       setCustomInterest('');
     } catch (error) {
@@ -794,17 +807,55 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                 />
               )}
             </div>
-            {/* End Time for Temporary Groups */}
+            {/* End Date for Temporary Groups (day & month; year defaults to current) */}
             {newGroup.isTemporary && (
               <div>
-                <Label htmlFor='endTime' className='dark:text-white'>End Time <span className='text-red-500'>(group will be deleted)</span></Label>
-                <Input
-                  id='endTime'
-                  type='datetime-local'
-                  value={newGroup.endTime}
-                  onChange={e => setNewGroup({ ...newGroup, endTime: e.target.value })}
-                  className='dark:bg-black dark:border-frinder-orange/20 dark:text-white border-red-500'
-                />
+                <Label className='dark:text-white'>End Date <span className='text-red-500'>(group will be deleted)</span></Label>
+                <div className='flex gap-2 mt-2'>
+                  <select
+                    value={newGroupEndDay}
+                    onChange={e => setNewGroupEndDay(e.target.value)}
+                    className='px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border w-24'
+                  >
+                    <option value=''>Day</option>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={String(d).padStart(2, '0')}>{d}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={newGroupEndMonth}
+                    onChange={e => setNewGroupEndMonth(e.target.value)}
+                    className='px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border w-28'
+                  >
+                    <option value=''>Month</option>
+                    {['01','02','03','04','05','06','07','08','09','10','11','12'].map((m, idx) => (
+                      <option key={m} value={m}>{new Date(0, idx).toLocaleString('en-GB', { month: 'long' })}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={newGroupEndHour}
+                    onChange={e => setNewGroupEndHour(e.target.value)}
+                    className='px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border w-16'
+                  >
+                    <option value=''>HH</option>
+                    {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={newGroupEndMinute}
+                    onChange={e => setNewGroupEndMinute(e.target.value)}
+                    className='px-3 py-2 bg-white/90 dark:bg-transparent rounded text-black dark:text-white border w-16'
+                  >
+                    <option value=''>MM</option>
+                    {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                {newGroupEndDay && newGroupEndMonth && newGroupEndHour && newGroupEndMinute && (
+                  <p className='text-xs text-muted-foreground mt-2'>Ends: {`${newGroupEndDay}/${newGroupEndMonth}/${new Date().getFullYear()} ${newGroupEndHour}:${newGroupEndMinute}`}</p>
+                )}
               </div>
             )}
 
@@ -927,7 +978,7 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
             <Button
               className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
               onClick={handleCreateGroup}
-              disabled={creating || !newGroup.name || !newGroup.description || (newGroup.isTemporary && !newGroup.endTime) || (newGroup.maxMembers !== undefined && (!newGroup.maxMembers || newGroup.maxMembers < 2))}
+              disabled={creating || !newGroup.name || !newGroup.description || (newGroup.isTemporary && (!newGroupEndDay || !newGroupEndMonth || !newGroupEndHour || !newGroupEndMinute)) || (newGroup.maxMembers !== undefined && (!newGroup.maxMembers || newGroup.maxMembers < 2))}
             >
               {creating ? <Loader2 className='w-4 h-4 animate-spin mr-2' /> : null}
               {newGroup.isTemporary ? 'Create Temporary Group' : 'Create Group'}
