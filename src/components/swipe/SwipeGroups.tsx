@@ -190,7 +190,8 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
   const [lastAction, setLastAction] = useState<{ group: Group; direction: string } | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showMyGroups, setShowMyGroups] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'temporary' | 'my'>('all');
+  // Only allow 'my', 'discover', 'temporary' as tab states
+  const [activeTab, setActiveTab] = useState<'my' | 'discover' | 'temporary'>('my');
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState({
     name: '',
@@ -200,8 +201,9 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
     location: '',
     isPrivate: false,
     isTemporary: false,
-    maxMembers: 10,
-    endTime: ''
+    maxMembers: undefined,
+    endTime: '',
+    photo: ''
   });
   const [creating, setCreating] = useState(false);
   const [customInterest, setCustomInterest] = useState('');
@@ -225,6 +227,13 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedPhoto(file);
+    }
+  };
 
   // Predefined interest tags for better algorithm matching
   const availableTags = [
@@ -418,13 +427,31 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
 
     try {
       setCreating(true);
+
+      let photoUrl = '';
+      if (selectedPhoto) {
+        setUploadingPhoto(true);
+        try {
+          const compressed = await compressImage(selectedPhoto);
+          const tempId = `new_${user.uid}_${Date.now()}`;
+          photoUrl = await uploadGroupPhoto(tempId, compressed);
+        } catch (error) {
+          console.error('Error uploading photo:', error);
+          toast.error('Failed to upload photo');
+          setUploadingPhoto(false);
+          setCreating(false);
+          return;
+        }
+        setUploadingPhoto(false);
+      }
+
       await createGroup(user.uid, {
         name: newGroup.name,
         description: newGroup.description,
         interests: newGroup.interests,
         activity: newGroup.activity,
         location: newGroup.location,
-        photo: '',
+        photo: photoUrl,
         isPrivate: newGroup.isPrivate,
         isTemporary: newGroup.isTemporary,
         maxMembers: newGroup.isTemporary ? newGroup.maxMembers : undefined,
@@ -436,7 +463,8 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
       });
 
       setShowCreateDialog(false);
-      setNewGroup({ name: '', description: '', interests: [], activity: '', location: '', isPrivate: false, isTemporary: false, maxMembers: 10, endTime: '' });
+      setNewGroup({ name: '', description: '', interests: [], activity: '', location: '', isPrivate: false, isTemporary: false, maxMembers: undefined, endTime: '', photo: '' });
+      setSelectedPhoto(null);
       setCustomInterest('');
     } catch (error) {
       console.error('Error creating group:', error);
@@ -609,16 +637,30 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
       })
     : activeTab === 'my'
       ? myGroups
-      : activeTab === 'discover'
-        ? groups.filter(g => !g.isTemporary)
-        : groups;
+      : groups.filter(g => !g.isTemporary);
 
   return (
     <div className='h-full flex flex-col'>
-      <div className='flex gap-2 justify-center py-4'>
-        <Button variant={activeTab === 'my' ? 'default' : 'outline'} onClick={() => setActiveTab('my')}>My Groups</Button>
-        <Button variant={activeTab === 'discover' ? 'default' : 'outline'} onClick={() => setActiveTab('discover')}>Discover</Button>
-        <Button variant={activeTab === 'temporary' ? 'default' : 'outline'} onClick={() => setActiveTab('temporary')}>Temporary</Button>
+      <div style={{background: 'red', color: 'white', textAlign: 'center', fontWeight: 'bold'}}>TEST: SwipeGroups Rendered</div>
+      <div className='flex w-full max-w-xl mx-auto mt-4 mb-6 rounded-full overflow-hidden border border-frinder-orange/30 bg-muted/50 dark:bg-black'>
+        <button
+          className={`flex-1 py-3 font-semibold transition-colors ${activeTab === 'my' ? 'bg-frinder-orange text-white' : 'bg-transparent text-frinder-orange hover:bg-frinder-orange/10'}`}
+          onClick={() => setActiveTab('my')}
+        >
+          My Groups
+        </button>
+        <button
+          className={`flex-1 py-3 font-semibold transition-colors ${activeTab === 'discover' ? 'bg-frinder-orange text-white' : 'bg-transparent text-frinder-orange hover:bg-frinder-orange/10'}`}
+          onClick={() => setActiveTab('discover')}
+        >
+          Discover
+        </button>
+        <button
+          className={`flex-1 py-3 font-semibold transition-colors ${activeTab === 'temporary' ? 'bg-frinder-orange text-white' : 'bg-transparent text-frinder-orange hover:bg-frinder-orange/10'}`}
+          onClick={() => setActiveTab('temporary')}
+        >
+          Temporary
+        </button>
       </div>
       {/* Create Group Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -628,6 +670,59 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
             <DialogDescription>Start a new group and invite others to join!</DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>
+            {/* Group Photo Adder */}
+            <div>
+              <Label className='dark:text-white'>Group Photo</Label>
+              <div className='mt-2 flex items-center gap-4'>
+                <div className='relative'>
+                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-black border-2 border-dashed border-gray-300 dark:border-gray-700'>
+                    {selectedPhoto ? (
+                      <img 
+                        src={URL.createObjectURL(selectedPhoto)} 
+                        alt='Preview' 
+                        className='w-full h-full object-cover'
+                      />
+                    ) : newGroup.photo ? (
+                      <img 
+                        src={newGroup.photo} 
+                        alt={newGroup.name} 
+                        className='w-full h-full object-cover'
+                      />
+                    ) : (
+                      <div className='w-full h-full flex items-center justify-center'>
+                        <Users className='w-10 h-10 text-muted-foreground' />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => photoInputRef.current?.click()}
+                    className='absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-frinder-orange text-white flex items-center justify-center shadow-lg hover:bg-frinder-burnt transition-colors'
+                  >
+                    <Camera className='w-4 h-4' />
+                  </button>
+                </div>
+                <input
+                  ref={photoInputRef}
+                  type='file'
+                  accept='image/*'
+                  onChange={handlePhotoSelect}
+                  className='hidden'
+                />
+                <div className='flex-1'>
+                  <p className='text-sm text-muted-foreground'>
+                    Upload a photo for your group. Recommended size: 400x400px
+                  </p>
+                  {selectedPhoto && (
+                    <button
+                      onClick={() => setSelectedPhoto(null)}
+                      className='text-xs text-red-500 hover:text-red-600 mt-1'
+                    >
+                      Remove selected photo
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div>
               <Label htmlFor='name' className='dark:text-white'>
                 Group Name
@@ -667,10 +762,26 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
               </div>
             </div>
 
-            {/* Max Members for Temporary Groups */}
-            {newGroup.isTemporary && (
-              <div>
-                <Label htmlFor='maxMembers' className='dark:text-white'>Max People</Label>
+            {/* Max Members for All Groups */}
+            <div className='flex items-center gap-3'>
+              <Label htmlFor='maxMembers' className='dark:text-white'>
+                Maximum Users
+              </Label>
+              <Button
+                type='button'
+                variant={newGroup.maxMembers === undefined ? 'default' : 'outline'}
+                className='flex items-center gap-2'
+                onClick={() => setNewGroup(prev => ({ ...prev, maxMembers: prev.maxMembers === undefined ? 10 : undefined }))}
+              >
+                <input
+                  type='checkbox'
+                  checked={newGroup.maxMembers === undefined}
+                  readOnly
+                  className='mr-2 accent-frinder-orange'
+                />
+                No limit
+              </Button>
+              {newGroup.maxMembers !== undefined && (
                 <Input
                   id='maxMembers'
                   type='number'
@@ -679,10 +790,10 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
                   value={newGroup.maxMembers}
                   onChange={e => setNewGroup({ ...newGroup, maxMembers: parseInt(e.target.value) })}
                   placeholder='Max people in group'
-                  className='dark:bg-black dark:border-frinder-orange/20 dark:text-white'
+                  className='dark:bg-black dark:border-frinder-orange/20 dark:text-white w-32'
                 />
-              </div>
-            )}
+              )}
+            </div>
             {/* End Time for Temporary Groups */}
             {newGroup.isTemporary && (
               <div>
@@ -816,80 +927,23 @@ export default function SwipeGroups({ onOpenGroupChat }: SwipeGroupsProps) {
             <Button
               className='w-full bg-frinder-orange hover:bg-frinder-burnt text-white'
               onClick={handleCreateGroup}
-              disabled={creating || !newGroup.name || !newGroup.description || (newGroup.isTemporary && (!newGroup.maxMembers || !newGroup.endTime))}
+              disabled={creating || !newGroup.name || !newGroup.description || (newGroup.isTemporary && !newGroup.endTime) || (newGroup.maxMembers !== undefined && (!newGroup.maxMembers || newGroup.maxMembers < 2))}
             >
               {creating ? <Loader2 className='w-4 h-4 animate-spin mr-2' /> : null}
               {newGroup.isTemporary ? 'Create Temporary Group' : 'Create Group'}
             </Button>
+
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Group Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={(open) => {
-        setShowEditDialog(open);
-        if (!open) setShowDeleteConfirm(false);
-      }}>
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto dark:bg-black dark:border-frinder-orange/20'>
           <DialogHeader>
             <DialogTitle className='dark:text-white'>Edit Group</DialogTitle>
-            <DialogDescription>Customize your group settings and appearance</DialogDescription>
+            <DialogDescription>Edit your group details</DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>
-            {/* Group Photo */}
-            <div>
-              <Label className='dark:text-white'>Group Photo</Label>
-              <div className='mt-2 flex items-center gap-4'>
-                <div className='relative'>
-                  <div className='w-24 h-24 rounded-xl overflow-hidden bg-muted dark:bg-black border-2 border-dashed border-gray-300 dark:border-gray-700'>
-                    {selectedPhoto ? (
-                      <img 
-                        src={URL.createObjectURL(selectedPhoto)} 
-                        alt='Preview' 
-                        className='w-full h-full object-cover'
-                      />
-                    ) : editGroup.photo ? (
-                      <img 
-                        src={editGroup.photo} 
-                        alt={editGroup.name} 
-                        className='w-full h-full object-cover'
-                      />
-                    ) : (
-                      <div className='w-full h-full flex items-center justify-center'>
-                        <Users className='w-10 h-10 text-muted-foreground' />
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => editPhotoInputRef.current?.click()}
-                    className='absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-frinder-orange text-white flex items-center justify-center shadow-lg hover:bg-frinder-burnt transition-colors'
-                  >
-                    <Camera className='w-4 h-4' />
-                  </button>
-                </div>
-                <input
-                  ref={editPhotoInputRef}
-                  type='file'
-                  accept='image/*'
-                  onChange={handleEditPhotoSelect}
-                  className='hidden'
-                />
-                <div className='flex-1'>
-                  <p className='text-sm text-muted-foreground'>
-                    Upload a photo for your group. Recommended size: 400x400px
-                  </p>
-                  {selectedPhoto && (
-                    <button
-                      onClick={() => setSelectedPhoto(null)}
-                      className='text-xs text-red-500 hover:text-red-600 mt-1'
-                    >
-                      Remove selected photo
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
             <div>
               <Label htmlFor='edit-name' className='dark:text-white'>
                 Group Name

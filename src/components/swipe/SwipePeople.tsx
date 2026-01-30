@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo, useAnimation } from 'framer-motion';
 import {
   Heart,
@@ -27,8 +27,11 @@ import {
   Plus,
   GraduationCap
 } from 'lucide-react';
+import { Camera } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
 import { getAvatarColor } from '@/components/ui/user-avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1007,13 +1010,20 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
   const { user } = useAuth();
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [myGroups, setMyGroups] = useState<GroupItem[]>([]);
+  const [temporaryGroups, setTemporaryGroups] = useState<GroupItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'discover' | 'mygroups'>('mygroups');
+  const [viewMode, setViewMode] = useState<'discover' | 'mygroups' | 'temporary'>('mygroups');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDescription, setNewGroupDescription] = useState('');
   const [newGroupPrivate, setNewGroupPrivate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [newGroupMaxMembers, setNewGroupMaxMembers] = useState<number | undefined>(undefined);
+  const [newGroupIsTemporary, setNewGroupIsTemporary] = useState(false);
+  const [newGroupEndTime, setNewGroupEndTime] = useState('');
 
   useEffect(() => {
     async function loadGroups() {
@@ -1021,11 +1031,12 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
       try {
         setLoading(true);
         // Import and call the group functions
-        const { getGroupsToSwipe, getMyGroups } = await import('@/lib/firebaseServices');
-        
-        const [availableGroups, userGroups] = await Promise.all([
+        const { getGroupsToSwipe, getMyGroups, getTemporaryGroups } = await import('@/lib/firebaseServices');
+
+        const [availableGroups, userGroups, tempGroups] = await Promise.all([
           getGroupsToSwipe(user.uid),
-          getMyGroups ? getMyGroups(user.uid) : Promise.resolve([])
+          getMyGroups ? getMyGroups(user.uid) : Promise.resolve([]),
+          getTemporaryGroups ? getTemporaryGroups(user.uid) : Promise.resolve([])
         ]);
 
         setGroups(availableGroups.map((g: any) => ({
@@ -1036,7 +1047,8 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
           memberCount: g.members?.length || 0,
           isPrivate: g.isPrivate || false,
           isMember: false,
-          creatorId: g.creatorId
+          creatorId: g.creatorId,
+          isTemporary: g.isTemporary || false
         })));
 
         // Sort user groups - created by user first
@@ -1050,7 +1062,8 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
             isPrivate: g.isPrivate || false,
             lastMessage: g.lastMessage || '',
             isMember: true,
-            creatorId: g.creatorId
+            creatorId: g.creatorId,
+            isTemporary: g.isTemporary || false
           }))
           .sort((a: GroupItem, b: GroupItem) => {
             // Groups created by user come first
@@ -1062,6 +1075,25 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
           });
 
         setMyGroups(sortedUserGroups);
+        setTemporaryGroups(
+          (tempGroups || [])
+            .filter((g: any) => {
+              const isExpired = g.endTime && new Date(g.endTime).getTime() <= Date.now();
+              const isFull = g.maxMembers && g.members && g.members.length >= g.maxMembers;
+              return g.isTemporary && !isExpired && !isFull;
+            })
+            .map((g: any) => ({
+              id: g.id,
+              name: g.name,
+              description: g.description || '',
+              photo: g.photo || '',
+              memberCount: g.members?.length || 0,
+              isPrivate: g.isPrivate || false,
+              isMember: false,
+              creatorId: g.creatorId,
+              isTemporary: true
+            }))
+        );
       } catch (error) {
         console.error('Error loading groups:', error);
       } finally {
@@ -1095,14 +1127,35 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
     try {
       setCreating(true);
       const { createGroup } = await import('@/lib/firebaseServices');
+      let photoUrl = '';
+      if (selectedPhoto) {
+        setUploadingPhoto(true);
+        try {
+          const { compressImage, uploadGroupPhoto } = await import('@/lib/storageService');
+          const compressed = await compressImage(selectedPhoto);
+          const tempId = `new_${user.uid}_${Date.now()}`;
+          photoUrl = await uploadGroupPhoto(tempId, compressed);
+        } catch (err) {
+          console.error('Error uploading photo:', err);
+          toast.error('Failed to upload photo');
+          setUploadingPhoto(false);
+          setCreating(false);
+          return;
+        }
+        setUploadingPhoto(false);
+      }
+
       const newGroupId = await createGroup(user.uid, {
         name: newGroupName.trim(),
         description: newGroupDescription.trim(),
-        photo: '',
+        photo: photoUrl,
         activity: '',
         location: '',
         interests: [],
         isPrivate: newGroupPrivate,
+        maxMembers: newGroupMaxMembers,
+        isTemporary: newGroupIsTemporary,
+        endTime: newGroupIsTemporary ? newGroupEndTime : undefined
       });
       
       // Add to my groups at the top
@@ -1121,6 +1174,10 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
       setNewGroupName('');
       setNewGroupDescription('');
       setNewGroupPrivate(false);
+      setSelectedPhoto(null);
+      setNewGroupMaxMembers(undefined);
+      setNewGroupIsTemporary(false);
+      setNewGroupEndTime('');
       setShowCreateGroup(false);
       toast.success('Group created successfully!');
     } catch (error) {
@@ -1162,6 +1219,16 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
           }`}
         >
           Discover
+        </button>
+        <button
+          onClick={() => setViewMode('temporary')}
+          className={`flex-1 py-2 px-4 rounded-full text-sm font-semibold transition-all ${
+            viewMode === 'temporary'
+              ? 'bg-frinder-orange text-white'
+              : 'text-white/70'
+          }`}
+        >
+          Temporary
         </button>
       </div>
 
@@ -1243,7 +1310,7 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
               </button>
             </div>
           )
-        ) : (
+        ) : viewMode === 'discover' ? (
           groups.length > 0 ? (
             groups.map((group, index) => (
               <motion.div
@@ -1309,7 +1376,68 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
               <p className='text-gray-500 text-sm'>Check back later for new groups!</p>
             </div>
           )
-        )}
+        ) : viewMode === 'temporary' ? (
+          temporaryGroups.length > 0 ? (
+            temporaryGroups.map((group, index) => (
+              <motion.div
+                key={group.id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+                className='rounded-3xl overflow-hidden shadow-xl'
+                style={{
+                  background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                  border: '2px solid rgba(255, 138, 76, 0.3)',
+                }}
+              >
+                {/* Group Photo Section */}
+                <div className='relative h-32 overflow-hidden'>
+                  {group.photo ? (
+                    <img src={group.photo} alt={group.name} className='w-full h-full object-cover' />
+                  ) : (
+                    <div className='w-full h-full bg-gradient-to-br from-frinder-orange/30 to-frinder-orange/10 flex items-center justify-center'>
+                      <Users className='w-12 h-12 text-frinder-orange/70' />
+                    </div>
+                  )}
+                  {/* Gradient overlay */}
+                  <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
+                  {/* Temporary badge */}
+                  <div className='absolute top-3 right-3 p-1.5 bg-black/40 rounded-full backdrop-blur-sm'>
+                    <Flame className='w-3.5 h-3.5 text-orange-400' />
+                  </div>
+                  {/* Group name overlay */}
+                  <div className='absolute bottom-3 left-4 right-4'>
+                    <h3 className='font-bold text-white text-lg drop-shadow-lg'>{group.name}</h3>
+                  </div>
+                </div>
+                {/* Group Info Section */}
+                <div className='p-4 bg-black/20 backdrop-blur-sm'>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-gray-300 text-sm truncate'>{group.lastMessage || group.description}</p>
+                      <div className='flex items-center gap-2 mt-1.5'>
+                        <Users className='w-3.5 h-3.5 text-frinder-orange' />
+                        <span className='text-gray-400 text-xs'>{group.memberCount} members</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleJoinGroup(group.id)}
+                      className='px-5 py-2.5 bg-frinder-orange text-white rounded-full text-sm font-semibold flex-shrink-0 ml-3 shadow-lg hover:bg-frinder-orange/90 transition-colors'
+                    >
+                      Join
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <div className='text-center py-12'>
+              <Flame className='w-12 h-12 text-orange-400 mx-auto mb-3' />
+              <p className='text-gray-300'>No temporary groups</p>
+              <p className='text-gray-500 text-sm'>Check back later for new temporary groups!</p>
+            </div>
+          )
+        ) : null}
       </div>
 
       {/* Floating Plus Button - only in My Groups */}
@@ -1354,6 +1482,36 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
               
               <div className='space-y-4'>
                 <div>
+                  <Label className='text-sm text-gray-400 mb-1.5 block'>Group Photo</Label>
+                  <div className='mt-2 flex items-center gap-4'>
+                    <div className='relative'>
+                      <div className='w-24 h-24 rounded-xl overflow-hidden bg-white/5 border border-white/10'>
+                        {selectedPhoto ? (
+                          <img src={URL.createObjectURL(selectedPhoto)} alt='Preview' className='w-full h-full object-cover' />
+                        ) : (
+                          <div className='w-full h-full flex items-center justify-center text-gray-400'>
+                            <Users className='w-8 h-8' />
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => photoInputRef.current?.click()}
+                        className='absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-frinder-orange text-white flex items-center justify-center shadow-lg hover:bg-frinder-burnt transition-colors'
+                      >
+                        <Camera className='w-4 h-4' />
+                      </button>
+                    </div>
+                    <input ref={photoInputRef} type='file' accept='image/*' onChange={(e) => { const f = e.target.files?.[0]; if (f) setSelectedPhoto(f); }} className='hidden' />
+                    <div className='flex-1'>
+                      <p className='text-sm text-gray-400'>Upload a photo for your group. Recommended size: 400x400px</p>
+                      {selectedPhoto && (
+                        <button onClick={() => setSelectedPhoto(null)} className='text-xs text-red-400 hover:text-red-500 mt-1'>Remove selected photo</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
                   <label className='text-sm text-gray-400 mb-1.5 block'>Group Name</label>
                   <input
                     type='text'
@@ -1392,6 +1550,46 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
                     />
                   </button>
                 </div>
+                <div className='flex items-center justify-between py-2'>
+                  <div>
+                    <p className='text-white font-medium'>Temporary Group</p>
+                    <p className='text-sm text-gray-500'>Swipe to join, auto-deletes at end time</p>
+                  </div>
+                  <Switch checked={newGroupIsTemporary} onCheckedChange={(v) => setNewGroupIsTemporary(!!v)} />
+                </div>
+
+                {newGroupIsTemporary && (
+                  <div className='mt-2'>
+                    <label className='text-sm text-gray-400 mb-1.5 block'>End Time <span className='text-xs text-red-400'>(group will be deleted)</span></label>
+                    <input
+                      type='datetime-local'
+                      value={newGroupEndTime}
+                      onChange={(e) => setNewGroupEndTime(e.target.value)}
+                      className='w-full px-4 py-3 bg-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-frinder-orange'
+                    />
+                  </div>
+                )}
+                <div className='flex items-center gap-3'>
+                  <label className='text-sm text-gray-400'>Maximum Users</label>
+                  <button
+                    type='button'
+                    onClick={() => setNewGroupMaxMembers(prev => prev === undefined ? 10 : undefined)}
+                    className={`flex items-center gap-2 px-3 py-1 rounded ${newGroupMaxMembers === undefined ? 'bg-frinder-orange text-white' : 'bg-white/10 text-white'}`}
+                  >
+                    <input type='checkbox' checked={newGroupMaxMembers === undefined} readOnly className='mr-2' />
+                    No limit
+                  </button>
+                  {newGroupMaxMembers !== undefined && (
+                    <input
+                      type='number'
+                      min={2}
+                      max={200}
+                      value={newGroupMaxMembers}
+                      onChange={e => setNewGroupMaxMembers(parseInt(e.target.value || '2'))}
+                      className='w-28 px-3 py-2 bg-white/10 rounded text-white'
+                    />
+                  )}
+                </div>
               </div>
               
               <div className='flex gap-3 mt-6'>
@@ -1403,7 +1601,7 @@ function GroupsView({ onOpenGroupChat }: GroupsViewProps) {
                 </button>
                 <button
                   onClick={handleCreateGroup}
-                  disabled={!newGroupName.trim() || creating}
+                  disabled={!newGroupName.trim() || creating || (newGroupIsTemporary && !newGroupEndTime)}
                   className='flex-1 py-3 rounded-xl bg-frinder-orange text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2'
                 >
                   {creating ? (
